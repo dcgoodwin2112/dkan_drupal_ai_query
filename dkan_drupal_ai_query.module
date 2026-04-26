@@ -1,0 +1,68 @@
+<?php
+
+/**
+ * @file
+ * Hook implementations for dkan_drupal_ai_query.
+ */
+
+/**
+ * Implements hook_modules_installed().
+ *
+ * Auto-wires AI provider modules to our migrated Key entities the moment they
+ * become available. Idempotent and non-destructive: only fills in api_key when
+ * the provider's slot is empty, never overwrites an operator's choice. Skipped
+ * during config sync — imported config is the source of truth there.
+ */
+function dkan_drupal_ai_query_modules_installed(array $modules, bool $is_syncing): void {
+  if ($is_syncing) {
+    return;
+  }
+  $map = [
+    'ai_provider_anthropic' => [
+      'cfg' => 'ai_provider_anthropic.settings',
+      'key' => 'dkan_anthropic',
+    ],
+    'ai_provider_openai' => [
+      'cfg' => 'ai_provider_openai.settings',
+      'key' => 'dkan_openai',
+    ],
+  ];
+  $keyStorage = \Drupal::entityTypeManager()->getStorage('key');
+  $cfgFactory = \Drupal::configFactory();
+  foreach ($modules as $module) {
+    if (!isset($map[$module])) {
+      continue;
+    }
+    $info = $map[$module];
+    if (!$keyStorage->load($info['key'])) {
+      continue;
+    }
+    $cfg = $cfgFactory->getEditable($info['cfg']);
+    if ($cfg->get('api_key')) {
+      continue;
+    }
+    $cfg->set('api_key', $info['key'])->save();
+    \Drupal::logger('dkan_drupal_ai_query')->notice(
+      'Wired @module to Key entity @key.',
+      ['@module' => $module, '@key' => $info['key']]
+    );
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function dkan_drupal_ai_query_theme($existing, $type, $theme, $path) {
+  return [
+    'dkan_drupal_ai_query_test' => [
+      'variables' => [],
+      'template' => 'dkan-drupal-ai-query-test',
+    ],
+    'dkan_drupal_ai_query_widget' => [
+      'variables' => [
+        'dataset_id' => '',
+      ],
+      'template' => 'dkan-drupal-ai-query-widget',
+    ],
+  ];
+}

@@ -1,0 +1,6 @@
+dkan_drupal_ai_query.settings_form:
+  title: 'DKAN AI Query'
+  description: 'Default model and widget display settings for the DKAN AI Query widget.'
+  parent: system.admin_config_services
+  route_name: dkan_drupal_ai_query.settings_form
+  weight: 10

@@ -1,0 +1,66 @@
+services:
+  dkan_drupal_ai_query.schema_context_builder:
+    class: Drupal\dkan_drupal_ai_query\Service\SchemaContextBuilder
+    arguments:
+      - '@dkan_query_tools.metastore'
+      - '@dkan_query_tools.datastore'
+      - '@cache.default'
+
+  dkan_drupal_ai_query.resource_id_resolver:
+    class: Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver
+    arguments:
+      - '@dkan_query_tools.metastore'
+      - '@dkan_query_tools.datastore'
+
+  dkan_drupal_ai_query.artifact_storage:
+    class: Drupal\dkan_drupal_ai_query\Service\ArtifactStorage
+    arguments:
+      - '@tempstore.private'
+
+  dkan_drupal_ai_query.artifact_capture_subscriber:
+    class: Drupal\dkan_drupal_ai_query\EventSubscriber\ArtifactCaptureSubscriber
+    arguments:
+      - '@dkan_drupal_ai_query.artifact_storage'
+      - '@logger.channel.dkan_drupal_ai_query'
+      - '@dkan_drupal_ai_query.resource_id_resolver'
+    tags:
+      - { name: event_subscriber }
+
+  dkan_drupal_ai_query.conversation_storage:
+    class: Drupal\dkan_drupal_ai_query\Service\ConversationStorage
+    arguments:
+      - '@entity_type.manager'
+
+  dkan_drupal_ai_query.suggestion_generator:
+    class: Drupal\dkan_drupal_ai_query\Service\SuggestionGenerator
+    arguments:
+      - '@ai.provider'
+      - '@logger.channel.dkan_drupal_ai_query'
+
+  dkan_drupal_ai_query.controller:
+    class: Drupal\dkan_drupal_ai_query\Controller\NlQueryController
+    arguments:
+      - '@plugin.manager.ai_agents'
+      - '@ai.provider'
+      - '@ai_agents.agent_status_poller'
+      - '@dkan_drupal_ai_query.artifact_storage'
+      - '@dkan_drupal_ai_query.conversation_storage'
+      - '@current_user'
+      - '@logger.channel.dkan_drupal_ai_query'
+      - '@config.factory'
+      - '@dkan_drupal_ai_query.suggestion_generator'
+    tags:
+      - { name: 'controller.service_arguments' }
+
+  dkan_drupal_ai_query.conversation_controller:
+    class: Drupal\dkan_drupal_ai_query\Controller\ConversationController
+    arguments:
+      - '@dkan_drupal_ai_query.conversation_storage'
+      - '@current_user'
+    tags:
+      - { name: 'controller.service_arguments' }
+
+  logger.channel.dkan_drupal_ai_query:
+    class: Drupal\Core\Logger\LoggerChannel
+    factory: ['@logger.factory', 'get']
+    arguments: ['dkan_drupal_ai_query']
