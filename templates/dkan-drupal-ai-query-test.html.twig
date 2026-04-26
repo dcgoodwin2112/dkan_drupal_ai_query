@@ -1,0 +1,62 @@
+{#
+/**
+ * @file
+ * Phase 1 test page: submit a question and watch poll events arrive.
+ */
+#}
+<div class="dkan-aiq-test dkan-aiq-test--with-sidebar" data-dkan-aiq-test>
+  <aside class="dkan-aiq-test__sidebar">
+    <div class="dkan-aiq-test__sidebar-header">
+      <h3>Conversations</h3>
+      <button type="button" class="dkan-aiq-test__new-btn" data-new-btn>+ New</button>
+    </div>
+    <ul class="dkan-aiq-test__conv-list" data-conv-list></ul>
+  </aside>
+
+  <div class="dkan-aiq-test__main">
+  <p class="dkan-aiq-test__intro">
+    Phase 3 test for the <code>dkan_data_query</code> agent. Selecting a
+    conversation in the sidebar appends new turns to it; "+&nbsp;New" starts
+    a fresh conversation.
+  </p>
+  <p class="dkan-aiq-test__active" data-active-conv>(new conversation)</p>
+
+  <form class="dkan-aiq-test__form" data-form>
+    <label>
+      Question
+      <textarea name="question" rows="3" required>How many rows are in this resource?</textarea>
+    </label>
+    <label>
+      Resource ID hint (optional)
+      <input type="text" name="resource_id" placeholder="abc123__1773329007 or a dataset title" />
+    </label>
+    <label>
+      Model (optional, provider__model_id)
+      <input type="text" name="model" placeholder="anthropic__claude-haiku-4-5-20251001" />
+    </label>
+    <button type="submit">Run</button>
+  </form>
+
+  <section class="dkan-aiq-test__panel">
+    <h3>Status / events</h3>
+    <ol class="dkan-aiq-test__events" data-events></ol>
+  </section>
+
+  <section class="dkan-aiq-test__panel">
+    <h3>Final answer</h3>
+    <pre class="dkan-aiq-test__answer" data-answer>(pending)</pre>
+  </section>
+
+  <section class="dkan-aiq-test__panel">
+    <h3>Captured tables</h3>
+    <div class="dkan-aiq-test__tables" data-tables></div>
+  </section>
+
+  <section class="dkan-aiq-test__panel">
+    <h3>Captured charts</h3>
+    <div class="dkan-aiq-test__charts" data-charts></div>
+  </section>
+
+  <input type="hidden" data-conv-id value="" />
+  </div>
+</div>

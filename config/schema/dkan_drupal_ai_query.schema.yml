@@ -1,0 +1,30 @@
+dkan_drupal_ai_query.settings:
+  type: config_object
+  label: 'DKAN AI Query settings'
+  mapping:
+    default_model:
+      type: string
+      label: 'Default model'
+    show_model_selector:
+      type: boolean
+      label: 'Show model selector'
+    show_examples:
+      type: boolean
+      label: 'Show example questions'
+    show_debug_panel:
+      type: boolean
+      label: 'Show tool-calls debug panel'
+    save_chat_history:
+      type: boolean
+      label: 'Save chat history'
+    show_follow_up_suggestions:
+      type: boolean
+      label: 'Show follow-up suggestion chips'
+
+block.settings.dkan_drupal_ai_query_widget:
+  type: block_settings
+  label: 'DKAN AI Query Widget block'
+  mapping:
+    dataset_id:
+      type: string
+      label: 'Dataset UUID'

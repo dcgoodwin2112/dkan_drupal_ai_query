@@ -1,0 +1,26 @@
+test_page:
+  version: VERSION
+  js:
+    js/test-page.js: { defer: true }
+  css:
+    component:
+      css/test-page.css: {}
+  dependencies:
+    - core/drupal
+    - core/once
+
+widget:
+  version: VERSION
+  js:
+    https://cdn.jsdelivr.net/npm/marked/marked.min.js: { type: external, minified: true }
+    https://cdn.jsdelivr.net/npm/vega@5/build/vega.min.js: { type: external, minified: true }
+    https://cdn.jsdelivr.net/npm/vega-lite@5/build/vega-lite.min.js: { type: external, minified: true }
+    https://cdn.jsdelivr.net/npm/vega-embed@6/build/vega-embed.min.js: { type: external, minified: true }
+    js/widget.js: { defer: true }
+  css:
+    component:
+      css/widget.css: {}
+  dependencies:
+    - core/drupal
+    - core/drupalSettings
+    - core/once

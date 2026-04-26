@@ -1,0 +1,183 @@
+<?php
+
+namespace Drupal\dkan_drupal_ai_query\EventSubscriber;
+
+use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
+use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
+use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+
+/**
+ * Captures table data and chart specs from tool executions.
+ *
+ * - For query_datastore / query_datastore_join: writes the parsed result
+ *   (when not an error) as a 'data' artifact. The poll endpoint surfaces it
+ *   so the UI can render an interactive table without bloating the LLM
+ *   conversation with the full payload.
+ * - For create_chart: pulls the Vega-Lite spec out of the tool's context
+ *   (the LLM-visible result was a stub) and writes it as a 'chart' artifact.
+ */
+class ArtifactCaptureSubscriber implements EventSubscriberInterface {
+
+  public function __construct(
+    protected ArtifactStorage $artifacts,
+    protected LoggerInterface $logger,
+    protected ResourceIdResolver $resolver,
+  ) {}
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function getSubscribedEvents(): array {
+    return [
+      AgentToolFinishedExecutionEvent::EVENT_NAME => ['onToolFinished', 0],
+    ];
+  }
+
+  /**
+   * Capture data table or chart spec when one of our tools finishes.
+   */
+  public function onToolFinished(AgentToolFinishedExecutionEvent $event): void {
+    $threadId = $event->getThreadId();
+    if (!$threadId) {
+      return;
+    }
+    $tool = $event->getTool();
+    $name = $tool->getFunctionName();
+
+    if ($name === 'query_datastore' || $name === 'query_datastore_join') {
+      $this->captureData($threadId, $tool, $name);
+      return;
+    }
+    if ($name === 'create_chart') {
+      $this->captureChart($threadId, $tool);
+    }
+  }
+
+  /**
+   * Decode the tool's JSON output and append a data artifact.
+   */
+  protected function captureData(string $threadId, $tool, string $toolName): void {
+    $raw = $tool->getReadableOutput();
+    if (!$raw) {
+      return;
+    }
+    $decoded = json_decode($raw, TRUE);
+    if (!is_array($decoded) || isset($decoded['error'])) {
+      return;
+    }
+
+    // Capture the original tool inputs so the UI can rebuild the equivalent
+    // REST API call and SQL statement. getContextValue() throws when a
+    // context isn't set, so guard each read.
+    $inputNames = [
+      'resource_id',
+      'columns',
+      'conditions',
+      'sort_field',
+      'sort_direction',
+      'limit',
+      'offset',
+      'expressions',
+      'groupings',
+    ];
+    if ($toolName === 'query_datastore_join') {
+      $inputNames[] = 'join_resource_id';
+      $inputNames[] = 'join_on';
+    }
+    $input = [];
+    foreach ($inputNames as $name) {
+      try {
+        $value = $tool->getContextValue($name);
+      }
+      catch (\Throwable $e) {
+        continue;
+      }
+      if ($value === NULL || $value === '') {
+        continue;
+      }
+      $input[$name] = $value;
+    }
+
+    // Resolve resource ids to their canonical "{identifier}__{version}" form
+    // so the API / SQL preview panels render the same identifiers the
+    // datastore query actually used. The LLM may have passed a fuzzy
+    // dataset title or a hex-corrupted id; the resolver normalizes both.
+    if (!empty($input['resource_id'])) {
+      $resolved = $this->resolver->resolve(ResourceIdResolver::normalize((string) $input['resource_id']));
+      if ($resolved !== NULL) {
+        $input['resolved_resource_id'] = $resolved;
+        // The public datastore query endpoint takes the distribution UUID,
+        // not the internal {hash}__{version} resource id, so capture both.
+        $distributionUuid = $this->resolver->resolveDistributionUuid($resolved);
+        if ($distributionUuid !== NULL) {
+          $input['distribution_uuid'] = $distributionUuid;
+        }
+      }
+    }
+    if (!empty($input['join_resource_id'])) {
+      $resolvedJoin = $this->resolver->resolve(ResourceIdResolver::normalize((string) $input['join_resource_id']));
+      if ($resolvedJoin !== NULL) {
+        $input['resolved_join_resource_id'] = $resolvedJoin;
+        $joinUuid = $this->resolver->resolveDistributionUuid($resolvedJoin);
+        if ($joinUuid !== NULL) {
+          $input['join_distribution_uuid'] = $joinUuid;
+        }
+      }
+    }
+
+    $this->artifacts->append($threadId, [
+      'type' => 'data',
+      'tool' => $toolName,
+      'rows' => $decoded['results'] ?? [],
+      'count' => $decoded['count'] ?? (isset($decoded['results']) ? count($decoded['results']) : 0),
+      'schema' => $decoded['schema'] ?? NULL,
+      'query' => $decoded['query'] ?? NULL,
+      'input' => $input ?: NULL,
+    ]);
+  }
+
+  /**
+   * Pull the spec from the tool context, normalize, append as chart artifact.
+   */
+  protected function captureChart(string $threadId, $tool): void {
+    $spec = $tool->getContextValue('spec');
+    if (!$spec) {
+      return;
+    }
+    if (is_string($spec)) {
+      $decoded = json_decode($spec, TRUE);
+      if (!is_array($decoded)) {
+        $this->logger->warning('Could not decode chart spec for thread @t.', ['@t' => $threadId]);
+        return;
+      }
+      $spec = $decoded;
+    }
+    if (!is_array($spec)) {
+      return;
+    }
+    $spec = $this->normalizeChartSizing($spec);
+    $this->artifacts->append($threadId, [
+      'type' => 'chart',
+      'spec' => $spec,
+    ]);
+  }
+
+  /**
+   * Replace "container" sizing with fixed pixel sizes.
+   *
+   * Matches dkan_nl_query behavior — keeps charts predictable inside scroll
+   * containers regardless of widget layout.
+   */
+  protected function normalizeChartSizing(array $spec): array {
+    if (($spec['width'] ?? NULL) === 'container') {
+      $spec['width'] = 600;
+    }
+    if (($spec['height'] ?? NULL) === 'container') {
+      $spec['height'] = 400;
+    }
+    return $spec;
+  }
+
+}
