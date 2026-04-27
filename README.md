@@ -97,7 +97,7 @@ ddev drush role:perm:add administrator 'administer dkan drupal ai query conversa
 
 1. **API keys.** Visit `/admin/config/system/keys`. Confirm `dkan_anthropic` (and `dkan_openai` if used) exist and contain valid keys.
 2. **Default model.** Visit `/admin/config/dkan/ai-query`. Pick a default model from the dropdown.
-3. **Default provider.** Visit `/admin/config/ai/settings`. Select Anthropic or OpenAI as the default provider for the `chat_with_tools` operation type.
+3. **Default provider.** Visit `/admin/config/ai/settings`. Select Anthropic or OpenAI as the default provider for the `chat` operation type. (drupal-ai 1.2 does not register `chat_with_tools` as a separate operation type; revisit when upgrading to a version that does.)
 4. **Provider key wiring.** Visit `/admin/config/ai/providers/anthropic` (and/or `openai`). Set the `api_key` field to the Key entity (`dkan_anthropic` / `dkan_openai`).
 5. **Widget toggles.** Back at `/admin/config/dkan/ai-query`, decide which UI features users see (model selector, examples, debug panel, history sidebar).
 
