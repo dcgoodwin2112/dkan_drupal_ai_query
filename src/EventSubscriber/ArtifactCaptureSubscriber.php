@@ -3,6 +3,8 @@
 namespace Drupal\dkan_drupal_ai_query\EventSubscriber;
 
 use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
+use Drupal\common\DataResource;
+use Drupal\datastore\DatastoreService;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
 use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
 use Psr\Log\LoggerInterface;
@@ -20,10 +22,18 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  */
 class ArtifactCaptureSubscriber implements EventSubscriberInterface {
 
+  /**
+   * Per-instance cache of resolved table names: resource_id => table_name.
+   *
+   * @var array
+   */
+  protected array $tableNameCache = [];
+
   public function __construct(
     protected ArtifactStorage $artifacts,
     protected LoggerInterface $logger,
     protected ResourceIdResolver $resolver,
+    protected DatastoreService $datastoreService,
   ) {}
 
   /**
@@ -114,6 +124,10 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
         if ($distributionUuid !== NULL) {
           $input['distribution_uuid'] = $distributionUuid;
         }
+        $tableName = $this->resolveTableName($resolved);
+        if ($tableName !== NULL) {
+          $input['table_name'] = $tableName;
+        }
       }
     }
     if (!empty($input['join_resource_id'])) {
@@ -124,6 +138,10 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
         if ($joinUuid !== NULL) {
           $input['join_distribution_uuid'] = $joinUuid;
         }
+        $joinTable = $this->resolveTableName($resolvedJoin);
+        if ($joinTable !== NULL) {
+          $input['join_table_name'] = $joinTable;
+        }
       }
     }
 
@@ -131,11 +149,33 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
       'type' => 'data',
       'tool' => $toolName,
       'rows' => $decoded['results'] ?? [],
-      'count' => $decoded['count'] ?? (isset($decoded['results']) ? count($decoded['results']) : 0),
+      'count' => $decoded['total_rows']
+      ?? $decoded['count']
+      ?? (isset($decoded['results']) ? count($decoded['results']) : 0),
       'schema' => $decoded['schema'] ?? NULL,
       'query' => $decoded['query'] ?? NULL,
       'input' => $input ?: NULL,
     ]);
+  }
+
+  /**
+   * Resolve a resource id to its physical datastore table name.
+   *
+   * Returns "datastore_<md5>" or NULL when no datastore storage exists for
+   * the given "{identifier}__{version}" resource id.
+   */
+  protected function resolveTableName(string $resolvedResourceId): ?string {
+    if (array_key_exists($resolvedResourceId, $this->tableNameCache)) {
+      return $this->tableNameCache[$resolvedResourceId];
+    }
+    try {
+      [$id, $version] = DataResource::getIdentifierAndVersion($resolvedResourceId);
+      $storage = $this->datastoreService->getStorage($id, $version);
+      return $this->tableNameCache[$resolvedResourceId] = $storage ? $storage->getTableName() : NULL;
+    }
+    catch (\Throwable $e) {
+      return $this->tableNameCache[$resolvedResourceId] = NULL;
+    }
   }
 
   /**
@@ -157,27 +197,10 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
     if (!is_array($spec)) {
       return;
     }
-    $spec = $this->normalizeChartSizing($spec);
     $this->artifacts->append($threadId, [
       'type' => 'chart',
       'spec' => $spec,
     ]);
-  }
-
-  /**
-   * Replace "container" sizing with fixed pixel sizes.
-   *
-   * Matches dkan_nl_query behavior — keeps charts predictable inside scroll
-   * containers regardless of widget layout.
-   */
-  protected function normalizeChartSizing(array $spec): array {
-    if (($spec['width'] ?? NULL) === 'container') {
-      $spec['width'] = 600;
-    }
-    if (($spec['height'] ?? NULL) === 'container') {
-      $spec['height'] = 400;
-    }
-    return $spec;
   }
 
 }

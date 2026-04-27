@@ -4,6 +4,7 @@ namespace Drupal\dkan_drupal_ai_query\Service;
 
 use Drupal\dkan_query_tools\Tool\DatastoreTools;
 use Drupal\dkan_query_tools\Tool\MetastoreTools;
+use Psr\Log\LoggerInterface;
 
 /**
  * Resolves a user-supplied resource_id, including fuzzy matching.
@@ -14,9 +15,36 @@ use Drupal\dkan_query_tools\Tool\MetastoreTools;
  */
 class ResourceIdResolver {
 
+  /**
+   * Hard cap on how many datasets to enumerate during fuzzy resolution.
+   */
+  private const MAX_DATASETS = 2000;
+
+  /**
+   * Per-instance cache of every dataset summary, populated on first need.
+   *
+   * @var array|null
+   */
+  protected ?array $datasetsCache = NULL;
+
+  /**
+   * Per-instance cache: dataset_uuid => distributions array.
+   *
+   * @var array
+   */
+  protected array $distributionsCache = [];
+
+  /**
+   * Per-instance cache: resource_id => import status string.
+   *
+   * @var array
+   */
+  protected array $importStatusCache = [];
+
   public function __construct(
     protected MetastoreTools $metastoreTools,
     protected DatastoreTools $datastoreTools,
+    protected ?LoggerInterface $logger = NULL,
   ) {}
 
   /**
@@ -54,8 +82,7 @@ class ResourceIdResolver {
    */
   public function resolve(string $input): ?string {
     if (str_contains($input, '__')) {
-      $status = $this->datastoreTools->getImportStatus($input);
-      if (($status['status'] ?? '') === 'done') {
+      if ($this->getImportStatus($input) === 'done') {
         return $input;
       }
 
@@ -98,10 +125,8 @@ class ResourceIdResolver {
    *   Distribution UUID, or NULL if no matching distribution exists.
    */
   public function resolveDistributionUuid(string $resourceId): ?string {
-    $datasets = $this->metastoreTools->listDatasets(0, 50);
-    foreach ($datasets['datasets'] ?? [] as $ds) {
-      $dists = $this->metastoreTools->listDistributions($ds['identifier']);
-      foreach ($dists['distributions'] ?? [] as $dist) {
+    foreach ($this->getAllDatasets() as $ds) {
+      foreach ($this->getDistributions($ds['identifier']) as $dist) {
         if (($dist['resource_id'] ?? '') === $resourceId && !empty($dist['identifier'])) {
           return $dist['identifier'];
         }
@@ -118,14 +143,12 @@ class ResourceIdResolver {
     if ($title === '') {
       return ['error' => 'Title search term is required.'];
     }
-    $datasets = $this->metastoreTools->listDatasets(0, 50);
-    foreach ($datasets['datasets'] ?? [] as $ds) {
+    foreach ($this->getAllDatasets() as $ds) {
       if (str_contains(strtolower($ds['title'] ?? ''), $title)) {
-        $dists = $this->metastoreTools->listDistributions($ds['identifier']);
         return [
           'dataset_id' => $ds['identifier'],
           'title' => $ds['title'],
-          'distributions' => $dists['distributions'] ?? [],
+          'distributions' => $this->getDistributions($ds['identifier']),
         ];
       }
     }
@@ -136,16 +159,11 @@ class ResourceIdResolver {
    * Find an imported resource whose id ends in the given version suffix.
    */
   protected function findByVersion(string $version): ?string {
-    $datasets = $this->metastoreTools->listDatasets(0, 50);
-    foreach ($datasets['datasets'] ?? [] as $ds) {
-      $dists = $this->metastoreTools->listDistributions($ds['identifier']);
-      foreach ($dists['distributions'] ?? [] as $dist) {
+    foreach ($this->getAllDatasets() as $ds) {
+      foreach ($this->getDistributions($ds['identifier']) as $dist) {
         $rid = $dist['resource_id'] ?? '';
-        if ($rid && str_ends_with($rid, "__$version")) {
-          $status = $this->datastoreTools->getImportStatus($rid);
-          if (($status['status'] ?? '') === 'done') {
-            return $rid;
-          }
+        if ($rid && str_ends_with($rid, "__$version") && $this->getImportStatus($rid) === 'done') {
+          return $rid;
         }
       }
     }
@@ -156,20 +174,69 @@ class ResourceIdResolver {
    * Find an imported resource whose identifier starts with the given prefix.
    */
   protected function findByPrefix(string $prefix): ?string {
-    $datasets = $this->metastoreTools->listDatasets(0, 50);
-    foreach ($datasets['datasets'] ?? [] as $ds) {
-      $dists = $this->metastoreTools->listDistributions($ds['identifier']);
-      foreach ($dists['distributions'] ?? [] as $dist) {
+    foreach ($this->getAllDatasets() as $ds) {
+      foreach ($this->getDistributions($ds['identifier']) as $dist) {
         $rid = $dist['resource_id'] ?? '';
-        if ($rid && str_starts_with($rid, $prefix)) {
-          $status = $this->datastoreTools->getImportStatus($rid);
-          if (($status['status'] ?? '') === 'done') {
-            return $rid;
-          }
+        if ($rid && str_starts_with($rid, $prefix) && $this->getImportStatus($rid) === 'done') {
+          return $rid;
         }
       }
     }
     return NULL;
+  }
+
+  /**
+   * Return every dataset summary in the catalog, paginated under the hood.
+   *
+   * Cached per request so repeated resolver methods within a single solve
+   * don't refetch. Caps at MAX_DATASETS with a warning to keep pathological
+   * sites from spinning the metastore.
+   */
+  protected function getAllDatasets(): array {
+    if ($this->datasetsCache !== NULL) {
+      return $this->datasetsCache;
+    }
+    $all = [];
+    $offset = 0;
+    $pageSize = 100;
+    do {
+      $page = $this->metastoreTools->listDatasets($offset, $pageSize);
+      $items = $page['datasets'] ?? [];
+      foreach ($items as $ds) {
+        $all[] = $ds;
+      }
+      $total = (int) ($page['total'] ?? count($items));
+      $offset += count($items);
+      if ($offset >= self::MAX_DATASETS && $offset < $total) {
+        $this->logger?->warning('Dataset enumeration capped at @n; resolver may miss some resources.', [
+          '@n' => self::MAX_DATASETS,
+        ]);
+        break;
+      }
+    } while ($items && $offset < $total);
+    return $this->datasetsCache = $all;
+  }
+
+  /**
+   * Return distributions for a dataset, memoized per request.
+   */
+  protected function getDistributions(string $datasetUuid): array {
+    if (!isset($this->distributionsCache[$datasetUuid])) {
+      $resp = $this->metastoreTools->listDistributions($datasetUuid);
+      $this->distributionsCache[$datasetUuid] = $resp['distributions'] ?? [];
+    }
+    return $this->distributionsCache[$datasetUuid];
+  }
+
+  /**
+   * Return the import status string for a resource_id, memoized per request.
+   */
+  protected function getImportStatus(string $resourceId): string {
+    if (!array_key_exists($resourceId, $this->importStatusCache)) {
+      $status = $this->datastoreTools->getImportStatus($resourceId);
+      $this->importStatusCache[$resourceId] = (string) ($status['status'] ?? '');
+    }
+    return $this->importStatusCache[$resourceId];
   }
 
 }

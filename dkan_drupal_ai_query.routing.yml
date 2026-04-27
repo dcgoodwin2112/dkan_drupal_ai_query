@@ -5,6 +5,7 @@ dkan_drupal_ai_query.start:
   methods: [POST]
   requirements:
     _permission: 'use dkan drupal ai query'
+    _csrf_request_header_token: 'TRUE'
   options:
     no_cache: TRUE
 
@@ -47,6 +48,7 @@ dkan_drupal_ai_query.conversation_delete:
   methods: [DELETE]
   requirements:
     _permission: 'manage own dkan drupal ai query conversations'
+    _csrf_request_header_token: 'TRUE'
     id: '\d+'
   options:
     no_cache: TRUE
@@ -58,6 +60,7 @@ dkan_drupal_ai_query.conversation_toggle_pin:
   methods: [POST]
   requirements:
     _permission: 'manage own dkan drupal ai query conversations'
+    _csrf_request_header_token: 'TRUE'
     id: '\d+'
   options:
     no_cache: TRUE

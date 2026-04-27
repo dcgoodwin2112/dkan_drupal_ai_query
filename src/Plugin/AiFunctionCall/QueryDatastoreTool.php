@@ -25,7 +25,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     'resource_id' => new ContextDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Resource ID'),
-      description: new TranslatableMarkup('Resource ID in the form identifier__version, or a dataset title for fuzzy lookup. Pass the bare value with no surrounding quotes. Examples: abc123__1773329007  or  Shark Tagging.'),
+      description: new TranslatableMarkup('In the form identifier__version, or a dataset title for fuzzy lookup. Pass the bare value with no surrounding quotes. Examples: abc123__1773329007  or  Shark Tagging.'),
       required: TRUE,
     ),
     'columns' => new ContextDefinition(
