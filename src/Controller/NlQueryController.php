@@ -94,6 +94,7 @@ class NlQueryController {
 
     // Resolve or create the conversation that this turn belongs to.
     $priorMessages = [];
+    $conversationCreatedNow = FALSE;
     if ($conversationId > 0) {
       $conversation = $this->conversations->loadConversation($conversationId);
       if (!$conversation) {
@@ -110,6 +111,7 @@ class NlQueryController {
         mb_substr($question, 0, 80),
         $datasetId !== '' ? $datasetId : NULL,
       );
+      $conversationCreatedNow = TRUE;
     }
 
     [$providerId, $modelId] = $this->resolveProviderAndModel($modelOption);
@@ -162,6 +164,13 @@ class NlQueryController {
       }
     }
     catch (\Throwable $e) {
+      // Drop a just-created conversation so a failed first turn does not
+      // leave an orphan entry in the user's sidebar. For continuations we
+      // keep the user message; the user expects their question preserved.
+      if ($conversationCreatedNow) {
+        $this->conversations->deleteConversation($conversationId);
+        $conversationId = 0;
+      }
       $this->logger->error('Agent solve failed for thread @t: @m', [
         '@t' => $threadId,
         '@m' => $e->getMessage(),

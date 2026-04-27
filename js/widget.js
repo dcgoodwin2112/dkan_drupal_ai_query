@@ -70,6 +70,10 @@
     this.bindForm();
     this.bindExamples();
     this.bindNewConversation();
+    // Prime the CSRF token so the first /start, /pin, or DELETE doesn't pay
+    // an extra serialized round trip. Cached as a thenable so concurrent
+    // submits share the same in-flight fetch.
+    this.csrfToken = ensureCsrfToken();
     if (this.historyEnabled) {
       this.root.classList.add('dkan-aiq-widget--with-sidebar');
       this.dom.sidebar.hidden = false;
@@ -87,10 +91,9 @@
   };
 
   Widget.prototype.fetchDatasetMap = function () {
-    fetch('/api/1/metastore/schemas/dataset/items?limit=50', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : []; })
+    fetchAllDatasets()
       .then((datasets) => {
-        (datasets || []).forEach((ds) => {
+        datasets.forEach((ds) => {
           if (ds && ds.identifier) {
             this.datasetMap[ds.identifier] = ds.title || ds.identifier;
           }
@@ -98,8 +101,7 @@
         if (this.cachedConversations.length) {
           this.renderSidebar(this.cachedConversations);
         }
-      })
-      .catch(() => {});
+      });
   };
 
   Widget.prototype.applyVisibilityToggles = function () {
@@ -164,13 +166,9 @@
     if (!this.dom.datasetSelect) {
       return;
     }
-    fetch('/api/dkan-ai-query/conversations', { credentials: 'same-origin' }).catch(() => {});
-    // For Phase 4 we keep this lightweight: use the catalog endpoint via the
-    // metastore listDatasets MCP path. Falls back gracefully if unavailable.
-    fetch('/api/1/metastore/schemas/dataset/items?limit=50', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : []; })
+    fetchAllDatasets()
       .then((datasets) => {
-        (datasets || []).forEach((ds) => {
+        datasets.forEach((ds) => {
           if (!ds || !ds.identifier) {
             return;
           }
@@ -183,9 +181,60 @@
         if (this.cachedConversations.length) {
           this.renderSidebar(this.cachedConversations);
         }
-      })
-      .catch(() => {});
+      });
   };
+
+  /**
+   * Cache for the Drupal session token, fetched once per page load.
+   *
+   * @var {Promise<string>|null}
+   */
+  let csrfTokenPromise = null;
+
+  /**
+   * Resolve a CSRF token via /session/token. Cached for the page lifetime.
+   */
+  function ensureCsrfToken() {
+    if (csrfTokenPromise) {
+      return csrfTokenPromise;
+    }
+    csrfTokenPromise = fetch('/session/token', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .catch(function () { return ''; });
+    return csrfTokenPromise;
+  }
+
+  /**
+   * Page through the metastore catalog endpoint until exhausted.
+   *
+   * Returns a flat array of dataset summaries. Caps at MAX_DATASETS to
+   * avoid runaway requests on misbehaving sites.
+   */
+  function fetchAllDatasets() {
+    const MAX_DATASETS = 2000;
+    const PAGE_SIZE = 100;
+    const out = [];
+    function loadPage(offset) {
+      return fetch('/api/1/metastore/schemas/dataset/items?limit=' + PAGE_SIZE + '&offset=' + offset, {
+        credentials: 'same-origin',
+      })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (page) {
+          if (!Array.isArray(page) || page.length === 0) {
+            return out;
+          }
+          for (let i = 0; i < page.length; i++) {
+            out.push(page[i]);
+          }
+          if (page.length < PAGE_SIZE || out.length >= MAX_DATASETS) {
+            return out;
+          }
+          return loadPage(offset + page.length);
+        })
+        .catch(function () { return out; });
+    }
+    return loadPage(0);
+  }
 
   Widget.prototype.bindForm = function () {
     this.dom.form.addEventListener('submit', (evt) => {
@@ -317,10 +366,11 @@
     pinBtn.title = conv.pinned ? 'Unpin' : 'Pin';
     pinBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      fetch('/api/dkan-ai-query/conversations/' + conv.id + '/pin', {
+      ensureCsrfToken().then((token) => fetch('/api/dkan-ai-query/conversations/' + conv.id + '/pin', {
         method: 'POST',
+        headers: { 'X-CSRF-Token': token },
         credentials: 'same-origin',
-      })
+      }))
         .then((r) => r.json())
         .then((result) => {
           conv.pinned = !!result.pinned;
@@ -341,10 +391,11 @@
       if (!window.confirm('Delete this conversation?')) {
         return;
       }
-      fetch('/api/dkan-ai-query/conversations/' + conv.id, {
+      ensureCsrfToken().then((token) => fetch('/api/dkan-ai-query/conversations/' + conv.id, {
         method: 'DELETE',
+        headers: { 'X-CSRF-Token': token },
         credentials: 'same-origin',
-      }).then(() => {
+      })).then(() => {
         this.cachedConversations = this.cachedConversations.filter((c) => c.id !== conv.id);
         entry.remove();
         if (this.currentConversationId === conv.id) {
@@ -464,12 +515,16 @@
     }, POLL_INTERVAL_MS);
     this.activeRun = pollHandle;
 
-    fetch('/api/dkan-ai-query/start', {
+    ensureCsrfToken().then((token) => fetch('/api/dkan-ai-query/start', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-Token': token,
+      },
       body: body,
       credentials: 'same-origin',
-    })
+    }))
       .then(function (r) {
         return r.json().then(function (j) { return { ok: r.ok, body: j }; });
       })
@@ -921,7 +976,10 @@
     }
     parts.push('SELECT ' + (selectCols.length ? selectCols.join(', ') : '*'));
 
-    const tableName = 'datastore_' + resourceId.replace(/-/g, '_');
+    // Prefer the physical table name resolved by the backend
+    // (datastore_<md5>) over a name built from the resource id, which would
+    // be wrong because the actual table uses md5(identifier__version__perspective).
+    const tableName = input.table_name || ('datastore_' + resourceId.replace(/-/g, '_'));
     if (isJoin) {
       parts.push('FROM ' + tableName + ' AS t');
     }
@@ -930,7 +988,7 @@
     }
 
     if (isJoin && input.join_on) {
-      const joinTable = 'datastore_' + joinId.replace(/-/g, '_');
+      const joinTable = input.join_table_name || ('datastore_' + joinId.replace(/-/g, '_'));
       const joinOn = input.join_on.trim();
       let onClause = '';
       if (joinOn.charAt(0) === '{') {
@@ -1047,11 +1105,19 @@
     bubble.appendChild(wrap);
     this.scrollToBottom();
 
+    // Always fill the bubble width — the LLM's explicit pixel width isn't
+    // meaningful in this chat context. Default the height when missing.
+    const spec = Object.assign({}, artifact.spec);
+    spec.width = 'container';
+    if (spec.height === undefined) {
+      spec.height = 360;
+    }
+
     const tryRender = () => {
       if (typeof window.vegaEmbed === 'undefined') {
         return;
       }
-      window.vegaEmbed(wrap, artifact.spec, {
+      window.vegaEmbed(wrap, spec, {
         actions: { export: true, source: false, compiled: false, editor: false },
         renderer: 'svg',
       }).catch(function () { wrap.textContent = 'Chart render failed.'; });
@@ -1290,7 +1356,9 @@
     }
     if ((name === 'query_datastore' || name === 'query_datastore_join') && Array.isArray(parsed.results)) {
       const got = parsed.results.length;
-      const total = parsed.count != null ? parsed.count : got;
+      const total = parsed.total_rows != null
+        ? parsed.total_rows
+        : (parsed.count != null ? parsed.count : got);
       return '→ ' + got.toLocaleString() + ' of ' + total.toLocaleString() + ' rows';
     }
     if (name === 'get_datastore_schema') {
@@ -1350,10 +1418,4 @@
   Widget.prototype.scrollToBottom = function () {
     this.dom.thread.scrollTop = this.dom.thread.scrollHeight;
   };
-
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
 })(Drupal, drupalSettings, once);

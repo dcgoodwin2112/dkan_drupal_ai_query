@@ -1,5 +1,6 @@
 .dkan-aiq-widget {
-  max-width: 900px;
+  max-width: var(--dkan-aiq-max-width, 1280px);
+  margin: 0 auto;
   font-family: inherit;
   display: flex;
   flex-direction: row;
@@ -7,7 +8,7 @@
 }
 
 .dkan-aiq-widget--with-sidebar {
-  max-width: 1180px;
+  max-width: var(--dkan-aiq-max-width-sidebar, 1480px);
 }
 
 .dkan-aiq-main {
@@ -25,7 +26,7 @@
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
-  max-height: 700px;
+  max-height: 100%;
 }
 
 .dkan-aiq-sidebar[hidden] {
@@ -197,8 +198,6 @@
 
 /* Chat thread */
 .dkan-aiq-thread {
-  max-height: 600px;
-  overflow-y: auto;
   padding: 8px 0;
 }
 
@@ -213,13 +212,15 @@
   border-radius: 10px;
   font-size: 15px;
   line-height: 1.6;
-  max-width: 85%;
+  max-width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   overflow: hidden;
 }
 
 .dkan-aiq-message-user {
   margin-left: auto;
+  max-width: 70ch;
   color: #fff;
   background: #2563eb;
   border-bottom-right-radius: 2px;
@@ -227,15 +228,23 @@
 
 .dkan-aiq-message-assistant {
   margin-right: auto;
+  max-width: 80ch;
   color: #1e293b;
   background: #f1f5f9;
   border-bottom-left-radius: 2px;
-  overflow-x: auto;
+}
+
+/* Bubbles carrying a chart or table inflate back to full width so the
+   artifact has room. Inner prose stays bounded by .dkan-aiq-answer. */
+.dkan-aiq-message-assistant:has(.dkan-aiq-chart-container),
+.dkan-aiq-message-assistant:has(.dkan-aiq-table-container) {
+  max-width: 100%;
 }
 
 /* Dataset selector */
 .dkan-aiq-dataset-selector {
   margin-bottom: 10px;
+  max-width: 80ch;
 }
 
 .dkan-aiq-dataset-selector[hidden] {
@@ -272,9 +281,14 @@
 }
 
 /* Form */
+.dkan-aiq-form {
+  flex-shrink: 0;
+}
+
 .dkan-aiq-input-wrapper {
   display: flex;
   gap: 8px;
+  max-width: 80ch;
 }
 
 .dkan-aiq-input {
@@ -324,6 +338,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  max-width: 80ch;
 }
 
 /* Example buttons / follow-up suggestions */
@@ -415,6 +430,15 @@
   font-size: 15px;
   line-height: 1.6;
   color: #1e293b;
+  max-width: 80ch;
+}
+
+/* Cap paragraph and list widths anywhere in the thread (defensive — covers
+   any text rendered outside .dkan-aiq-answer too). */
+.dkan-aiq-thread p,
+.dkan-aiq-thread ul,
+.dkan-aiq-thread ol {
+  max-width: 80ch;
 }
 
 .dkan-aiq-answer:empty {
@@ -486,7 +510,8 @@
 /* Chart (inside assistant bubble) */
 .dkan-aiq-chart-container {
   margin: 12px 0;
-  min-height: 100px;
+  min-height: 320px;
+  width: 100%;
   max-width: 100%;
   overflow: visible;
 }
@@ -804,6 +829,9 @@
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   font-size: 13px;
+  /* Pixel value (not 80ch) because this element has font-size: 13px,
+     so 80ch resolves narrower than the 16px elements above it. */
+  max-width: 806px;
 }
 
 .dkan-aiq-debug-summary {

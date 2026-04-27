@@ -11,6 +11,7 @@ services:
     arguments:
       - '@dkan_query_tools.metastore'
       - '@dkan_query_tools.datastore'
+      - '@logger.channel.dkan_drupal_ai_query'
 
   dkan_drupal_ai_query.artifact_storage:
     class: Drupal\dkan_drupal_ai_query\Service\ArtifactStorage
@@ -23,6 +24,7 @@ services:
       - '@dkan_drupal_ai_query.artifact_storage'
       - '@logger.channel.dkan_drupal_ai_query'
       - '@dkan_drupal_ai_query.resource_id_resolver'
+      - '@dkan.datastore.service'
     tags:
       - { name: event_subscriber }
 

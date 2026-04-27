@@ -25,13 +25,13 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     'resource_id' => new ContextDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Primary resource ID'),
-      description: new TranslatableMarkup('Resource ID (identifier__version) OR a dataset title for fuzzy lookup.'),
+      description: new TranslatableMarkup('In identifier__version form OR a dataset title for fuzzy lookup.'),
       required: TRUE,
     ),
     'join_resource_id' => new ContextDefinition(
       data_type: 'string',
       label: new TranslatableMarkup('Join resource ID'),
-      description: new TranslatableMarkup('Resource ID to join with.'),
+      description: new TranslatableMarkup('Second resource to join with the primary one.'),
       required: TRUE,
     ),
     'join_on' => new ContextDefinition(
