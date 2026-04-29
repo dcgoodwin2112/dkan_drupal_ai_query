@@ -14,7 +14,7 @@ use Drupal\Core\Extension\ExtensionPathResolver;
  */
 class SystemPromptLoader {
 
-  public const DEFAULT_VERSION = 'v1';
+  public const DEFAULT_VERSION = 'v2';
 
   /**
    * The extension path resolver.

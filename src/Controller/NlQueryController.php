@@ -15,6 +15,7 @@ use Drupal\dkan_drupal_ai_query\Service\ConversationStorage;
 use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
 use Drupal\dkan_drupal_ai_query\Service\SuggestionGenerator;
 use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
+use Drupal\dkan_drupal_ai_query\Service\UnknownColumnCounter;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -47,6 +48,7 @@ class NlQueryController {
     protected SuggestionGenerator $suggestions,
     protected SystemPromptLoader $promptLoader,
     protected RefusalCollector $refusals,
+    protected UnknownColumnCounter $unknownColumnCounter,
   ) {}
 
   /**
@@ -198,6 +200,7 @@ class NlQueryController {
     // Drop the in-process refusal record so a subsequent /start on the same
     // thread starts clean.
     $this->refusals->forget($threadId);
+    $this->unknownColumnCounter->forget($threadId);
 
     // Generate follow-up question chips when enabled and there's an answer.
     $config = $this->configFactory->get('dkan_drupal_ai_query.settings');

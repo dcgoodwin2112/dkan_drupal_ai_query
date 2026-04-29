@@ -14,6 +14,17 @@ services:
   dkan_drupal_ai_query.refusal_collector:
     class: Drupal\dkan_drupal_ai_query\Service\RefusalCollector
 
+  dkan_drupal_ai_query.unknown_column_counter:
+    class: Drupal\dkan_drupal_ai_query\Service\UnknownColumnCounter
+
+  dkan_drupal_ai_query.unknown_column_guard_subscriber:
+    class: Drupal\dkan_drupal_ai_query\EventSubscriber\UnknownColumnGuardSubscriber
+    arguments:
+      - '@dkan_drupal_ai_query.unknown_column_counter'
+      - '@dkan_drupal_ai_query.refusal_collector'
+    tags:
+      - { name: event_subscriber }
+
   dkan_drupal_ai_query.artifact_capture_subscriber:
     class: Drupal\dkan_drupal_ai_query\EventSubscriber\ArtifactCaptureSubscriber
     arguments:
@@ -69,6 +80,7 @@ services:
       - '@dkan_drupal_ai_query.suggestion_generator'
       - '@dkan_drupal_ai_query.system_prompt_loader'
       - '@dkan_drupal_ai_query.refusal_collector'
+      - '@dkan_drupal_ai_query.unknown_column_counter'
     tags:
       - { name: 'controller.service_arguments' }
 
@@ -104,3 +116,4 @@ services:
       - '@logger.channel.dkan_drupal_ai_query'
       - '@dkan_drupal_ai_query.refusal_collector'
       - '@dkan_drupal_ai_query.system_prompt_loader'
+      - '@dkan_drupal_ai_query.unknown_column_counter'
