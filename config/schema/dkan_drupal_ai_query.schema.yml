@@ -28,3 +28,46 @@ block.settings.dkan_drupal_ai_query_widget:
     dataset_id:
       type: string
       label: 'Dataset UUID'
+
+dkan_drupal_ai_query.caveat.*:
+  type: config_entity
+  label: 'Dataset caveat'
+  mapping:
+    id:
+      type: string
+      label: 'Machine ID (slugged dataset UUID)'
+    label:
+      type: label
+      label: 'Dataset label (denormalized title)'
+    dataset_uuid:
+      type: string
+      label: 'Dataset UUID'
+    suppression:
+      type: text
+      label: 'Suppression / data-quality note'
+      nullable: true
+    column_caveats:
+      type: sequence
+      label: 'Column caveats'
+      sequence:
+        type: text
+        label: 'Caveat text'
+    freshness:
+      type: mapping
+      label: 'Freshness'
+      mapping:
+        updated:
+          type: string
+          label: 'Updated'
+        coverage:
+          type: string
+          label: 'Coverage'
+    code_lists:
+      type: sequence
+      label: 'Code lists'
+      sequence:
+        type: sequence
+        label: 'Values'
+        sequence:
+          type: string
+          label: 'Value'

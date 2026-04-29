@@ -15,3 +15,8 @@ administer dkan drupal ai query conversations:
   title: 'Administer DKAN AI query conversations'
   description: 'View and manage conversations belonging to other users.'
   restrict access: true
+
+administer dkan dataset caveats:
+  title: 'Administer DKAN dataset caveats'
+  description: 'Create, edit, and delete per-dataset caveats shown to the AI query agent.'
+  restrict access: true
