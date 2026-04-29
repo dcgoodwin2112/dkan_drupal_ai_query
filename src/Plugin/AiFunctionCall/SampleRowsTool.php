@@ -8,19 +8,18 @@ use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
 use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\dkan_drupal_ai_query\Service\DatasetCaveatRegistry;
 use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
 use Drupal\dkan_query_tools\Tool\DatastoreTools;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * Get column names, types, and descriptions for a datastore resource.
+ * Return the first N rows of a datastore resource for orientation.
  */
 #[FunctionCall(
-  id: 'dkan_drupal_ai_query:get_datastore_schema',
-  function_name: 'get_datastore_schema',
-  name: 'Get datastore schema',
-  description: 'Get column names, types, and descriptions for a resource. Use before querying to discover available fields.',
+  id: 'dkan_drupal_ai_query:sample_rows',
+  function_name: 'sample_rows',
+  name: 'Sample rows',
+  description: 'Return the first N rows of a datastore resource (sorted by record_number ascending). Useful before querying to learn cell shapes, code values, and units.',
   group: 'dkan_drupal_ai_query',
   context_definitions: [
     'resource_id' => new ContextDefinition(
@@ -29,9 +28,15 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
       description: new TranslatableMarkup('In identifier__version form OR a dataset title for fuzzy lookup.'),
       required: TRUE,
     ),
+    'n' => new ContextDefinition(
+      data_type: 'integer',
+      label: new TranslatableMarkup('Row count'),
+      description: new TranslatableMarkup('Number of rows to return (1-50, default 5).'),
+      required: FALSE,
+    ),
   ],
 )]
-class GetDatastoreSchemaTool extends FunctionCallBase implements ExecutableFunctionCallInterface {
+class SampleRowsTool extends FunctionCallBase implements ExecutableFunctionCallInterface {
 
   /**
    * The datastore tools.
@@ -44,18 +49,12 @@ class GetDatastoreSchemaTool extends FunctionCallBase implements ExecutableFunct
   protected ResourceIdResolver $resolver;
 
   /**
-   * The dataset caveat registry.
-   */
-  protected DatasetCaveatRegistry $caveats;
-
-  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): FunctionCallInterface|static {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->datastoreTools = $container->get('dkan_query_tools.datastore');
     $instance->resolver = $container->get('dkan_drupal_ai_query.resource_id_resolver');
-    $instance->caveats = $container->get('dkan_drupal_ai_query.dataset_caveat_registry');
     return $instance;
   }
 
@@ -69,28 +68,8 @@ class GetDatastoreSchemaTool extends FunctionCallBase implements ExecutableFunct
       $this->setOutput(json_encode(['error' => "Could not resolve resource: {$input}"], JSON_UNESCAPED_SLASHES));
       return;
     }
-    $result = $this->datastoreTools->getDatastoreSchema(resourceId: $resolved);
-    $datasetUuid = $this->resolver->resolveDatasetUuid($resolved);
-    if ($datasetUuid !== NULL) {
-      $columnCaveats = $this->caveats->getColumnCaveats($datasetUuid);
-      if ($columnCaveats && !empty($result['columns'])) {
-        foreach ($result['columns'] as &$col) {
-          if (isset($columnCaveats[$col['name']])) {
-            $col['caveat'] = $columnCaveats[$col['name']];
-          }
-        }
-        unset($col);
-      }
-      $caveats = $this->caveats->getCaveats($datasetUuid);
-      if ($caveats) {
-        // Top-level dataset caveats minus column_caveats (already inlined).
-        $datasetCaveats = $caveats;
-        unset($datasetCaveats['column_caveats']);
-        if ($datasetCaveats) {
-          $result['dataset_caveats'] = $datasetCaveats;
-        }
-      }
-    }
+    $n = (int) ($this->getContextValue('n') ?: 5);
+    $result = $this->datastoreTools->sampleRows(resourceId: $resolved, n: $n);
     $this->setOutput(json_encode($result, JSON_UNESCAPED_SLASHES));
   }
 

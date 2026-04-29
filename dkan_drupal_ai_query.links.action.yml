@@ -1,0 +1,5 @@
+entity.dataset_caveat.add_form:
+  route_name: entity.dataset_caveat.add_form
+  title: 'Add dataset caveat'
+  appears_on:
+    - entity.dataset_caveat.collection
