@@ -6,19 +6,25 @@ use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
 use Drupal\datastore\DatastoreService;
 use Drupal\dkan_drupal_ai_query\EventSubscriber\ArtifactCaptureSubscriber;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
+use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
 use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class ArtifactCaptureSubscriberTest extends TestCase {
 
-  protected function buildSubscriber(ArtifactStorage $artifacts, ?ResourceIdResolver $resolver = NULL): ArtifactCaptureSubscriber {
+  protected function buildSubscriber(
+    ArtifactStorage $artifacts,
+    ?ResourceIdResolver $resolver = NULL,
+    ?RefusalCollector $refusals = NULL,
+  ): ArtifactCaptureSubscriber {
     $resolver = $resolver ?? $this->createMock(ResourceIdResolver::class);
     return new ArtifactCaptureSubscriber(
       $artifacts,
       $this->createMock(LoggerInterface::class),
       $resolver,
       $this->createMock(DatastoreService::class),
+      $refusals ?? new RefusalCollector(),
     );
   }
 

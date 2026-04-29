@@ -12,7 +12,9 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
 use Drupal\dkan_drupal_ai_query\Service\ConversationStorage;
+use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
 use Drupal\dkan_drupal_ai_query\Service\SuggestionGenerator;
+use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -43,6 +45,8 @@ class NlQueryController {
     protected LoggerInterface $logger,
     protected ConfigFactoryInterface $configFactory,
     protected SuggestionGenerator $suggestions,
+    protected SystemPromptLoader $promptLoader,
+    protected RefusalCollector $refusals,
   ) {}
 
   /**
@@ -182,9 +186,18 @@ class NlQueryController {
       ], 500);
     }
 
-    // Persist the assistant turn with any artifacts captured this run.
+    // Persist the assistant turn. Artifacts already include any refusal
+    // captured by ArtifactCaptureSubscriber; we tag prompt_version so
+    // historical messages can be correlated to the prompt that produced them.
     $turnArtifacts = $this->artifacts->load($threadId);
+    $turnArtifacts[] = [
+      'type' => 'meta',
+      'prompt_version' => $this->promptLoader->activeVersion(),
+    ];
     $this->conversations->addMessage($conversationId, 'assistant', $answer, $turnArtifacts);
+    // Drop the in-process refusal record so a subsequent /start on the same
+    // thread starts clean.
+    $this->refusals->forget($threadId);
 
     // Generate follow-up question chips when enabled and there's an answer.
     $config = $this->configFactory->get('dkan_drupal_ai_query.settings');

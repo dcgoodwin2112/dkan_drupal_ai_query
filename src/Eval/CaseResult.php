@@ -26,6 +26,8 @@ final class CaseResult {
     public readonly string $model,
     public readonly string $executedAt,
     public readonly ?string $errorMessage = NULL,
+    public readonly ?string $promptVersion = NULL,
+    public readonly ?array $refusal = NULL,
   ) {}
 
   /**
@@ -45,6 +47,8 @@ final class CaseResult {
       'model' => $this->model,
       'executed_at' => $this->executedAt,
       'error_message' => $this->errorMessage,
+      'prompt_version' => $this->promptVersion,
+      'refusal' => $this->refusal,
     ];
   }
 
