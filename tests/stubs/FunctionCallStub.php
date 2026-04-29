@@ -35,4 +35,8 @@ class FunctionCallStub {
     return $this->context[$name];
   }
 
+  public function getContextValues(): array {
+    return $this->context;
+  }
+
 }

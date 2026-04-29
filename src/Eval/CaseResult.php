@@ -28,6 +28,7 @@ final class CaseResult {
     public readonly ?string $errorMessage = NULL,
     public readonly ?string $promptVersion = NULL,
     public readonly ?array $refusal = NULL,
+    public readonly array $runFlags = [],
   ) {}
 
   /**
@@ -49,6 +50,7 @@ final class CaseResult {
       'error_message' => $this->errorMessage,
       'prompt_version' => $this->promptVersion,
       'refusal' => $this->refusal,
+      'run_flags' => $this->runFlags,
     ];
   }
 
