@@ -26,6 +26,12 @@ services:
     arguments:
       - '@entity_type.manager'
 
+  dkan_drupal_ai_query.dataset_caveat_registry:
+    class: Drupal\dkan_drupal_ai_query\Service\DatasetCaveatRegistry
+    arguments:
+      - '@entity_type.manager'
+      - '@logger.channel.dkan_drupal_ai_query'
+
   dkan_drupal_ai_query.suggestion_generator:
     class: Drupal\dkan_drupal_ai_query\Service\SuggestionGenerator
     arguments:
