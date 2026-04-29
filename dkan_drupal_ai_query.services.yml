@@ -11,6 +11,9 @@ services:
     arguments:
       - '@tempstore.private'
 
+  dkan_drupal_ai_query.refusal_collector:
+    class: Drupal\dkan_drupal_ai_query\Service\RefusalCollector
+
   dkan_drupal_ai_query.artifact_capture_subscriber:
     class: Drupal\dkan_drupal_ai_query\EventSubscriber\ArtifactCaptureSubscriber
     arguments:
@@ -18,6 +21,7 @@ services:
       - '@logger.channel.dkan_drupal_ai_query'
       - '@dkan_drupal_ai_query.resource_id_resolver'
       - '@dkan.datastore.service'
+      - '@dkan_drupal_ai_query.refusal_collector'
     tags:
       - { name: event_subscriber }
 
@@ -25,6 +29,19 @@ services:
     class: Drupal\dkan_drupal_ai_query\Service\ConversationStorage
     arguments:
       - '@entity_type.manager'
+
+  dkan_drupal_ai_query.system_prompt_loader:
+    class: Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader
+    arguments:
+      - '@extension.path.resolver'
+
+  dkan_drupal_ai_query.system_prompt_subscriber:
+    class: Drupal\dkan_drupal_ai_query\EventSubscriber\SystemPromptSubscriber
+    arguments:
+      - '@dkan_drupal_ai_query.system_prompt_loader'
+      - '@logger.channel.dkan_drupal_ai_query'
+    tags:
+      - { name: event_subscriber }
 
   dkan_drupal_ai_query.dataset_caveat_registry:
     class: Drupal\dkan_drupal_ai_query\Service\DatasetCaveatRegistry
@@ -50,6 +67,8 @@ services:
       - '@logger.channel.dkan_drupal_ai_query'
       - '@config.factory'
       - '@dkan_drupal_ai_query.suggestion_generator'
+      - '@dkan_drupal_ai_query.system_prompt_loader'
+      - '@dkan_drupal_ai_query.refusal_collector'
     tags:
       - { name: 'controller.service_arguments' }
 
@@ -83,3 +102,5 @@ services:
       - '@dkan_drupal_ai_query.artifact_storage'
       - '@dkan_drupal_ai_query.eval.evaluator'
       - '@logger.channel.dkan_drupal_ai_query'
+      - '@dkan_drupal_ai_query.refusal_collector'
+      - '@dkan_drupal_ai_query.system_prompt_loader'
