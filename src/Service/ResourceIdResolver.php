@@ -136,6 +136,23 @@ class ResourceIdResolver {
   }
 
   /**
+   * Map a {hash}__{version} resource id back to its parent dataset UUID.
+   *
+   * @return string|null
+   *   Dataset UUID, or NULL when no dataset owns this resource.
+   */
+  public function resolveDatasetUuid(string $resourceId): ?string {
+    foreach ($this->getAllDatasets() as $ds) {
+      foreach ($this->getDistributions($ds['identifier']) as $dist) {
+        if (($dist['resource_id'] ?? '') === $resourceId) {
+          return $ds['identifier'] ?? NULL;
+        }
+      }
+    }
+    return NULL;
+  }
+
+  /**
    * Find a dataset by partial title and return its distributions.
    */
   public function findDatasetResources(string $title): array {

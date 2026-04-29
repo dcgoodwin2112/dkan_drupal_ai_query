@@ -8,6 +8,7 @@ use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
 use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\dkan_drupal_ai_query\Service\DatasetCaveatRegistry;
 use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -33,10 +34,13 @@ class FindDatasetResourcesTool extends FunctionCallBase implements ExecutableFun
 
   /**
    * The resource id resolver.
-   *
-   * @var \Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver
    */
   protected ResourceIdResolver $resolver;
+
+  /**
+   * The dataset caveat registry.
+   */
+  protected DatasetCaveatRegistry $caveats;
 
   /**
    * {@inheritdoc}
@@ -44,6 +48,7 @@ class FindDatasetResourcesTool extends FunctionCallBase implements ExecutableFun
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): FunctionCallInterface|static {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->resolver = $container->get('dkan_drupal_ai_query.resource_id_resolver');
+    $instance->caveats = $container->get('dkan_drupal_ai_query.dataset_caveat_registry');
     return $instance;
   }
 
@@ -52,6 +57,12 @@ class FindDatasetResourcesTool extends FunctionCallBase implements ExecutableFun
    */
   public function execute() {
     $result = $this->resolver->findDatasetResources((string) $this->getContextValue('title'));
+    if (isset($result['dataset_id'])) {
+      $caveats = $this->caveats->getCaveats($result['dataset_id']);
+      if ($caveats) {
+        $result['caveats'] = $caveats;
+      }
+    }
     $this->setOutput(json_encode($result, JSON_UNESCAPED_SLASHES));
   }
 

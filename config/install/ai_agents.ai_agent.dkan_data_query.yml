@@ -19,6 +19,12 @@ system_prompt: |
     match. resource_id format is {identifier}__{version}.
   - Use get_datastore_schema(resource_id) to discover columns before
     querying.
+  - Use sample_rows(resource_id, n=5) to see actual cell shapes, code values,
+    and units before composing filters.
+  - Use distinct_values(resource_id, column) to learn the exact code list /
+    enum domain of a column before filtering on it. If `truncated` is true,
+    the column has more values than returned — narrow your filter or fall
+    back to query_datastore with a LIKE-style condition.
   - Use get_datastore_stats(resource_id) to understand distribution before
     aggregating.
   - Use query_datastore for filtered/aggregated queries; use
@@ -52,6 +58,8 @@ tools:
   'dkan_drupal_ai_query:query_datastore_join': true
   'dkan_drupal_ai_query:get_datastore_schema': true
   'dkan_drupal_ai_query:get_datastore_stats': true
+  'dkan_drupal_ai_query:sample_rows': true
+  'dkan_drupal_ai_query:distinct_values': true
   'dkan_drupal_ai_query:search_columns': true
   'dkan_drupal_ai_query:search_datasets': true
   'dkan_drupal_ai_query:list_datasets': true

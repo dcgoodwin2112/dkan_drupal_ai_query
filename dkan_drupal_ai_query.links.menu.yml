@@ -4,3 +4,10 @@ dkan_drupal_ai_query.settings_form:
   parent: system.admin_config_services
   route_name: dkan_drupal_ai_query.settings_form
   weight: 10
+
+entity.dataset_caveat.collection:
+  title: 'DKAN dataset caveats'
+  description: 'Curate per-dataset caveats (suppression, column gotchas, freshness) shown to the AI query agent.'
+  parent: system.admin_config_services
+  route_name: entity.dataset_caveat.collection
+  weight: 11
