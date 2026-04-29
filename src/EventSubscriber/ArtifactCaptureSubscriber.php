@@ -178,17 +178,74 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
       }
     }
 
+    $rows = $decoded['results'] ?? [];
+    $totalRows = $decoded['total_rows']
+      ?? $decoded['count']
+      ?? count($rows);
     $this->artifacts->append($threadId, [
       'type' => 'data',
       'tool' => $toolName,
-      'rows' => $decoded['results'] ?? [],
-      'count' => $decoded['total_rows']
-      ?? $decoded['count']
-      ?? (isset($decoded['results']) ? count($decoded['results']) : 0),
+      'rows' => $rows,
+      'count' => $totalRows,
       'schema' => $decoded['schema'] ?? NULL,
       'query' => $decoded['query'] ?? NULL,
       'input' => $input ?: NULL,
+      'provenance' => $this->buildProvenance($toolName, $input, $decoded, count($rows), (int) $totalRows),
     ]);
+  }
+
+  /**
+   * Build the provenance block that travels with each data artifact.
+   *
+   * Auditable trail of one tool call: when it ran, what query shape was
+   * executed, how many rows came back, and any sanity flags the datastore
+   * tools attached. The widget renders this as an expandable panel.
+   */
+  protected function buildProvenance(string $toolName, array $input, array $decoded, int $returnedRows, int $totalRows): array {
+    return [
+      'executed_at' => gmdate('c'),
+      'tool' => $toolName,
+      'row_count' => $returnedRows,
+      'total_rows' => $totalRows,
+      'sanity_flags' => $decoded['sanity_flags'] ?? NULL,
+      'query_summary' => $this->buildQuerySummary($toolName, $input),
+    ];
+  }
+
+  /**
+   * Strip the input down to the structured-query fields, decoding JSON ones.
+   *
+   * conditions/expressions arrive from the LLM as JSON strings; decoding them
+   * lets the UI (and a future LLM-as-judge in Phase 6) reason over structured
+   * data rather than re-parsing strings.
+   */
+  protected function buildQuerySummary(string $toolName, array $input): array {
+    $summary = [
+      'resource_id' => $input['resolved_resource_id'] ?? $input['resource_id'] ?? NULL,
+    ];
+    foreach (['columns', 'sort_field', 'sort_direction', 'groupings'] as $key) {
+      if (isset($input[$key]) && $input[$key] !== '') {
+        $summary[$key] = $input[$key];
+      }
+    }
+    foreach (['limit', 'offset'] as $key) {
+      if (isset($input[$key])) {
+        $summary[$key] = (int) $input[$key];
+      }
+    }
+    foreach (['conditions', 'expressions'] as $key) {
+      if (isset($input[$key]) && is_string($input[$key]) && $input[$key] !== '') {
+        $decoded = json_decode($input[$key], TRUE);
+        $summary[$key] = is_array($decoded) ? $decoded : $input[$key];
+      }
+    }
+    if ($toolName === 'query_datastore_join') {
+      $summary['join_resource_id'] = $input['resolved_join_resource_id'] ?? $input['join_resource_id'] ?? NULL;
+      if (isset($input['join_on'])) {
+        $summary['join_on'] = $input['join_on'];
+      }
+    }
+    return $summary;
   }
 
   /**
