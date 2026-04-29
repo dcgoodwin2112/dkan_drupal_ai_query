@@ -54,10 +54,6 @@ function dkan_drupal_ai_query_modules_installed(array $modules, bool $is_syncing
  */
 function dkan_drupal_ai_query_theme($existing, $type, $theme, $path) {
   return [
-    'dkan_drupal_ai_query_test' => [
-      'variables' => [],
-      'template' => 'dkan-drupal-ai-query-test',
-    ],
     'dkan_drupal_ai_query_widget' => [
       'variables' => [
         'dataset_id' => '',

@@ -1330,10 +1330,8 @@
   /**
    * Best-effort one-line summary of a tool's parsed JSON output.
    *
-   * Mirrors the dkan_nl_query convention ("→ N of M rows", "→ K columns: …")
-   * but derives the numbers from the live tool_results JSON instead of a
-   * backend-prepared result_summary object. Returns '' when nothing useful
-   * can be inferred.
+   * Renders "→ N of M rows" / "→ K columns: …" derived from the live
+   * tool_results JSON. Returns '' when nothing useful can be inferred.
    */
   function formatToolResultSummary(name, raw) {
     if (raw == null || raw === '') {
