@@ -15,10 +15,15 @@ class AgentToolFinishedExecutionEvent {
   public function __construct(
     protected string $threadId = '',
     protected mixed $tool = NULL,
+    protected string $runnerId = '',
   ) {}
 
   public function getThreadId(): string {
     return $this->threadId;
+  }
+
+  public function getAgentRunnerId(): string {
+    return $this->runnerId !== '' ? $this->runnerId : $this->threadId;
   }
 
   public function getTool(): mixed {
