@@ -24,6 +24,10 @@ class FunctionCallStub {
     return $this->output;
   }
 
+  public function setOutput(string $output): void {
+    $this->output = $output;
+  }
+
   public function getContextValue(string $name): mixed {
     if (!array_key_exists($name, $this->context)) {
       throw new \RuntimeException("Context '$name' not set.");
