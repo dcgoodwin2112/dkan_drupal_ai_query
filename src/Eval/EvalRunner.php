@@ -9,6 +9,7 @@ use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\ai_agents\PluginManager\AiAgentManager;
 use Drupal\ai_agents\Task\Task;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
+use Drupal\dkan_drupal_ai_query\Service\EvalToolCallCollector;
 use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
 use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
 use Drupal\dkan_drupal_ai_query\Service\UnknownColumnCounter;
@@ -39,6 +40,7 @@ class EvalRunner {
     protected RefusalCollector $refusals,
     protected SystemPromptLoader $promptLoader,
     protected UnknownColumnCounter $unknownColumnCounter,
+    protected EvalToolCallCollector $toolCalls,
   ) {}
 
   /**
@@ -56,6 +58,8 @@ class EvalRunner {
    *   Seconds to pause between cases. Used to dodge LLM rate limits.
    * @param callable|null $progress
    *   Optional callback: ($index, $total, GoldenCase, CaseResult).
+   * @param array $runFlags
+   *   Run-level flags (e.g., 'no-schema-dictionary') recorded on every case.
    *
    * @return \Drupal\dkan_drupal_ai_query\Eval\CaseResult[]
    *   Results in the same order as $cases.
@@ -67,6 +71,7 @@ class EvalRunner {
     bool $clearCaches = TRUE,
     int $sleepSeconds = 0,
     ?callable $progress = NULL,
+    array $runFlags = [],
   ): array {
     $results = [];
     $total = count($cases);
@@ -77,7 +82,7 @@ class EvalRunner {
       if ($clearCaches) {
         $this->clearCaches();
       }
-      $result = $this->runOne($case, $providerId, $modelId);
+      $result = $this->runOne($case, $providerId, $modelId, $runFlags);
       $results[] = $result;
       if ($progress !== NULL) {
         $progress($i + 1, $total, $case, $result);
@@ -89,7 +94,7 @@ class EvalRunner {
   /**
    * Execute a single case end-to-end and build its result row.
    */
-  protected function runOne(GoldenCase $case, string $providerId, string $modelId): CaseResult {
+  protected function runOne(GoldenCase $case, string $providerId, string $modelId, array $runFlags = []): CaseResult {
     $threadId = 'eval-' . $case->id . '-' . bin2hex(random_bytes(4));
 
     $start = hrtime(TRUE);
@@ -142,8 +147,11 @@ class EvalRunner {
       $category = 'dsl_limitation';
     }
 
+    $capturedToolCalls = $this->toolCalls->load($threadId);
+
     $this->refusals->forget($threadId);
     $this->unknownColumnCounter->forget($threadId);
+    $this->toolCalls->forget($threadId);
 
     return new CaseResult(
       caseId: $case->id,
@@ -151,7 +159,7 @@ class EvalRunner {
       outcome: $outcome,
       failureCategory: $category,
       answer: $answer,
-      toolCalls: [],
+      toolCalls: $capturedToolCalls,
       artifacts: $this->artifacts->load($threadId),
       durationMs: $durationMs,
       provider: $providerId,
@@ -160,6 +168,7 @@ class EvalRunner {
       errorMessage: $errorMessage,
       promptVersion: $this->promptLoader->activeVersion(),
       refusal: $structuredRefusal,
+      runFlags: $runFlags,
     );
   }
 
