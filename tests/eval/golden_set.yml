@@ -1,0 +1,106 @@
+# dkan_drupal_ai_query eval golden set
+#
+# Each case runs end-to-end through the dkan_data_query agent. Pass/fail is
+# determined by CaseEvaluator (see src/Eval/CaseEvaluator.php). Phase 1 uses
+# heuristic refusal detection; Phase 3 will switch to a structured RefuseTool
+# signal.
+#
+# Schema (per case):
+#   id:                       unique slug, used for filtering with --case=
+#   question:                 user-facing question
+#   expected_dataset_id:      UUID the model should land on (null for refusal cases)
+#   expected_columns_used:    columns the answer should reference (advisory)
+#   expected_answer_pattern:  case-insensitive regex matched against the answer
+#   expected_refusal:         true if the model should decline
+#   expected_failure_category: when set, scored as a fail of that category if
+#                             the model does not refuse. Used for dsl_limitation.
+#   notes:                    free text
+#
+# Editing:
+#   Add cases by appending to `cases:`. Re-run `drush dkan-aiq:eval` to score.
+#   For new datasets, run `drush dkan:list_datasets` and `drush dkan:get_datastore_schema`
+#   to confirm column names before writing patterns.
+
+cases:
+  - id: crime_houston_violent_total
+    question: "How many violent crimes were reported in Houston?"
+    expected_dataset_id: d460252e-d42c-474a-9ea9-5287b1d595f6
+    expected_columns_used: [city, violent_crimes]
+    expected_answer_pattern: '22[,.\s]?008'
+    expected_refusal: false
+    notes: "Simple lookup. Houston violent_crimes = 22008."
+
+  - id: foreclosure_california_total
+    question: "How many foreclosures did California have in January 2012?"
+    expected_dataset_id: 74c06c81-9fe0-439c-aba9-cd5c980a6df4
+    expected_columns_used: [state, totalforeclosures]
+    expected_answer_pattern: '51[,.\s]?584'
+    expected_refusal: false
+    notes: "Filtered lookup, totalforeclosures column."
+
+  - id: asthma_california_adults
+    question: "What is the current asthma prevalence among adults in California?"
+    expected_dataset_id: 95f8eac4-fd1f-4b35-8472-5c87e9425dfa
+    expected_columns_used: [state, age_range, current_asthma_prevalence]
+    expected_answer_pattern: '7\.9'
+    expected_refusal: false
+    notes: "Filtered lookup with age_range = Adults."
+
+  - id: crime_homicides_chicago_synonym
+    question: "How many homicides were reported in Chicago?"
+    expected_dataset_id: d460252e-d42c-474a-9ea9-5287b1d595f6
+    expected_columns_used: [city, murder_and_nonnegligent_manslaughter]
+    expected_answer_pattern: '\d+'
+    expected_refusal: false
+    notes: "Wrong-column synonym: 'homicides' must resolve to murder_and_nonnegligent_manslaughter via schema lookup, not direct match."
+
+  - id: refusal_no_matching_dataset
+    question: "How many electric vehicles were sold in the United States in 2023?"
+    expected_dataset_id: null
+    expected_columns_used: []
+    expected_answer_pattern: null
+    expected_refusal: true
+    notes: "Catalog has no EV sales data. Should refuse, not invent."
+
+  - id: refusal_write_request
+    question: "Please delete the gold prices dataset from the catalog."
+    expected_dataset_id: null
+    expected_columns_used: []
+    expected_answer_pattern: null
+    expected_refusal: true
+    notes: "Write requests are out of scope. Should refuse without attempting."
+
+  - id: varicella_out_of_coverage
+    question: "What was the Varicella mortality rate for 5-to-9-year-olds in 2020?"
+    expected_dataset_id: e1f2ebcd-ee23-454f-87b5-df0306658418
+    expected_columns_used: [year, 5_to_9_years_old]
+    expected_answer_pattern: null
+    expected_refusal: true
+    notes: "Varicella dataset covers 1991-2007. 2020 is out of coverage; should refuse or explicitly acknowledge no data for that year."
+
+  - id: dsl_yoy_varicella
+    question: "What was the year-over-year change in mortality for the 1-to-4-year-old age group in the Varicella dataset?"
+    expected_dataset_id: e1f2ebcd-ee23-454f-87b5-df0306658418
+    expected_columns_used: [year, 1_to_4_years_old]
+    expected_answer_pattern: null
+    expected_refusal: true
+    expected_failure_category: dsl_limitation
+    notes: "DSL limit: requires LAG or self-join. Graceful refusal passes; confident structured query fails as dsl_limitation."
+
+  - id: dsl_above_avg_crime
+    question: "Which cities had above-average violent crime rates per 100,000 people?"
+    expected_dataset_id: d460252e-d42c-474a-9ea9-5287b1d595f6
+    expected_columns_used: [city, violent_crime_rate_per_100000_people]
+    expected_answer_pattern: null
+    expected_refusal: true
+    expected_failure_category: dsl_limitation
+    notes: "DSL limit: requires subquery to compare against the average. No subqueries in DatastoreQuery."
+
+  - id: dsl_percentile_gold
+    question: "What was the 90th percentile gold price each decade?"
+    expected_dataset_id: 5dc1cfcf-8028-476c-a020-f58ec6dd621c
+    expected_columns_used: [date, price]
+    expected_answer_pattern: null
+    expected_refusal: true
+    expected_failure_category: dsl_limitation
+    notes: "DSL limit: requires PERCENTILE_CONT or window function plus decade extraction."

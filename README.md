@@ -160,6 +160,41 @@ Drupal's Request Path block-visibility condition does **literal** path matching.
 - **Polling cost.** `/poll` reads from `PrivateTempStore` (DB-backed). At 500 ms cadence × N concurrent conversations, that's ~120 reqs/min/user against the temp store. Manageable; raise the JS `POLL_INTERVAL_MS` to 750–1000 if it shows up in metrics.
 - **No graceful cancellation.** Closing the browser tab does not abort `solve()`. Worth flagging in the UI when implementing real cancel; v1 is best-effort.
 
+## Eval harness
+
+Phase 1 ships a Drush-driven eval harness so accuracy improvements are measurable.
+
+```bash
+ddev drush dkan-aiq:eval                              # Run the full golden set
+ddev drush dkan-aiq:eval --case=foo_bar               # Run one case by id
+ddev drush dkan-aiq:eval --model=claude-sonnet-4-6    # Override the model
+ddev drush dkan-aiq:eval --sleep-seconds=20           # Pause N seconds between cases to dodge rate limits
+ddev drush dkan-aiq:eval --no-cache-clear             # Skip drupal_flush_all_caches between cases
+```
+
+Default provider/model: `anthropic` / `claude-haiku-4-5-20251001`. Default output: `sites/default/files/private/ai-eval/run-{label}.{jsonl,md}`.
+
+The runner invokes the `dkan_data_query` agent directly (`agent.solve()`), bypassing `NlQueryController` and the polling endpoint. Same agent, same tools, same prompt, but no HTTP and no `PrivateTempStore` contention.
+
+### Adding a golden case
+
+Edit `tests/eval/golden_set.yml`. Each case is one entry under `cases:`:
+
+```yaml
+- id: my_new_case
+  question: "What's the population of Houston?"
+  expected_dataset_id: d460252e-d42c-474a-9ea9-5287b1d595f6   # null for refusal cases
+  expected_columns_used: [city, population]                    # advisory
+  expected_answer_pattern: '2[,.\s]?219[,.\s]?933'             # case-insensitive regex
+  expected_refusal: false
+  expected_failure_category: null                              # set to dsl_limitation when applicable
+  notes: "Why this case exists."
+```
+
+Discover dataset ids and column names with `drush dkan:list_datasets` and `drush dkan:get_datastore_schema`. Phase 1 uses heuristic refusal detection in `CaseEvaluator`; Phase 3 will switch to a structured `RefuseTool` signal.
+
+The baseline run lives at `tests/eval/baseline/`. Re-run after each phase ships and commit the new file alongside; PR descriptions should show the delta.
+
 ## Tests
 
 PHPUnit:
