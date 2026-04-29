@@ -10,30 +10,23 @@ use Drupal\dkan_drupal_ai_query\Entity\Message;
 
 /**
  * Implements hook_install().
- *
- * Best-effort migration of API keys from dkan_nl_query.settings into the
- * Key registry. Idempotent — skips any Key entity that already exists.
  */
 function dkan_drupal_ai_query_install(): void {
-  _dkan_drupal_ai_query_install_entity_types();
-  $migrated = _dkan_drupal_ai_query_migrate_keys();
-  if ($migrated) {
-    \Drupal::logger('dkan_drupal_ai_query')->notice(
-      'Migrated @n API key(s) from dkan_nl_query into the Key registry: @keys. Manage them at @url.',
-      [
-        '@n' => count($migrated),
-        '@keys' => implode(', ', $migrated),
-        '@url' => '/admin/config/system/keys',
-      ]
-    );
+  $update_manager = \Drupal::entityDefinitionUpdateManager();
+  foreach (['dkan_aiq_conversation' => Conversation::class, 'dkan_aiq_message' => Message::class] as $eid => $class) {
+    if ($update_manager->getEntityType($eid)) {
+      continue;
+    }
+    $type = \Drupal::entityTypeManager()->getDefinition($eid);
+    $update_manager->installEntityType($type);
   }
 }
 
 /**
  * Implements hook_uninstall().
  *
- * Removes the Conversation and Message tables. Does NOT delete migrated Key
- * entities — they outlive this module.
+ * Removes the Conversation and Message tables. Does NOT delete Key entities
+ * configured for AI providers — they outlive this module.
  */
 function dkan_drupal_ai_query_uninstall(): void {
   $update_manager = \Drupal::entityDefinitionUpdateManager();
@@ -42,24 +35,6 @@ function dkan_drupal_ai_query_uninstall(): void {
       $update_manager->uninstallEntityType($type);
     }
   }
-}
-
-/**
- * Migrate API keys from dkan_nl_query.settings into the Key registry.
- *
- * Re-runnable. Skips a Key entity if it already exists under the canonical
- * name (`dkan_anthropic`, `dkan_openai`).
- */
-function dkan_drupal_ai_query_update_10001(): string {
-  $migrated = _dkan_drupal_ai_query_migrate_keys();
-  if (!$migrated) {
-    return 'No new keys migrated (none configured in dkan_nl_query.settings, or already present in Key registry).';
-  }
-  return sprintf(
-    'Migrated %d API key(s) into the Key registry: %s. Manage at /admin/config/system/keys.',
-    count($migrated),
-    implode(', ', $migrated)
-  );
 }
 
 /**
@@ -78,144 +53,4 @@ function dkan_drupal_ai_query_update_10003(): string {
   }
   $config->set('default_model', '')->save();
   return sprintf('Cleared legacy default_model "%s"; pick a new value at /admin/config/dkan/ai-query.', $current);
-}
-
-/**
- * Copy conversation history from dkan_nl_query → dkan_drupal_ai_query.
- *
- * Optional. Run via `drush updb` after enabling the module. Skipped if the
- * source entity type is not installed or already empty. Each conversation
- * gets a "[migrated]" suffix in the title so users can tell what came over.
- */
-function dkan_drupal_ai_query_update_10002(): string {
-  $etm = \Drupal::entityTypeManager();
-  if (!$etm->hasDefinition('nl_query_conversation') || !$etm->hasDefinition('nl_query_message')) {
-    return 'dkan_nl_query entity types not present — skipping conversation copy.';
-  }
-
-  $srcConvStorage = $etm->getStorage('nl_query_conversation');
-  $srcMsgStorage = $etm->getStorage('nl_query_message');
-  $dstConvStorage = $etm->getStorage('dkan_aiq_conversation');
-  $dstMsgStorage = $etm->getStorage('dkan_aiq_message');
-
-  $convIds = $srcConvStorage->getQuery()->accessCheck(FALSE)->execute();
-  if (!$convIds) {
-    return 'No dkan_nl_query conversations to copy.';
-  }
-
-  $copiedConv = 0;
-  $copiedMsg = 0;
-  foreach ($srcConvStorage->loadMultiple($convIds) as $src) {
-    $dst = $dstConvStorage->create([
-      'uid' => $src->get('uid')->target_id,
-      'title' => mb_substr(($src->get('title')->value ?? 'Untitled') . ' [migrated]', 0, 255),
-      'dataset_id' => $src->get('dataset_id')->value,
-      'pinned' => (bool) $src->get('pinned')->value,
-    ]);
-    $dst->save();
-    $copiedConv++;
-
-    $msgIds = $srcMsgStorage->getQuery()
-      ->accessCheck(FALSE)
-      ->condition('conversation_id', $src->id())
-      ->sort('weight', 'ASC')
-      ->sort('id', 'ASC')
-      ->execute();
-    foreach ($srcMsgStorage->loadMultiple($msgIds) as $i => $srcMsg) {
-      // Preserve role + content. Old chart_spec / table_data / tool_calls are
-      // collapsed into the new `artifacts` JSON field.
-      $artifacts = [];
-      $tableData = $srcMsg->get('table_data')->value;
-      if ($tableData) {
-        $decoded = json_decode($tableData, TRUE);
-        if (is_array($decoded)) {
-          $artifacts[] = ['type' => 'data', 'tool' => 'query_datastore'] + $decoded;
-        }
-      }
-      $chartSpec = $srcMsg->get('chart_spec')->value;
-      if ($chartSpec) {
-        $decoded = json_decode($chartSpec, TRUE);
-        if (is_array($decoded)) {
-          $artifacts[] = ['type' => 'chart', 'spec' => $decoded];
-        }
-      }
-      $dstMsg = $dstMsgStorage->create([
-        'conversation_id' => $dst->id(),
-        'role' => $srcMsg->get('role')->value,
-        'content' => $srcMsg->get('content')->value,
-        'artifacts' => $artifacts ? json_encode($artifacts) : NULL,
-        'weight' => $srcMsg->get('weight')->value ?? $i,
-      ]);
-      $dstMsg->save();
-      $copiedMsg++;
-    }
-  }
-
-  return sprintf(
-    'Copied %d conversation(s) and %d message(s) from dkan_nl_query.',
-    $copiedConv,
-    $copiedMsg
-  );
-}
-
-/**
- * Helper: install the new entity types if not already installed.
- */
-function _dkan_drupal_ai_query_install_entity_types(): void {
-  $update_manager = \Drupal::entityDefinitionUpdateManager();
-  foreach (['dkan_aiq_conversation' => Conversation::class, 'dkan_aiq_message' => Message::class] as $eid => $class) {
-    if ($update_manager->getEntityType($eid)) {
-      continue;
-    }
-    $type = \Drupal::entityTypeManager()->getDefinition($eid);
-    $update_manager->installEntityType($type);
-  }
-}
-
-/**
- * Helper: migrate API keys from dkan_nl_query.settings into the Key registry.
- *
- * @return array
- *   The Key entity ids that were created.
- */
-function _dkan_drupal_ai_query_migrate_keys(): array {
-  $created = [];
-  $config = \Drupal::config('dkan_nl_query.settings');
-  $keyStorage = \Drupal::entityTypeManager()->getStorage('key');
-
-  $candidates = [
-    'dkan_anthropic' => [
-      'label' => 'DKAN Anthropic API Key',
-      'value' => trim((string) ($config->get('anthropic_api_key') ?: $config->get('api_key'))),
-    ],
-    'dkan_openai' => [
-      'label' => 'DKAN OpenAI API Key',
-      'value' => trim((string) $config->get('openai_api_key')),
-    ],
-  ];
-
-  foreach ($candidates as $id => $info) {
-    if ($info['value'] === '') {
-      continue;
-    }
-    if ($keyStorage->load($id)) {
-      // Already present — preserve whatever the operator configured.
-      continue;
-    }
-    $key = $keyStorage->create([
-      'id' => $id,
-      'label' => $info['label'],
-      'key_type' => 'authentication',
-      'key_provider' => 'config',
-      'key_provider_settings' => [
-        'key_value' => $info['value'],
-        'base64_encoded' => FALSE,
-      ],
-      'key_input' => 'text_field',
-    ]);
-    $key->save();
-    $created[] = $id;
-  }
-
-  return $created;
 }

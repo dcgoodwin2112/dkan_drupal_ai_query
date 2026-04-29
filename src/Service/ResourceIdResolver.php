@@ -9,9 +9,9 @@ use Psr\Log\LoggerInterface;
 /**
  * Resolves a user-supplied resource_id, including fuzzy matching.
  *
- * Extracted from dkan_nl_query\Service\ToolExecutor::resolveResourceId(),
- * findResourceByVersion(), findResourceByPrefix(), findDatasetResources().
- * Logic unchanged.
+ * Accepts an exact identifier__version, a corrupted variant the LLM may have
+ * mangled (matched on version suffix or 6-char identifier prefix), or a
+ * dataset title for fuzzy lookup.
  */
 class ResourceIdResolver {
 

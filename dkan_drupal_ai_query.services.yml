@@ -1,11 +1,4 @@
 services:
-  dkan_drupal_ai_query.schema_context_builder:
-    class: Drupal\dkan_drupal_ai_query\Service\SchemaContextBuilder
-    arguments:
-      - '@dkan_query_tools.metastore'
-      - '@dkan_query_tools.datastore'
-      - '@cache.default'
-
   dkan_drupal_ai_query.resource_id_resolver:
     class: Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver
     arguments:
