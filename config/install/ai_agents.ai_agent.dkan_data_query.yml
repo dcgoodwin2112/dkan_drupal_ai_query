@@ -66,6 +66,7 @@ tools:
   'dkan_drupal_ai_query:list_distributions': true
   'dkan_drupal_ai_query:find_dataset_resources': true
   'dkan_drupal_ai_query:create_chart': true
+  'dkan_drupal_ai_query:refuse': true
 tool_usage_limits: {  }
 tool_settings: {  }
 orchestration_agent: false

@@ -6,6 +6,7 @@ use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
 use Drupal\common\DataResource;
 use Drupal\datastore\DatastoreService;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
+use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
 use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -34,6 +35,7 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
     protected LoggerInterface $logger,
     protected ResourceIdResolver $resolver,
     protected DatastoreService $datastoreService,
+    protected RefusalCollector $refusals,
   ) {}
 
   /**
@@ -49,7 +51,12 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
    * Capture data table or chart spec when one of our tools finishes.
    */
   public function onToolFinished(AgentToolFinishedExecutionEvent $event): void {
-    $threadId = $event->getThreadId();
+    // ai_agents only auto-generates a thread id when progressTracking is on.
+    // CLI runs (eval, future cron) disable that to avoid PrivateTempStore's
+    // session requirement, so threadId is NULL there. Fall back to the
+    // runner id, which the caller always sets. The controller wires both
+    // to the same value, so behaviour is unchanged for HTTP requests.
+    $threadId = $event->getThreadId() ?: $event->getAgentRunnerId();
     if (!$threadId) {
       return;
     }
@@ -62,7 +69,33 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
     }
     if ($name === 'create_chart') {
       $this->captureChart($threadId, $tool);
+      return;
     }
+    if ($name === 'refuse') {
+      $this->captureRefusal($threadId, $tool);
+    }
+  }
+
+  /**
+   * Capture a structured refusal payload into RefusalCollector.
+   */
+  protected function captureRefusal(string $threadId, $tool): void {
+    $raw = $tool->getReadableOutput();
+    if (!$raw) {
+      return;
+    }
+    $decoded = json_decode($raw, TRUE);
+    if (!is_array($decoded) || empty($decoded['refused'])) {
+      return;
+    }
+    $this->refusals->record($threadId, $decoded);
+    // Also surface to the UI artifact stream when a session is available.
+    $this->artifacts->append($threadId, [
+      'type' => 'refusal',
+      'reason_category' => $decoded['reason_category'] ?? 'other',
+      'explanation' => $decoded['explanation'] ?? '',
+      'datasets_searched' => $decoded['datasets_searched'] ?? [],
+    ]);
   }
 
   /**

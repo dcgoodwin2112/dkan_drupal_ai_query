@@ -9,6 +9,8 @@ use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\ai_agents\PluginManager\AiAgentManager;
 use Drupal\ai_agents\Task\Task;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
+use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
+use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -33,6 +35,8 @@ class EvalRunner {
     protected ArtifactStorage $artifacts,
     protected CaseEvaluator $evaluator,
     protected LoggerInterface $logger,
+    protected RefusalCollector $refusals,
+    protected SystemPromptLoader $promptLoader,
   ) {}
 
   /**
@@ -114,16 +118,29 @@ class EvalRunner {
     }
     $durationMs = (int) ((hrtime(TRUE) - $start) / 1e6);
 
-    [$outcome, $category] = $this->evaluator->evaluate($case, $answer, $errorMessage);
+    $structuredRefusal = $this->refusals->get($threadId);
 
+    [$outcome, $category] = $this->evaluator->evaluate(
+      $case,
+      $answer,
+      $errorMessage,
+      $structuredRefusal,
+    );
+
+    // dsl_limitation cases must demonstrate DSL awareness: a structured
+    // refusal with reason_category=dsl_limitation, or — for older runs that
+    // refused in free text — heuristic mention of LAG/percentile/etc.
     if (
       $outcome === CaseResult::OUTCOME_PASS
       && $case->expectedFailureCategory === 'dsl_limitation'
+      && !$this->evaluator->isStructuredDslLimitRefusal($structuredRefusal)
       && !$this->evaluator->looksLikeDslLimitRefusal($answer)
     ) {
       $outcome = CaseResult::OUTCOME_FAIL;
       $category = 'dsl_limitation';
     }
+
+    $this->refusals->forget($threadId);
 
     return new CaseResult(
       caseId: $case->id,
@@ -138,6 +155,8 @@ class EvalRunner {
       model: $modelId,
       executedAt: gmdate('c'),
       errorMessage: $errorMessage,
+      promptVersion: $this->promptLoader->activeVersion(),
+      refusal: $structuredRefusal,
     );
   }
 
