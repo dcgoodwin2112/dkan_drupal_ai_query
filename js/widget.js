@@ -622,14 +622,18 @@
     else if (artifact.type === 'chart') {
       this.renderChartInBubble(bubble, artifact);
     }
+    else if (artifact.type === 'refusal') {
+      this.renderRefusalInBubble(bubble, artifact);
+    }
   };
 
   Widget.prototype.renderTableInBubble = function (bubble, artifact) {
     const rows = artifact.rows || [];
-    if (rows.length === 0) {
+    const provenance = artifact.provenance || null;
+    if (rows.length === 0 && !provenance) {
       return;
     }
-    const cols = Object.keys(rows[0] || {});
+    const cols = rows.length ? Object.keys(rows[0] || {}) : [];
     const input = artifact.input || null;
     const toolName = artifact.tool || 'query_datastore';
 
@@ -663,11 +667,14 @@
     const actions = document.createElement('span');
     actions.className = 'dkan-aiq-table-actions';
 
-    const toggleBtn = document.createElement('button');
-    toggleBtn.type = 'button';
-    toggleBtn.className = 'dkan-aiq-table-toggle';
-    toggleBtn.textContent = 'Show table';
-    actions.appendChild(toggleBtn);
+    let toggleBtn = null;
+    if (rows.length) {
+      toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.className = 'dkan-aiq-table-toggle';
+      toggleBtn.textContent = 'Show table';
+      actions.appendChild(toggleBtn);
+    }
 
     let apiBtn = null;
     if (apiText) {
@@ -687,12 +694,23 @@
       actions.appendChild(sqlBtn);
     }
 
-    const csvBtn = document.createElement('button');
-    csvBtn.type = 'button';
-    csvBtn.className = 'dkan-aiq-csv-btn';
-    csvBtn.textContent = 'Download CSV';
-    csvBtn.addEventListener('click', () => { downloadCsv(cols, rows); });
-    actions.appendChild(csvBtn);
+    let provBtn = null;
+    if (provenance) {
+      provBtn = document.createElement('button');
+      provBtn.type = 'button';
+      provBtn.className = 'dkan-aiq-prov-btn';
+      provBtn.textContent = 'Show provenance';
+      actions.appendChild(provBtn);
+    }
+
+    if (rows.length) {
+      const csvBtn = document.createElement('button');
+      csvBtn.type = 'button';
+      csvBtn.className = 'dkan-aiq-csv-btn';
+      csvBtn.textContent = 'Download CSV';
+      csvBtn.addEventListener('click', () => { downloadCsv(cols, rows); });
+      actions.appendChild(csvBtn);
+    }
 
     summary.appendChild(actions);
     container.appendChild(summary);
@@ -755,11 +773,29 @@
       });
     }
 
+    // Provenance collapsible panel (Phase 5).
+    if (provBtn && provenance) {
+      const provWrap = document.createElement('div');
+      provWrap.className = 'dkan-aiq-prov-wrapper';
+      provWrap.hidden = true;
+      renderProvenancePanel(provWrap, provenance);
+      container.appendChild(provWrap);
+      provBtn.addEventListener('click', () => {
+        const isHidden = provWrap.hidden;
+        provWrap.hidden = !isHidden;
+        provBtn.textContent = isHidden ? 'Hide provenance' : 'Show provenance';
+        this.scrollToBottom();
+      });
+    }
+
     // Table wrapper (collapsed by default; built lazily on first reveal).
-    const tableWrap = document.createElement('div');
-    tableWrap.className = 'dkan-aiq-table-wrapper';
-    tableWrap.hidden = true;
-    container.appendChild(tableWrap);
+    let tableWrap = null;
+    if (rows.length) {
+      tableWrap = document.createElement('div');
+      tableWrap.className = 'dkan-aiq-table-wrapper';
+      tableWrap.hidden = true;
+      container.appendChild(tableWrap);
+    }
 
     let sortCol = null;
     let sortAsc = true;
@@ -818,15 +854,17 @@
       tableWrap.appendChild(table);
     };
 
-    toggleBtn.addEventListener('click', () => {
-      const isHidden = tableWrap.hidden;
-      tableWrap.hidden = !isHidden;
-      toggleBtn.textContent = isHidden ? 'Hide table' : 'Show table';
-      if (isHidden && !tableWrap.hasChildNodes()) {
-        buildTable(rows);
-      }
-      this.scrollToBottom();
-    });
+    if (toggleBtn && tableWrap) {
+      toggleBtn.addEventListener('click', () => {
+        const isHidden = tableWrap.hidden;
+        tableWrap.hidden = !isHidden;
+        toggleBtn.textContent = isHidden ? 'Hide table' : 'Show table';
+        if (isHidden && !tableWrap.hasChildNodes()) {
+          buildTable(rows);
+        }
+        this.scrollToBottom();
+      });
+    }
 
     this.scrollToBottom();
   };
@@ -1076,6 +1114,76 @@
     return str;
   }
 
+  /**
+   * Render the provenance block as a definition list inside `wrap`.
+   *
+   * Provenance is the audit trail for one query_datastore tool call:
+   * when it ran, the structured query shape, total rows, and any
+   * sanity flags surfaced by the datastore.
+   */
+  function renderProvenancePanel(wrap, prov) {
+    const dl = document.createElement('dl');
+    dl.className = 'dkan-aiq-prov';
+
+    const addRow = (label, value) => {
+      const dt = document.createElement('dt');
+      dt.textContent = label;
+      dl.appendChild(dt);
+      const dd = document.createElement('dd');
+      if (value instanceof Node) {
+        dd.appendChild(value);
+      }
+      else {
+        dd.textContent = value;
+      }
+      dl.appendChild(dd);
+    };
+
+    if (prov.executed_at) {
+      addRow('Executed', prov.executed_at);
+    }
+    addRow('Tool', prov.tool || '(unknown)');
+    if (prov.row_count != null) {
+      let countText = String(prov.row_count) + ' returned';
+      if (prov.total_rows != null && prov.total_rows !== prov.row_count) {
+        countText += ' / ' + prov.total_rows + ' total';
+      }
+      addRow('Rows', countText);
+    }
+
+    const flags = prov.sanity_flags || null;
+    if (flags) {
+      const flagged = [];
+      if (flags.zero_rows) flagged.push('zero_rows');
+      if (flags.row_cap_hit) flagged.push('row_cap_hit');
+      if (Array.isArray(flags.all_null_columns) && flags.all_null_columns.length) {
+        flagged.push('all_null_columns: ' + flags.all_null_columns.join(', '));
+      }
+      if (flags.coverage_warning) {
+        flagged.push('coverage_warning: ' + flags.coverage_warning);
+      }
+      if (flagged.length) {
+        const ul = document.createElement('ul');
+        ul.className = 'dkan-aiq-prov-flags';
+        flagged.forEach((line) => {
+          const li = document.createElement('li');
+          li.textContent = line;
+          ul.appendChild(li);
+        });
+        addRow('Sanity flags', ul);
+      }
+    }
+
+    if (prov.query_summary) {
+      const pre = document.createElement('pre');
+      pre.className = 'dkan-aiq-prov-query';
+      pre.textContent = JSON.stringify(prov.query_summary, null, 2);
+      addRow('Query', pre);
+    }
+
+    wrap.appendChild(dl);
+  }
+
   function downloadCsv(columns, rows) {
     const lines = [];
     lines.push(columns.map(csvEscape).join(','));
@@ -1135,6 +1243,53 @@
       }, 100);
       setTimeout(() => clearInterval(interval), 8000);
     }
+  };
+
+  /**
+   * Render a structured refusal as a distinct card (no provenance block).
+   *
+   * The agent calls the `refuse` tool when it cannot answer; the
+   * subscriber persists a `{type: refusal, reason_category, explanation,
+   * datasets_searched}` artifact. We render it here as a clearly
+   * differentiated card so the user understands the agent stopped
+   * deliberately.
+   */
+  Widget.prototype.renderRefusalInBubble = function (bubble, artifact) {
+    const card = document.createElement('div');
+    card.className = 'dkan-aiq-refusal';
+    bubble.classList.add('dkan-aiq-message-has-refusal');
+
+    const header = document.createElement('div');
+    header.className = 'dkan-aiq-refusal-header';
+    const label = document.createElement('span');
+    label.className = 'dkan-aiq-refusal-label';
+    label.textContent = 'Refused';
+    header.appendChild(label);
+    const cat = document.createElement('span');
+    cat.className = 'dkan-aiq-refusal-category';
+    cat.textContent = artifact.reason_category || 'other';
+    header.appendChild(cat);
+    card.appendChild(header);
+
+    if (artifact.explanation) {
+      const body = document.createElement('p');
+      body.className = 'dkan-aiq-refusal-explanation';
+      body.textContent = artifact.explanation;
+      card.appendChild(body);
+    }
+
+    const searched = artifact.datasets_searched || [];
+    const list = Array.isArray(searched) ? searched : [searched];
+    const items = list.filter((s) => typeof s === 'string' && s.length);
+    if (items.length) {
+      const note = document.createElement('p');
+      note.className = 'dkan-aiq-refusal-searched';
+      note.textContent = 'Searched: ' + items.join(', ');
+      card.appendChild(note);
+    }
+
+    bubble.appendChild(card);
+    this.scrollToBottom();
   };
 
   Widget.prototype.renderFollowUpSuggestions = function (items) {
