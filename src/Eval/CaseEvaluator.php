@@ -7,10 +7,24 @@ namespace Drupal\dkan_drupal_ai_query\Eval;
 /**
  * Decides pass/fail for a single case given the agent's output.
  *
- * Phase 1 detection is heuristic. When RefuseTool lands in Phase 3, refusal
- * detection moves from regex to a structured signal.
+ * Refusal detection prefers a structured RefuseTool payload (Phase 3) when
+ * present, and falls back to heuristic regex over the answer text for older
+ * runs / cases where the model refused without invoking the tool.
  */
 class CaseEvaluator {
+
+  /**
+   * Map of refusal reason_category to recorded failure category.
+   */
+  protected const STRUCTURED_REFUSAL_TO_CATEGORY = [
+    'no_matching_dataset' => 'should_have_answered',
+    'out_of_scope' => 'should_have_answered',
+    'write_request' => 'should_have_answered',
+    'out_of_coverage' => 'should_have_answered',
+    'dsl_limitation' => 'should_have_answered',
+    'repeated_unknown_column' => 'should_have_answered',
+    'other' => 'should_have_answered',
+  ];
 
   /**
    * Heuristic patterns that indicate the model declined to answer.
@@ -44,12 +58,17 @@ class CaseEvaluator {
    * CaseResult::OUTCOME_* constants and category is the failure category
    * (or NULL on pass / on error with category 'execution_error').
    */
-  public function evaluate(GoldenCase $case, string $answer, ?string $errorMessage = NULL): array {
+  public function evaluate(
+    GoldenCase $case,
+    string $answer,
+    ?string $errorMessage = NULL,
+    ?array $structuredRefusal = NULL,
+  ): array {
     if ($errorMessage !== NULL) {
       return [CaseResult::OUTCOME_ERROR, 'execution_error'];
     }
 
-    $isRefusal = $this->looksLikeRefusal($answer);
+    $isRefusal = $structuredRefusal !== NULL || $this->looksLikeRefusal($answer);
 
     if ($case->expectedRefusal) {
       if ($isRefusal) {
@@ -59,6 +78,13 @@ class CaseEvaluator {
     }
 
     if ($isRefusal) {
+      // Structured refusal carries a deterministic reason; map it through
+      // STRUCTURED_REFUSAL_TO_CATEGORY so the eval report records the model's
+      // own category rather than a generic catch-all.
+      if ($structuredRefusal !== NULL) {
+        $cat = $structuredRefusal['reason_category'] ?? 'other';
+        return [CaseResult::OUTCOME_FAIL, self::STRUCTURED_REFUSAL_TO_CATEGORY[$cat] ?? 'should_have_answered'];
+      }
       return [CaseResult::OUTCOME_FAIL, 'should_have_answered'];
     }
 
@@ -75,6 +101,14 @@ class CaseEvaluator {
     }
 
     return [CaseResult::OUTCOME_PASS, NULL];
+  }
+
+  /**
+   * TRUE when the structured refusal payload claims a DSL-limit refusal.
+   */
+  public function isStructuredDslLimitRefusal(?array $structuredRefusal): bool {
+    return is_array($structuredRefusal)
+      && ($structuredRefusal['reason_category'] ?? NULL) === 'dsl_limitation';
   }
 
   /**

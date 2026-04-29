@@ -76,6 +76,40 @@ class CaseEvaluatorTest extends TestCase {
     $this->assertSame('empty_answer', $cat);
   }
 
+  public function testStructuredRefusalPassesExpectedRefusal(): void {
+    $case = $this->makeCase(['expected_refusal' => TRUE]);
+    $refusal = ['refused' => TRUE, 'reason_category' => 'no_matching_dataset', 'explanation' => 'No catalog match.'];
+    [$outcome, $cat] = (new CaseEvaluator())->evaluate(
+      $case,
+      // The text answer is irrelevant when a structured refusal is set.
+      'irrelevant text',
+      NULL,
+      $refusal,
+    );
+    $this->assertSame(CaseResult::OUTCOME_PASS, $outcome);
+    $this->assertNull($cat);
+  }
+
+  public function testStructuredRefusalWhenAnswerExpectedFails(): void {
+    $case = $this->makeCase(['expected_answer_pattern' => '\\d+']);
+    $refusal = ['refused' => TRUE, 'reason_category' => 'dsl_limitation', 'explanation' => 'Needs LAG.'];
+    [$outcome, $cat] = (new CaseEvaluator())->evaluate($case, '', NULL, $refusal);
+    $this->assertSame(CaseResult::OUTCOME_FAIL, $outcome);
+    // Mapped from STRUCTURED_REFUSAL_TO_CATEGORY.
+    $this->assertSame('should_have_answered', $cat);
+  }
+
+  public function testIsStructuredDslLimitRefusal(): void {
+    $evaluator = new CaseEvaluator();
+    $this->assertTrue($evaluator->isStructuredDslLimitRefusal([
+      'refused' => TRUE, 'reason_category' => 'dsl_limitation',
+    ]));
+    $this->assertFalse($evaluator->isStructuredDslLimitRefusal([
+      'refused' => TRUE, 'reason_category' => 'no_matching_dataset',
+    ]));
+    $this->assertFalse($evaluator->isStructuredDslLimitRefusal(NULL));
+  }
+
   public function testDslLimitRefusalDetection(): void {
     $evaluator = new CaseEvaluator();
     $this->assertTrue($evaluator->looksLikeDslLimitRefusal(
