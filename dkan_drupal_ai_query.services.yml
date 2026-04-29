@@ -97,6 +97,16 @@ services:
     factory: ['@logger.factory', 'get']
     arguments: ['dkan_drupal_ai_query']
 
+  dkan_drupal_ai_query.eval.tool_call_collector:
+    class: Drupal\dkan_drupal_ai_query\Service\EvalToolCallCollector
+
+  dkan_drupal_ai_query.eval.tool_call_subscriber:
+    class: Drupal\dkan_drupal_ai_query\EventSubscriber\ToolCallEvalCollectorSubscriber
+    arguments:
+      - '@dkan_drupal_ai_query.eval.tool_call_collector'
+    tags:
+      - { name: event_subscriber }
+
   dkan_drupal_ai_query.eval.loader:
     class: Drupal\dkan_drupal_ai_query\Eval\GoldenCaseLoader
 
@@ -117,3 +127,4 @@ services:
       - '@dkan_drupal_ai_query.refusal_collector'
       - '@dkan_drupal_ai_query.system_prompt_loader'
       - '@dkan_drupal_ai_query.unknown_column_counter'
+      - '@dkan_drupal_ai_query.eval.tool_call_collector'

@@ -104,3 +104,107 @@ cases:
     expected_refusal: true
     expected_failure_category: dsl_limitation
     notes: "DSL limit: requires PERCENTILE_CONT or window function plus decade extraction."
+
+  # ---------------------------------------------------------------------------
+  # Data-dictionary lift cases. Each targets behavior that should improve when
+  # the get_datastore_schema response carries dictionary_title /
+  # dictionary_description / dictionary_type per column. v2 prompt does not
+  # mention dictionaries, so any pass-rate delta on these cases between v2 and
+  # v3 is attributable to the dictionary integration.
+  # ---------------------------------------------------------------------------
+
+  - id: dict_bike_lncd_meaning
+    question: "What does the LNCD column in the Florida bike lanes data represent?"
+    expected_dataset_id: cedcd327-4e5d-43f9-8eb1-c11850fa7c55
+    expected_columns_used: [lncd]
+    expected_answer_pattern: 'lane[ _-]?(code|class)'
+    expected_refusal: false
+    notes: "Dictionary: 'Lane classification code.' Without dictionary, model would guess from the cryptic column name."
+
+  - id: dict_bike_road_side_codes
+    question: "What values appear in the road_side column of the Florida bike lanes dataset, and what do they mean?"
+    expected_dataset_id: cedcd327-4e5d-43f9-8eb1-c11850fa7c55
+    expected_columns_used: [road_side]
+    expected_answer_pattern: '\bl\b.{0,30}\br\b|left.{0,15}right|side of the road'
+    expected_refusal: false
+    notes: "Dictionary: 'Side of the road on which the bike lane is located (e.g., L, R).' v2 would need distinct_values or sample_rows."
+
+  - id: dict_crime_violent_breakdown
+    question: "What crimes are counted in the violent_crimes column of the crime dataset?"
+    expected_dataset_id: d460252e-d42c-474a-9ea9-5287b1d595f6
+    expected_columns_used: [violent_crimes]
+    expected_answer_pattern: 'aggravated\s+assault'
+    expected_refusal: false
+    notes: "Dictionary lists 'sum of murder, rape, robbery, aggravated assault'. The phrase 'aggravated assault' specifically (vs generic 'assault') is the dictionary-derived signal. Loose pattern because the answer's markdown formatting exceeds tight character distances."
+
+  - id: dict_gold_price_units
+    question: "What units are the values in the gold prices dataset reported in?"
+    expected_dataset_id: 5dc1cfcf-8028-476c-a020-f58ec6dd621c
+    expected_columns_used: [price]
+    expected_answer_pattern: 'USD|U\.S\.\s*dollar|US\s*dollar|per\s+ounce'
+    expected_refusal: false
+    notes: "Dictionary: 'Monthly average price of one ounce of fine gold in USD'. v2 might guess GBP given London market."
+
+  - id: dict_varicella_age_bucket
+    question: "In the pre-vaccine Varicella dataset, what does the 1_to_4_years_old column count?"
+    expected_dataset_id: e1f2ebcd-ee23-454f-87b5-df0306658418
+    expected_columns_used: ['1_to_4_years_old']
+    expected_answer_pattern: '(varicella|chickenpox).{0,30}death|death.{0,30}(varicella|chickenpox|child)'
+    expected_refusal: false
+    notes: "Dictionary (1974-1990 distribution): 'Varicella deaths in children aged 1 to 4 years.' v2 wouldn't know the column counts deaths vs cases."
+
+  - id: dict_bike_objectid_purpose
+    question: "What is the objectid column for in the Florida bike lanes dataset?"
+    expected_dataset_id: cedcd327-4e5d-43f9-8eb1-c11850fa7c55
+    expected_columns_used: [objectid]
+    expected_answer_pattern: '(feature\s+record|internal.{0,20}identifier|record.{0,15}identifier|unique.{0,15}identifier)'
+    expected_refusal: false
+    notes: "Dictionary: 'Internal feature record identifier.' v2 would guess 'unique key' which would also pass — kept for symmetry with the rest of the bike-lanes documentation cases."
+
+  - id: dict_asthma_pct_units_caveat
+    question: "Is California's adult asthma prevalence value 7.9 percent or 7.9 per thousand?"
+    expected_dataset_id: 95f8eac4-fd1f-4b35-8472-5c87e9425dfa
+    expected_columns_used: [current_asthma_prevalence]
+    expected_answer_pattern: '(7\.9|7\s*\.\s*9).{0,30}(percent|%)'
+    expected_refusal: false
+    notes: "Dictionary description clarifies units; the cell is stored with a trailing %. v2 would have to infer from sample_rows."
+
+  - id: dict_asthma_storage_disagreement
+    question: "Is the current_asthma_prevalence column stored as a number or as text in the Asthma dataset?"
+    expected_dataset_id: 95f8eac4-fd1f-4b35-8472-5c87e9425dfa
+    expected_columns_used: [current_asthma_prevalence]
+    expected_answer_pattern: '(string|text|stored.{0,15}(as.{0,5})?(string|text)|trailing\s*%)'
+    expected_refusal: false
+    notes: "Dictionary type=string AND DB type=string here, but the value is semantically numeric — tests whether the agent calls out the trailing-% storage caveat per the v3 prompt rule."
+
+  # ---------------------------------------------------------------------------
+  # Dictionary-level cases (vs. column-level above). These ask about the
+  # dictionary as a unit — the use case where the dedicated get_data_dictionary
+  # tool's unique features (full field list, dictionary title, deep-link URL)
+  # would naturally apply. If the agent answers these from get_datastore_schema
+  # alone, the dedicated tool is genuinely redundant and can be removed.
+  # ---------------------------------------------------------------------------
+
+  - id: dict_meta_florida_documented
+    question: "Is there documentation available for the Florida bike lanes dataset?"
+    expected_dataset_id: cedcd327-4e5d-43f9-8eb1-c11850fa7c55
+    expected_columns_used: []
+    expected_answer_pattern: '(yes|data dictionary|documentation|documented)'
+    expected_refusal: false
+    notes: "Meta-question about the dictionary's existence. Could route through get_data_dictionary or be inferred from get_datastore_schema's dictionary_url root key."
+
+  - id: dict_meta_asthma_full_listing
+    question: "List all the documented fields in the Asthma Prevalence data dictionary along with their descriptions."
+    expected_dataset_id: 95f8eac4-fd1f-4b35-8472-5c87e9425dfa
+    expected_columns_used: []
+    expected_answer_pattern: 'state.{0,200}(age_range|prevalence|standard_error)'
+    expected_refusal: false
+    notes: "Wants the dictionary as a unit. The dedicated tool returns the full field list cleanly; the schema tool requires the agent to reconstruct the listing from per-column keys."
+
+  - id: dict_meta_gold_dict_link
+    question: "Where can I find the data dictionary for the gold prices dataset? Give me the URL."
+    expected_dataset_id: 5dc1cfcf-8028-476c-a020-f58ec6dd621c
+    expected_columns_used: []
+    expected_answer_pattern: '/api/1/metastore/schemas/data-dictionary/items/'
+    expected_refusal: false
+    notes: "Wants the dictionary URL specifically. Both tools return it (schema response under dictionary_url root key, dedicated tool under .url). Tests whether the agent surfaces it correctly."
