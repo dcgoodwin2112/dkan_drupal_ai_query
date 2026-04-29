@@ -72,11 +72,3 @@ dkan_drupal_ai_query.settings_form:
     _title: 'DKAN AI Query Settings'
   requirements:
     _permission: 'administer dkan drupal ai query'
-
-dkan_drupal_ai_query.test_page:
-  path: '/admin/dkan/ai-query-test'
-  defaults:
-    _controller: 'dkan_drupal_ai_query.controller:testPage'
-    _title: 'DKAN AI Query — Phase 1 Test'
-  requirements:
-    _permission: 'administer dkan drupal ai query'

@@ -12,9 +12,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Widget display + default-model settings form.
  *
- * API keys are not configured here — they live as Key entities (see
- * `key` module). Phase 5 will add a hook_update_N that migrates existing
- * dkan_nl_query keys into the Key registry.
+ * API keys are not configured here — they live as Key entities (see the
+ * `key` module). Manage them at /admin/config/system/keys.
  */
 class SettingsForm extends ConfigFormBase {
 

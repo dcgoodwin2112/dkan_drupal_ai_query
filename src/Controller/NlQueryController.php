@@ -219,19 +219,6 @@ class NlQueryController {
   }
 
   /**
-   * Minimal test page: a textarea + submit + live event log.
-   */
-  public function testPage(): array {
-    return [
-      '#theme' => 'dkan_drupal_ai_query_test',
-      '#attached' => [
-        'library' => ['dkan_drupal_ai_query/test_page'],
-      ],
-      '#cache' => ['max-age' => 0],
-    ];
-  }
-
-  /**
    * Determine provider and model.
    *
    * Resolution order:
