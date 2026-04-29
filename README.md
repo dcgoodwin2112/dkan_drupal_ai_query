@@ -19,8 +19,8 @@ ai.provider plugin (anthropic / openai)
   │
   ▼
 FunctionCall tools: query_datastore, query_datastore_join,
-  get_datastore_schema, get_datastore_stats, search_columns,
-  search_datasets, list_datasets, list_distributions,
+  get_datastore_schema, get_data_dictionary, get_datastore_stats,
+  search_columns, search_datasets, list_datasets, list_distributions,
   find_dataset_resources, create_chart
   │
   ▼
@@ -160,40 +160,32 @@ Drupal's Request Path block-visibility condition does **literal** path matching.
 - **Polling cost.** `/poll` reads from `PrivateTempStore` (DB-backed). At 500 ms cadence × N concurrent conversations, that's ~120 reqs/min/user against the temp store. Manageable; raise the JS `POLL_INTERVAL_MS` to 750–1000 if it shows up in metrics.
 - **No graceful cancellation.** Closing the browser tab does not abort `solve()`. Worth flagging in the UI when implementing real cancel; v1 is best-effort.
 
-## Eval harness
+## Caveats vs data dictionaries
 
-Phase 1 ships a Drush-driven eval harness so accuracy improvements are measurable.
+Two parallel metadata systems are merged into the agent's view of a dataset:
 
-```bash
-ddev drush dkan-aiq:eval                              # Run the full golden set
-ddev drush dkan-aiq:eval --case=foo_bar               # Run one case by id
-ddev drush dkan-aiq:eval --model=claude-sonnet-4-6    # Override the model
-ddev drush dkan-aiq:eval --sleep-seconds=20           # Pause N seconds between cases to dodge rate limits
-ddev drush dkan-aiq:eval --no-cache-clear             # Skip drupal_flush_all_caches between cases
-```
+- **Data dictionaries** describe *static* per-column metadata (declared type, human title, description) authored by the dataset publisher and stored in the metastore as `data-dictionary` items. Linked from a distribution via `describedBy`. Surfaced via `get_datastore_schema` (per-column `dictionary_*` keys + `dictionary_url` at the root) and the dedicated `get_data_dictionary` tool.
+- **Caveats** (`DatasetCaveatRegistry`) describe *operational* concerns the agent must honor when querying — suppression rules, coverage windows, code-list interpretations. These live in config entities maintained by the site operator and are merged into `get_datastore_schema` and `find_dataset_resources` responses as `caveat` / `dataset_caveats` keys.
 
-Default provider/model: `anthropic` / `claude-haiku-4-5-20251001`. Default output: `sites/default/files/private/ai-eval/run-{label}.{jsonl,md}`.
+When both exist, both apply: dictionaries explain what a column means; caveats explain how to read or filter it. The system prompt instructs the agent to prefer dictionary text over column-name guesses, and to call out storage-vs-dictionary type disagreements when relevant.
 
-The runner invokes the `dkan_data_query` agent directly (`agent.solve()`), bypassing `NlQueryController` and the polling endpoint. Same agent, same tools, same prompt, but no HTTP and no `PrivateTempStore` contention.
+## Documentation
 
-### Adding a golden case
+Topic guides live in [docs/](docs/):
 
-Edit `tests/eval/golden_set.yml`. Each case is one entry under `cases:`:
+| Doc | Covers |
+|---|---|
+| [accuracy-overview.md](docs/accuracy-overview.md) | One-page map of the 5 accuracy subsystems and how a request flows through them. Start here. |
+| [eval-harness.md](docs/eval-harness.md) | `drush dkan-aiq:eval`, golden case format, baseline + per-phase deltas. |
+| [dataset-caveats.md](docs/dataset-caveats.md) | The `dataset_caveat` config entity and its admin UI. |
+| [system-prompt.md](docs/system-prompt.md) | How the file-backed, versioned system prompt works and how to bump it. |
+| [refusal-flow.md](docs/refusal-flow.md) | `RefuseTool`, the 3-strikes unknown-column guard, and how refusals render. |
+| [provenance.md](docs/provenance.md) | The `provenance` block and the widget's provenance panel. |
+| [changelog.md](docs/changelog.md) | Eval pass-rate delta per phase. |
 
-```yaml
-- id: my_new_case
-  question: "What's the population of Houston?"
-  expected_dataset_id: d460252e-d42c-474a-9ea9-5287b1d595f6   # null for refusal cases
-  expected_columns_used: [city, population]                    # advisory
-  expected_answer_pattern: '2[,.\s]?219[,.\s]?933'             # case-insensitive regex
-  expected_refusal: false
-  expected_failure_category: null                              # set to dsl_limitation when applicable
-  notes: "Why this case exists."
-```
-
-Discover dataset ids and column names with `drush dkan:list_datasets` and `drush dkan:get_datastore_schema`. Phase 1 uses heuristic refusal detection in `CaseEvaluator`; Phase 3 will switch to a structured `RefuseTool` signal.
-
-The baseline run lives at `tests/eval/baseline/`. Re-run after each phase ships and commit the new file alongside; PR descriptions should show the delta.
+Upstream tool-response contract (success / error / sanity-flag shapes
+returned by `DatastoreTools`) lives at
+[../dkan_query_tools/docs/tool-responses.md](../dkan_query_tools/docs/tool-responses.md).
 
 ## Tests
 
@@ -208,5 +200,3 @@ Lint (PHP only — JS sniffs in Drupal phpcs misfire on modern JS):
 ```bash
 ddev exec vendor/bin/phpcs --standard=Drupal,DrupalPractice --extensions=php,module web/modules/custom/dkan_drupal_ai_query/
 ```
-
-Phase 0–4 smoke tests are documented in the implementation plan at `[plans/please-research-the-drupal-atomic-gizmo.md]` (developer machine only).
