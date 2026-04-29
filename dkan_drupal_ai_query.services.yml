@@ -59,3 +59,21 @@ services:
     class: Drupal\Core\Logger\LoggerChannel
     factory: ['@logger.factory', 'get']
     arguments: ['dkan_drupal_ai_query']
+
+  dkan_drupal_ai_query.eval.loader:
+    class: Drupal\dkan_drupal_ai_query\Eval\GoldenCaseLoader
+
+  dkan_drupal_ai_query.eval.evaluator:
+    class: Drupal\dkan_drupal_ai_query\Eval\CaseEvaluator
+
+  dkan_drupal_ai_query.eval.reporter:
+    class: Drupal\dkan_drupal_ai_query\Eval\RunReporter
+
+  dkan_drupal_ai_query.eval.runner:
+    class: Drupal\dkan_drupal_ai_query\Eval\EvalRunner
+    arguments:
+      - '@plugin.manager.ai_agents'
+      - '@ai.provider'
+      - '@dkan_drupal_ai_query.artifact_storage'
+      - '@dkan_drupal_ai_query.eval.evaluator'
+      - '@logger.channel.dkan_drupal_ai_query'
