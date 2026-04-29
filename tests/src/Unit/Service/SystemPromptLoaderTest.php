@@ -55,7 +55,7 @@ class SystemPromptLoaderTest extends TestCase {
   }
 
   public function testActiveVersionDefault(): void {
-    $this->assertSame('v1', $this->makeLoader()->activeVersion());
+    $this->assertSame('v2', $this->makeLoader()->activeVersion());
   }
 
   public function testStripsTrailingWhitespace(): void {

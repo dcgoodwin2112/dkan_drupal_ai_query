@@ -11,6 +11,7 @@ use Drupal\ai_agents\Task\Task;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
 use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
 use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
+use Drupal\dkan_drupal_ai_query\Service\UnknownColumnCounter;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -37,6 +38,7 @@ class EvalRunner {
     protected LoggerInterface $logger,
     protected RefusalCollector $refusals,
     protected SystemPromptLoader $promptLoader,
+    protected UnknownColumnCounter $unknownColumnCounter,
   ) {}
 
   /**
@@ -141,6 +143,7 @@ class EvalRunner {
     }
 
     $this->refusals->forget($threadId);
+    $this->unknownColumnCounter->forget($threadId);
 
     return new CaseResult(
       caseId: $case->id,
