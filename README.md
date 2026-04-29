@@ -1,6 +1,6 @@
 # DKAN AI Query
 
-Natural-language query widget for DKAN datasets. Built on `drupal/ai` + `drupal/ai_agents` + `dkan_query_tools`. Replaces `dkan_nl_query` with a polling-based architecture that aligns with the Drupal AI initiative's roadmap.
+Natural-language query widget for DKAN datasets. Built on `drupal/ai` + `drupal/ai_agents` + `dkan_query_tools`. Polling-based architecture (long-blocking POST + 500 ms GET poll) aligned with the Drupal AI initiative's roadmap.
 
 ## Architecture
 
@@ -61,19 +61,13 @@ While `solve()` blocks server-side, `ai_agents` writes per-iteration status even
    ddev drush en dkan_drupal_ai_query
    ```
 
-The install hook:
-
-1. Installs the `dkan_aiq_conversation` and `dkan_aiq_message` entity types.
-2. Migrates `anthropic_api_key` / `openai_api_key` from `dkan_nl_query.settings` into the Key registry as `dkan_anthropic` / `dkan_openai` (skips any Key that already exists).
-3. Logs a notice with a link to `/admin/config/system/keys`.
+The install hook installs the `dkan_aiq_conversation` and `dkan_aiq_message` entity types. Configure API keys at `/admin/config/system/keys` (see Configuring below).
 
 If you upgrade later (e.g. add new entity fields), run:
 
 ```bash
 ddev drush updb
 ```
-
-`hook_update_10002` (optional) copies existing `dkan_nl_query` conversations into the new entity types so user history carries over.
 
 ## Granting permissions
 
@@ -124,22 +118,6 @@ Drupal's Request Path block-visibility condition does **literal** path matching.
 /dataset
 /dataset/*
 ```
-
-## Removing dkan_nl_query
-
-After verifying that conversations and queries work end-to-end on the new module, disable the legacy module:
-
-```bash
-ddev drush pmu -y dkan_nl_query
-```
-
-The legacy entity tables remain in the database. To drop them as well, manually:
-
-```bash
-ddev drush sql:query "DROP TABLE nl_query_messages, nl_query_conversations;"
-```
-
-The migrated Key entities (`dkan_anthropic`, `dkan_openai`) are untouched by the legacy uninstall.
 
 ## Endpoints
 

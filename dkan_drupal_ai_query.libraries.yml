@@ -1,14 +1,3 @@
-test_page:
-  version: VERSION
-  js:
-    js/test-page.js: { defer: true }
-  css:
-    component:
-      css/test-page.css: {}
-  dependencies:
-    - core/drupal
-    - core/once
-
 widget:
   version: VERSION
   js:
