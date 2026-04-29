@@ -14,7 +14,7 @@ use Drupal\Core\Extension\ExtensionPathResolver;
  */
 class SystemPromptLoader {
 
-  public const DEFAULT_VERSION = 'v2';
+  public const DEFAULT_VERSION = 'v3';
 
   /**
    * The extension path resolver.
@@ -28,8 +28,23 @@ class SystemPromptLoader {
    */
   protected array $cache = [];
 
+  /**
+   * Transient override of the active version (eval / debugging only).
+   */
+  protected ?string $override = NULL;
+
   public function __construct(ExtensionPathResolver $path_resolver) {
     $this->pathResolver = $path_resolver;
+  }
+
+  /**
+   * Override the active prompt version for the lifetime of this process.
+   *
+   * Intended for the eval harness and ad-hoc debugging — long-lived requests
+   * should not call this. Pass NULL to clear.
+   */
+  public function setOverride(?string $version): void {
+    $this->override = $version === NULL || $version === '' ? NULL : ltrim($version, 'v');
   }
 
   /**
@@ -56,6 +71,9 @@ class SystemPromptLoader {
    * tooling can correlate behavior with prompt changes.
    */
   public function activeVersion(): string {
+    if ($this->override !== NULL) {
+      return 'v' . $this->override;
+    }
     return self::DEFAULT_VERSION;
   }
 

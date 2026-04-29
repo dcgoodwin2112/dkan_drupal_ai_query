@@ -95,6 +95,14 @@ class RunReporter {
     $lines[] = "- Fail: {$summary['fail']}";
     $lines[] = sprintf('- Pass rate: %.1f%%', $summary['pass_rate'] * 100);
     $lines[] = sprintf('- DSL limitation rate: %.1f%%', $summary['dsl_limitation_rate'] * 100);
+    $promptVersion = $results[0]->promptVersion ?? NULL;
+    if ($promptVersion) {
+      $lines[] = "- Prompt version: {$promptVersion}";
+    }
+    $runFlags = $results[0]->runFlags ?? [];
+    if ($runFlags) {
+      $lines[] = '- Run flags: ' . implode(', ', $runFlags);
+    }
     $lines[] = '';
     if (!empty($summary['by_failure_category'])) {
       $lines[] = '## Failures by category';
