@@ -20,6 +20,10 @@ function dkan_drupal_ai_query_install(): void {
     $type = \Drupal::entityTypeManager()->getDefinition($eid);
     $update_manager->installEntityType($type);
   }
+  // Replace the stub system_prompt that shipped via config/install with the
+  // active markdown file. The .md is the editable source of truth.
+  $result = \Drupal::service('dkan_drupal_ai_query.agent_prompt_sync')->sync();
+  \Drupal::logger('dkan_drupal_ai_query')->notice($result['message']);
 }
 
 /**
@@ -87,4 +91,15 @@ function dkan_drupal_ai_query_update_10005(): string {
   $tools[$key] = TRUE;
   $config->set('tools', $tools)->save();
   return 'Registered get_data_dictionary tool on dkan_data_query agent.';
+}
+
+/**
+ * Sync the active markdown system prompt into the agent config entity.
+ *
+ * Existing installs were running with a stub prompt in the config entity
+ * because a now-removed event subscriber substituted the markdown at runtime.
+ * This update aligns the admin UI with what the LLM actually receives.
+ */
+function dkan_drupal_ai_query_update_10006(): string {
+  return (string) \Drupal::service('dkan_drupal_ai_query.agent_prompt_sync')->sync()['message'];
 }
