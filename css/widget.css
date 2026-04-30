@@ -778,6 +778,19 @@
   background: #475569;
 }
 
+/* Cross-reference caption shown inside the API and SQL panels: surfaces the
+   alternate identifier so users can reconcile the public REST view with the
+   internal datastore view of the same resource. */
+.dkan-aiq-id-note {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #334155;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 11px;
+  color: #94a3b8;
+  word-break: break-all;
+}
+
 /* Provenance panel (Phase 5) */
 .dkan-aiq-prov-btn {
   padding: 4px 10px;
