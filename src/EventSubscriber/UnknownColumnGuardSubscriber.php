@@ -27,6 +27,9 @@ class UnknownColumnGuardSubscriber implements EventSubscriberInterface {
    */
   protected const GUARDED_TOOLS = ['query_datastore', 'query_datastore_join'];
 
+  /**
+   * Constructs the subscriber.
+   */
   public function __construct(
     protected UnknownColumnCounter $counter,
     protected RefusalCollector $refusals,
@@ -41,6 +44,9 @@ class UnknownColumnGuardSubscriber implements EventSubscriberInterface {
     ];
   }
 
+  /**
+   * Rewrites unknown_column tool errors into a hint about search_columns.
+   */
   public function onToolFinished(AgentToolFinishedExecutionEvent $event): void {
     $tool = $event->getTool();
     if (!in_array($tool->getFunctionName(), self::GUARDED_TOOLS, TRUE)) {

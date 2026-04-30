@@ -4,6 +4,7 @@ namespace Drupal\dkan_drupal_ai_query\EventSubscriber;
 
 use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
 use Drupal\common\DataResource;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\datastore\DatastoreService;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
 use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
@@ -36,6 +37,7 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
     protected ResourceIdResolver $resolver,
     protected DatastoreService $datastoreService,
     protected RefusalCollector $refusals,
+    protected ConfigFactoryInterface $configFactory,
   ) {}
 
   /**
@@ -62,6 +64,27 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
     }
     $tool = $event->getTool();
     $name = $tool->getFunctionName();
+
+    if (($this->configFactory->get('dkan_drupal_ai_query.settings')->get('debug_log_level') ?? 'off') === 'debug') {
+      try {
+        $args = $tool->getContextValues();
+      }
+      catch (\Throwable) {
+        $args = [];
+      }
+      try {
+        $output = (string) $tool->getReadableOutput();
+      }
+      catch (\Throwable) {
+        $output = '';
+      }
+      $this->logger->debug('Tool finished: thread=@t name=@n args=@a output=@o', [
+        '@t' => $threadId,
+        '@n' => $name,
+        '@a' => mb_substr((string) json_encode($args), 0, 1000),
+        '@o' => mb_substr($output, 0, 1000),
+      ]);
+    }
 
     if ($name === 'query_datastore' || $name === 'query_datastore_join') {
       $this->captureData($threadId, $tool, $name);
@@ -215,7 +238,7 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
   /**
    * Strip the input down to the structured-query fields, decoding JSON ones.
    *
-   * conditions/expressions arrive from the LLM as JSON strings; decoding them
+   * Conditions/expressions arrive from the LLM as JSON strings; decoding them
    * lets the UI (and a future LLM-as-judge in Phase 6) reason over structured
    * data rather than re-parsing strings.
    */

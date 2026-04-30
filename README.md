@@ -84,16 +84,18 @@ ddev drush role:perm:add administrator 'administer dkan drupal ai query conversa
 |---|---|
 | `use dkan drupal ai query` | Submit questions through the widget |
 | `manage own dkan drupal ai query conversations` | Save / list / pin / delete one's own conversation history |
-| `administer dkan drupal ai query` | Access the settings form at `/admin/config/dkan/ai-query` |
+| `administer dkan drupal ai query` | Access the settings form at `/admin/dkan/ai-query/settings` |
 | `administer dkan drupal ai query conversations` | View and manage other users' conversations |
 
 ## Configuring
 
+The module's admin pages are grouped under `/admin/dkan/ai-query` (alongside the rest of DKAN's admin landing page), with two children: **Settings** (`/admin/dkan/ai-query/settings`) and **Dataset caveats** (`/admin/dkan/ai-query/caveats`).
+
 1. **API keys.** Visit `/admin/config/system/keys`. Confirm `dkan_anthropic` (and `dkan_openai` if used) exist and contain valid keys.
-2. **Default model.** Visit `/admin/config/dkan/ai-query`. Pick a default model from the dropdown.
+2. **Default model.** Visit `/admin/dkan/ai-query/settings`. Pick a default model from the dropdown.
 3. **Default provider.** Visit `/admin/config/ai/settings`. Select Anthropic or OpenAI as the default provider for the `chat` operation type. (drupal-ai 1.2 does not register `chat_with_tools` as a separate operation type; revisit when upgrading to a version that does.)
 4. **Provider key wiring.** Visit `/admin/config/ai/providers/anthropic` (and/or `openai`). Set the `api_key` field to the Key entity (`dkan_anthropic` / `dkan_openai`).
-5. **Widget toggles.** Back at `/admin/config/dkan/ai-query`, decide which UI features users see (model selector, examples, debug panel, history sidebar).
+5. **Widget toggles.** Back at `/admin/dkan/ai-query/settings`, walk the grouped sections (Widget interface, Result actions, Conversation history, Agent runtime, Logging) to decide which features users see and tune runtime/retention/debug knobs.
 
 ## Placing the widget
 
@@ -159,6 +161,7 @@ Drupal's Request Path block-visibility condition does **literal** path matching.
 - **Web server timeouts.** Raise Nginx `proxy_read_timeout` / Apache `ProxyTimeout` to ≥ 120s on `/api/dkan-ai-query/start`. Disable response buffering on that path so long requests don't fill the buffer.
 - **Polling cost.** `/poll` reads from `PrivateTempStore` (DB-backed). At 500 ms cadence × N concurrent conversations, that's ~120 reqs/min/user against the temp store. Manageable; raise the JS `POLL_INTERVAL_MS` to 750–1000 if it shows up in metrics.
 - **No graceful cancellation.** Closing the browser tab does not abort `solve()`. Worth flagging in the UI when implementing real cancel; v1 is best-effort.
+- **Conversation retention.** Set the **Conversation history → Retention (days)** setting to a non-zero value to have `hook_cron` purge unpinned conversations older than that age. Default `0` keeps everything forever — relevant for PII / compliance reviews.
 
 ## Caveats vs data dictionaries
 

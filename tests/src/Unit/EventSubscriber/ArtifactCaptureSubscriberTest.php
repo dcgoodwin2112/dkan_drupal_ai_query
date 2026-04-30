@@ -3,6 +3,8 @@
 namespace Drupal\Tests\dkan_drupal_ai_query\Unit\EventSubscriber;
 
 use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
+use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\ImmutableConfig;
 use Drupal\datastore\DatastoreService;
 use Drupal\dkan_drupal_ai_query\EventSubscriber\ArtifactCaptureSubscriber;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
@@ -19,12 +21,17 @@ class ArtifactCaptureSubscriberTest extends TestCase {
     ?RefusalCollector $refusals = NULL,
   ): ArtifactCaptureSubscriber {
     $resolver = $resolver ?? $this->createMock(ResourceIdResolver::class);
+    $config = $this->createMock(ImmutableConfig::class);
+    $config->method('get')->willReturn(NULL);
+    $configFactory = $this->createMock(ConfigFactoryInterface::class);
+    $configFactory->method('get')->willReturn($config);
     return new ArtifactCaptureSubscriber(
       $artifacts,
       $this->createMock(LoggerInterface::class),
       $resolver,
       $this->createMock(DatastoreService::class),
       $refusals ?? new RefusalCollector(),
+      $configFactory,
     );
   }
 
