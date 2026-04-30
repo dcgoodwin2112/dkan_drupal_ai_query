@@ -7,6 +7,9 @@ namespace Drupal\Core\Extension;
  */
 class ExtensionPathResolver {
 
+  /**
+   * Stub that returns an empty path; tests override via createMock instead.
+   */
   public function getPath(string $type, string $name): string {
     return '';
   }

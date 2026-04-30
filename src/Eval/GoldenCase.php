@@ -18,6 +18,10 @@ final class GoldenCase {
     public readonly bool $expectedRefusal,
     public readonly ?string $expectedFailureCategory,
     public readonly string $notes,
+    public readonly array $expectedToolCalls = [],
+    public readonly array $forbiddenToolCalls = [],
+    public readonly ?string $expectedRefusalCategory = NULL,
+    public readonly ?string $forbiddenAnswerPattern = NULL,
   ) {}
 
   /**
@@ -38,6 +42,10 @@ final class GoldenCase {
       expectedRefusal: (bool) ($row['expected_refusal'] ?? FALSE),
       expectedFailureCategory: isset($row['expected_failure_category']) ? (string) $row['expected_failure_category'] : NULL,
       notes: (string) ($row['notes'] ?? ''),
+      expectedToolCalls: array_values(array_map('strval', $row['expected_tool_calls'] ?? [])),
+      forbiddenToolCalls: array_values(array_map('strval', $row['forbidden_tool_calls'] ?? [])),
+      expectedRefusalCategory: isset($row['expected_refusal_category']) ? (string) $row['expected_refusal_category'] : NULL,
+      forbiddenAnswerPattern: isset($row['forbidden_answer_pattern']) ? (string) $row['forbidden_answer_pattern'] : NULL,
     );
   }
 

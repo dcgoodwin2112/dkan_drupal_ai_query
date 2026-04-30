@@ -120,4 +120,96 @@ class CaseEvaluatorTest extends TestCase {
     ));
   }
 
+  /**
+   * A case asserting expected_tool_calls passes when the tool was invoked.
+   */
+  public function testRequiredToolCallPresent(): void {
+    $case = $this->makeCase([
+      'expected_answer_pattern' => '\\d+',
+      'expected_tool_calls' => ['compute_stats'],
+    ]);
+    $toolCalls = [
+      ['tool' => 'query_datastore', 'input' => [], 'iteration' => 1, 'output_bytes' => 0],
+      ['tool' => 'compute_stats', 'input' => [], 'iteration' => 2, 'output_bytes' => 0],
+    ];
+    [$outcome] = (new CaseEvaluator())->evaluate($case, 'The median is 42.', NULL, NULL, $toolCalls);
+    $this->assertSame(CaseResult::OUTCOME_PASS, $outcome);
+  }
+
+  /**
+   * Missing a required tool fails as missing_required_tool.
+   */
+  public function testRequiredToolCallMissingFails(): void {
+    $case = $this->makeCase([
+      'expected_answer_pattern' => '\\d+',
+      'expected_tool_calls' => ['compute_stats'],
+    ]);
+    $toolCalls = [
+      ['tool' => 'query_datastore', 'input' => [], 'iteration' => 1, 'output_bytes' => 0],
+    ];
+    [$outcome, $cat] = (new CaseEvaluator())->evaluate($case, 'The median is 42.', NULL, NULL, $toolCalls);
+    $this->assertSame(CaseResult::OUTCOME_FAIL, $outcome);
+    $this->assertSame('missing_required_tool', $cat);
+  }
+
+  /**
+   * Invoking a forbidden tool fails as used_forbidden_tool.
+   */
+  public function testForbiddenToolCallFails(): void {
+    $case = $this->makeCase([
+      'expected_answer_pattern' => '\\d+',
+      'forbidden_tool_calls' => ['sample_rows'],
+    ]);
+    $toolCalls = [
+      ['tool' => 'query_datastore', 'input' => [], 'iteration' => 1, 'output_bytes' => 0],
+      ['tool' => 'sample_rows', 'input' => [], 'iteration' => 2, 'output_bytes' => 0],
+    ];
+    [$outcome, $cat] = (new CaseEvaluator())->evaluate($case, '5 rows.', NULL, NULL, $toolCalls);
+    $this->assertSame(CaseResult::OUTCOME_FAIL, $outcome);
+    $this->assertSame('used_forbidden_tool', $cat);
+  }
+
+  /**
+   * Answer text matching forbidden_answer_pattern fails the case.
+   */
+  public function testForbiddenAnswerPatternFails(): void {
+    $case = $this->makeCase([
+      'expected_answer_pattern' => 'Asthma Prevalence',
+      'forbidden_answer_pattern' => '95f8eac4',
+    ]);
+    [$outcome, $cat] = (new CaseEvaluator())->evaluate(
+      $case,
+      'The Asthma Prevalence dataset (UUID: 95f8eac4-…) has 3 distinct age ranges.',
+    );
+    $this->assertSame(CaseResult::OUTCOME_FAIL, $outcome);
+    $this->assertSame('forbidden_text_in_answer', $cat);
+  }
+
+  /**
+   * Structured refusal whose category matches expected_refusal_category passes.
+   */
+  public function testExpectedRefusalCategoryMatch(): void {
+    $case = $this->makeCase([
+      'expected_refusal' => TRUE,
+      'expected_refusal_category' => 'out_of_scope',
+    ]);
+    $refusal = ['refused' => TRUE, 'reason_category' => 'out_of_scope', 'explanation' => 'Off topic.'];
+    [$outcome] = (new CaseEvaluator())->evaluate($case, '', NULL, $refusal);
+    $this->assertSame(CaseResult::OUTCOME_PASS, $outcome);
+  }
+
+  /**
+   * Refusal with the wrong category fails as wrong_refusal_category.
+   */
+  public function testExpectedRefusalCategoryMismatchFails(): void {
+    $case = $this->makeCase([
+      'expected_refusal' => TRUE,
+      'expected_refusal_category' => 'out_of_scope',
+    ]);
+    $refusal = ['refused' => TRUE, 'reason_category' => 'no_matching_dataset', 'explanation' => 'No data.'];
+    [$outcome, $cat] = (new CaseEvaluator())->evaluate($case, '', NULL, $refusal);
+    $this->assertSame(CaseResult::OUTCOME_FAIL, $outcome);
+    $this->assertSame('wrong_refusal_category', $cat);
+  }
+
 }

@@ -7,6 +7,9 @@ namespace Drupal\Core\Entity;
  */
 interface EntityTypeManagerInterface {
 
+  /**
+   * Return the storage handler for the given entity type id.
+   */
   public function getStorage(string $entity_type_id): EntityStorageInterface;
 
 }
@@ -16,8 +19,14 @@ interface EntityTypeManagerInterface {
  */
 interface EntityStorageInterface {
 
+  /**
+   * Load a single entity by id.
+   */
   public function load(string $id): ?object;
 
+  /**
+   * Load multiple entities by id, or all when $ids is NULL.
+   */
   public function loadMultiple(?array $ids = NULL): array;
 
 }

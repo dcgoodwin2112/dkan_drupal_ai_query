@@ -11,9 +11,20 @@
 #   expected_dataset_id:      UUID the model should land on (null for refusal cases)
 #   expected_columns_used:    columns the answer should reference (advisory)
 #   expected_answer_pattern:  case-insensitive regex matched against the answer
+#   forbidden_answer_pattern: case-insensitive regex that must NOT appear
 #   expected_refusal:         true if the model should decline
+#   expected_refusal_category: required RefuseTool reason_category (e.g.
+#                             out_of_scope, out_of_coverage). Pins refusal
+#                             routing — fails as wrong_refusal_category if
+#                             the structured payload says otherwise.
 #   expected_failure_category: when set, scored as a fail of that category if
 #                             the model does not refuse. Used for dsl_limitation.
+#   expected_tool_calls:      list of tool names the run must invoke at least
+#                             once. Pins routing fixes (e.g. compute_stats for
+#                             median). Fails as missing_required_tool.
+#   forbidden_tool_calls:     list of tool names the run must NOT invoke. Pins
+#                             negative-routing fixes (e.g. no sample_rows for
+#                             "first N rows"). Fails as used_forbidden_tool.
 #   notes:                    free text
 #
 # Editing:
@@ -239,3 +250,70 @@ cases:
     expected_answer_pattern: '/api/1/metastore/schemas/data-dictionary/items/'
     expected_refusal: false
     notes: "Wants the dictionary URL specifically. Both tools return it (schema response under dictionary_url root key, dedicated tool under .url). Tests whether the agent surfaces it correctly."
+
+  # ---------------------------------------------------------------------------
+  # Phase 5 regression cases. Each pins one fix from Phases 1-4 so a prompt
+  # rewrite or tool-description change that re-introduces the old behavior is
+  # caught the next time the eval suite runs.
+  # ---------------------------------------------------------------------------
+
+  - id: first_n_uses_query_datastore
+    question: "Show me the first 5 rows of the asthma prevalence dataset."
+    expected_dataset_id: 95f8eac4-fd1f-4b35-8472-5c87e9425dfa
+    expected_columns_used: []
+    expected_answer_pattern: '\d'
+    expected_refusal: false
+    expected_tool_calls: [query_datastore]
+    forbidden_tool_calls: [sample_rows]
+    notes: "Phase-2 routing: 'first N' must go through query_datastore with an explicit sort, NOT sample_rows. sample_rows is undefined-order and answers a different question."
+
+  - id: median_uses_compute_stats
+    question: "What is the median violent_crimes value across all cities in the FBI UCR dataset?"
+    expected_dataset_id: d460252e-d42c-474a-9ea9-5287b1d595f6
+    expected_columns_used: [violent_crimes]
+    expected_answer_pattern: '\d'
+    expected_refusal: false
+    expected_tool_calls: [query_datastore, compute_stats]
+    notes: "Phase-2 routing: median must call compute_stats after query_datastore. The DSL has no median operator; eyeballing it from the 10-row dump is forbidden."
+
+  - id: off_topic_refuses
+    question: "Tell me the plot of Game of Thrones."
+    expected_dataset_id: null
+    expected_columns_used: []
+    expected_answer_pattern: null
+    expected_refusal: true
+    expected_refusal_category: out_of_scope
+    expected_tool_calls: [refuse]
+    notes: "Phase-2 routing: off-topic questions must call refuse(category: out_of_scope), not decline in prose. Known-flaky on Haiku 4.5 — if it fails routinely, decide between sterner prompt rephrase or accepting prose decline as fallback."
+
+  - id: out_of_coverage_refuses_clean
+    question: "What was the Varicella mortality rate for 5-9 year olds in 2020?"
+    expected_dataset_id: e1f2ebcd-ee23-454f-87b5-df0306658418
+    expected_columns_used: []
+    expected_answer_pattern: null
+    expected_refusal: true
+    forbidden_answer_pattern: '\(no answer\)'
+    notes: "Phase-1 display fix: when the agent refuses with out_of_coverage, the bubble must NOT show the literal '(no answer)' placeholder text on top of the refusal card. Pins the renderAssistantText guard."
+
+  - id: dataset_title_in_prose
+    question: "How many distinct age ranges are in the asthma prevalence dataset?"
+    expected_dataset_id: 95f8eac4-fd1f-4b35-8472-5c87e9425dfa
+    expected_columns_used: [age_range]
+    expected_answer_pattern: 'asthma\s+prevalence'
+    forbidden_answer_pattern: '95f8eac4'
+    expected_refusal: false
+    notes: "Phase-2/4: the agent must name datasets by their title in prose, not by UUID. Catalog pre-seed (Phase 4) gives the title for free; a regression here usually means the catalog injection broke."
+
+  # NOTE: chart_full_range from the plan is verified manually in the browser.
+  # The eval harness disables progress tracking and runs in CLI, so artifact
+  # capture (which carries the row-count via the data artifact) soft-fails.
+  # The proxy here is that query_datastore with a high limit is used; finer
+  # row-count assertions will need an artifact-storage CLI fallback first.
+  - id: chart_full_range_uses_create_chart
+    question: "Plot the gold price over the entire history of the dataset."
+    expected_dataset_id: 5dc1cfcf-8028-476c-a020-f58ec6dd621c
+    expected_columns_used: [date, price]
+    expected_answer_pattern: 'chart|plot|graph|rendered|visual'
+    expected_refusal: false
+    expected_tool_calls: [query_datastore, create_chart]
+    notes: "Phase-4 chart cap: agent must invoke create_chart after query_datastore for plotting requests. The 5000-row ceiling lets it span the full 1950-2008 range; verify the actual row count manually via the browser data artifact."

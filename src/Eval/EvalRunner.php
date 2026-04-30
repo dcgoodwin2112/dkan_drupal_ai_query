@@ -126,12 +126,14 @@ class EvalRunner {
     $durationMs = (int) ((hrtime(TRUE) - $start) / 1e6);
 
     $structuredRefusal = $this->refusals->get($threadId);
+    $capturedToolCalls = $this->toolCalls->load($threadId);
 
     [$outcome, $category] = $this->evaluator->evaluate(
       $case,
       $answer,
       $errorMessage,
       $structuredRefusal,
+      $capturedToolCalls,
     );
 
     // dsl_limitation cases must demonstrate DSL awareness: a structured
@@ -146,8 +148,6 @@ class EvalRunner {
       $outcome = CaseResult::OUTCOME_FAIL;
       $category = 'dsl_limitation';
     }
-
-    $capturedToolCalls = $this->toolCalls->load($threadId);
 
     $this->refusals->forget($threadId);
     $this->unknownColumnCounter->forget($threadId);
