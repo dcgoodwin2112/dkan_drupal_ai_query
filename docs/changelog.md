@@ -51,6 +51,37 @@ renders provenance as a collapsible panel and structured refusals as a
 red-bordered card, zero-row results render summary + provenance instead
 of bailing silently. See [provenance.md](provenance.md).
 
+## Phase 6: compute_stats tool
+
+Eval (24 cases, prompt v4, Haiku 4.5): 24/24 = 100%. DSL limitation: 0%.
+Three new positive cases pass: `stats_percentile_gold`,
+`stats_median_violent_crime_rate`,
+`stats_correlation_violent_murder_rate`. All cases that passed at the
+end of Phase 4 still pass.
+
+Highlights: `compute_stats` FunctionCall plugin + `StatsCalculator`
+service (median, percentile, stddev, variance, quartiles, correlation —
+ops the DSL cannot express; 20-test unit coverage on the calculator),
+prompt v4 with a new "Calculations" section that routes sum/count/avg/
+min/max through `query_datastore` and percentile/stddev/correlation
+through `compute_stats`. Two iteration shoes dropped during the eval
+loop: the agent was tempted to fake per-bucket stats by calling
+`compute_stats` once per bucket, and to fake subqueries by computing a
+threshold then filtering against it. The final v4 prompt names both
+anti-patterns explicitly and adds a per-decade refusal as Example 4a.
+Read-only positive coverage shifts the agent from "refuse" to "answer"
+on percentile/median/correlation questions without weakening the
+refusal floor on bucketed or subquery-shaped questions.
+
+Bundled fix: registered `get_data_dictionary` in the `dkan_data_query`
+agent's tools map (`update_10005`). The plugin and the v3/v4 prompt
+both reference it but it was never added to the tools list when data
+dictionaries were wired in (commit 92fe31b on main), so the agent
+could not invoke it. With it registered, `dict_meta_asthma_full_listing`
+flips from `wrong_summary` (the agent reconstructed the field list from
+`get_datastore_schema`) to a clean pass via a single
+`get_data_dictionary` call.
+
 ## Cumulative delta
 
 | Phase | Pass rate | DSL limitation rate |
@@ -60,6 +91,11 @@ of bailing silently. See [provenance.md](provenance.md).
 | Phase 3 | 90% | 10% |
 | Phase 4 | 100% | 0% |
 | Phase 5 | 100% | 0% |
+| Phase 6 | 100% (24-case set) | 0% |
 
 Phase 5 is UX/audit work; pass rate stays flat because the eval scores
-agent output, not widget rendering.
+agent output, not widget rendering. Phase 6 grows the eval set by 6
+cases (3 new positive `stats_*` cases plus 3 dictionary-meta cases that
+landed in a separate concurrent merge) and lands two agent-config
+fixes: `compute_stats` registration + `get_data_dictionary`
+registration.

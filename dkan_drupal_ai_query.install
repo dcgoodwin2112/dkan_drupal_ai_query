@@ -54,3 +54,37 @@ function dkan_drupal_ai_query_update_10003(): string {
   $config->set('default_model', '')->save();
   return sprintf('Cleared legacy default_model "%s"; pick a new value at /admin/config/dkan/ai-query.', $current);
 }
+
+/**
+ * Register the compute_stats tool on the dkan_data_query agent.
+ */
+function dkan_drupal_ai_query_update_10004(): string {
+  $config = \Drupal::configFactory()->getEditable('ai_agents.ai_agent.dkan_data_query');
+  $tools = $config->get('tools') ?? [];
+  $key = 'dkan_drupal_ai_query:compute_stats';
+  if (array_key_exists($key, $tools)) {
+    return 'compute_stats already registered.';
+  }
+  $tools[$key] = TRUE;
+  $config->set('tools', $tools)->save();
+  return 'Registered compute_stats tool on dkan_data_query agent.';
+}
+
+/**
+ * Register the get_data_dictionary tool on the dkan_data_query agent.
+ *
+ * The plugin and the v3/v4 prompt both reference this tool, but it was
+ * never added to the agent's tools map when data dictionaries were wired
+ * in — so the agent could not actually invoke it.
+ */
+function dkan_drupal_ai_query_update_10005(): string {
+  $config = \Drupal::configFactory()->getEditable('ai_agents.ai_agent.dkan_data_query');
+  $tools = $config->get('tools') ?? [];
+  $key = 'dkan_drupal_ai_query:get_data_dictionary';
+  if (array_key_exists($key, $tools)) {
+    return 'get_data_dictionary already registered.';
+  }
+  $tools[$key] = TRUE;
+  $config->set('tools', $tools)->save();
+  return 'Registered get_data_dictionary tool on dkan_data_query agent.';
+}

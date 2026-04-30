@@ -17,6 +17,9 @@ services:
   dkan_drupal_ai_query.unknown_column_counter:
     class: Drupal\dkan_drupal_ai_query\Service\UnknownColumnCounter
 
+  dkan_drupal_ai_query.stats_calculator:
+    class: Drupal\dkan_drupal_ai_query\Service\StatsCalculator
+
   dkan_drupal_ai_query.unknown_column_guard_subscriber:
     class: Drupal\dkan_drupal_ai_query\EventSubscriber\UnknownColumnGuardSubscriber
     arguments:
