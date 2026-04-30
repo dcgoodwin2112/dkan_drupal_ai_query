@@ -50,6 +50,27 @@ function dkan_drupal_ai_query_modules_installed(array $modules, bool $is_syncing
 }
 
 /**
+ * Implements hook_cron().
+ *
+ * Purges saved conversations older than `conversation_retention_days`. A value
+ * of 0 (the default) disables the purge. Pinned conversations are preserved.
+ */
+function dkan_drupal_ai_query_cron(): void {
+  $days = (int) (\Drupal::config('dkan_drupal_ai_query.settings')->get('conversation_retention_days') ?? 0);
+  if ($days <= 0) {
+    return;
+  }
+  $cutoff = \Drupal::time()->getRequestTime() - ($days * 86400);
+  $deleted = \Drupal::service('dkan_drupal_ai_query.conversation_storage')->purgeOlderThan($cutoff);
+  if ($deleted > 0) {
+    \Drupal::logger('dkan_drupal_ai_query')->notice(
+      'Purged @n conversations older than @d days.',
+      ['@n' => $deleted, '@d' => $days]
+    );
+  }
+}
+
+/**
  * Implements hook_theme().
  */
 function dkan_drupal_ai_query_theme($existing, $type, $theme, $path) {

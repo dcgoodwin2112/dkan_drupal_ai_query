@@ -44,7 +44,7 @@ caveat lifecycle to dataset CRUD would entangle re-imports.
    ddev drush role:perm:add administrator 'administer dkan dataset caveats'
    ```
 
-2. Navigate to `/admin/config/dkan/ai-query/caveats`. Empty list on a
+2. Navigate to `/admin/dkan/ai-query/caveats`. Empty list on a
    fresh install.
 
 3. Click "Add dataset caveat":

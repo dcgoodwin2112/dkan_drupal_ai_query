@@ -33,7 +33,7 @@ properties:
 | Subsystem | Entry point | Doc |
 |---|---|---|
 | Eval harness | `drush dkan-aiq:eval` | [eval-harness.md](eval-harness.md) |
-| Dataset caveats | `/admin/config/dkan/ai-query/caveats` | [dataset-caveats.md](dataset-caveats.md) |
+| Dataset caveats | `/admin/dkan/ai-query/caveats` | [dataset-caveats.md](dataset-caveats.md) |
 | Versioned system prompt | `prompts/query_system_prompt.v{N}.md` | [system-prompt.md](system-prompt.md) |
 | Refusal flow + 3-strikes guard | `RefuseTool`, `UnknownColumnGuardSubscriber` | [refusal-flow.md](refusal-flow.md) |
 | Provenance + sanity flags | `ArtifactCaptureSubscriber`, widget JS | [provenance.md](provenance.md) |
