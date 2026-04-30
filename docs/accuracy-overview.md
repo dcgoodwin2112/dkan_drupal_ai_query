@@ -54,8 +54,9 @@ NlQueryController
   │
   ▼
 ai_agents agent: dkan_data_query
-  │  ↑ system prompt loaded from prompts/query_system_prompt.v{N}.md
-  │    via SystemPromptSubscriber on BuildSystemPromptEvent
+  │  ↑ system prompt sourced from prompts/query_system_prompt.v{N}.md
+  │    and synced into the agent config entity by hook_install /
+  │    hook_update_N (drush dkan-aiq:sync-prompt for ad-hoc resync)
   ▼
 LLM provider (Anthropic / OpenAI)
   │  picks tool calls per iteration

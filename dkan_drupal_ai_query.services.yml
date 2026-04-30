@@ -50,13 +50,11 @@ services:
     arguments:
       - '@extension.path.resolver'
 
-  dkan_drupal_ai_query.system_prompt_subscriber:
-    class: Drupal\dkan_drupal_ai_query\EventSubscriber\SystemPromptSubscriber
+  dkan_drupal_ai_query.agent_prompt_sync:
+    class: Drupal\dkan_drupal_ai_query\Service\AgentPromptSync
     arguments:
       - '@dkan_drupal_ai_query.system_prompt_loader'
-      - '@logger.channel.dkan_drupal_ai_query'
-    tags:
-      - { name: event_subscriber }
+      - '@entity_type.manager'
 
   dkan_drupal_ai_query.dataset_caveat_registry:
     class: Drupal\dkan_drupal_ai_query\Service\DatasetCaveatRegistry
