@@ -55,7 +55,7 @@ class SystemPromptLoaderTest extends TestCase {
   }
 
   public function testActiveVersionDefault(): void {
-    $this->assertSame('v4', $this->makeLoader()->activeVersion());
+    $this->assertSame('v5', $this->makeLoader()->activeVersion());
   }
 
   public function testActiveVersionOverride(): void {
@@ -65,9 +65,9 @@ class SystemPromptLoaderTest extends TestCase {
     $loader->setOverride('1');
     $this->assertSame('v1', $loader->activeVersion());
     $loader->setOverride(NULL);
-    $this->assertSame('v4', $loader->activeVersion());
+    $this->assertSame('v5', $loader->activeVersion());
     $loader->setOverride('');
-    $this->assertSame('v4', $loader->activeVersion());
+    $this->assertSame('v5', $loader->activeVersion());
   }
 
   public function testStripsTrailingWhitespace(): void {
