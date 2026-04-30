@@ -20,6 +20,33 @@ dkan_drupal_ai_query.settings:
     show_follow_up_suggestions:
       type: boolean
       label: 'Show follow-up suggestion chips'
+    show_table_toggle:
+      type: boolean
+      label: 'Show / Hide table toggle'
+    show_api_call:
+      type: boolean
+      label: 'Show / Hide API call button'
+    show_sql:
+      type: boolean
+      label: 'Show / Hide SQL button'
+    show_provenance:
+      type: boolean
+      label: 'Show / Hide provenance button'
+    show_download_csv:
+      type: boolean
+      label: 'Download CSV button'
+    show_copy_buttons:
+      type: boolean
+      label: 'Copy API / SQL buttons'
+    max_iterations:
+      type: integer
+      label: 'Max agent iterations'
+    conversation_retention_days:
+      type: integer
+      label: 'Conversation retention (days)'
+    debug_log_level:
+      type: string
+      label: 'Debug log level'
 
 block.settings.dkan_drupal_ai_query_widget:
   type: block_settings

@@ -138,6 +138,29 @@ class ConversationStorage {
   }
 
   /**
+   * Delete unpinned conversations whose `changed` is older than the cutoff.
+   *
+   * Returns the number of conversations deleted. Pinned conversations are
+   * preserved regardless of age.
+   */
+  public function purgeOlderThan(int $cutoffTimestamp): int {
+    $storage = $this->entityTypeManager->getStorage(self::CONVERSATION);
+    $ids = $storage->getQuery()
+      ->accessCheck(FALSE)
+      ->condition('changed', $cutoffTimestamp, '<')
+      ->condition('pinned', FALSE)
+      ->execute();
+    $count = 0;
+    foreach (array_chunk(array_values($ids), 50) as $chunk) {
+      foreach ($chunk as $id) {
+        $this->deleteConversation((int) $id);
+        $count++;
+      }
+    }
+    return $count;
+  }
+
+  /**
    * Flip the pinned flag on a conversation. Returns the new value.
    */
   public function togglePin(int $conversationId): bool {

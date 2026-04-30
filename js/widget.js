@@ -8,7 +8,8 @@
  * chart specs) drive in-bubble rendering.
  *
  * Settings (via drupalSettings.dkanAiQuery): showModelSelector, showExamples,
- * showDebugPanel, saveChatHistory.
+ * showDebugPanel, saveChatHistory, showFollowUpSuggestions, showTableToggle,
+ * showApiCall, showSql, showProvenance, showDownloadCsv, showCopyButtons.
  */
 (function (Drupal, drupalSettings, once) {
   'use strict';
@@ -711,8 +712,10 @@
     const actions = document.createElement('span');
     actions.className = 'dkan-aiq-table-actions';
 
+    const s = this.settings || {};
+
     let toggleBtn = null;
-    if (rows.length) {
+    if (rows.length && s.showTableToggle !== false) {
       toggleBtn = document.createElement('button');
       toggleBtn.type = 'button';
       toggleBtn.className = 'dkan-aiq-table-toggle';
@@ -721,7 +724,7 @@
     }
 
     let apiBtn = null;
-    if (apiText) {
+    if (apiText && s.showApiCall !== false) {
       apiBtn = document.createElement('button');
       apiBtn.type = 'button';
       apiBtn.className = 'dkan-aiq-api-btn';
@@ -730,7 +733,7 @@
     }
 
     let sqlBtn = null;
-    if (sqlText) {
+    if (sqlText && s.showSql !== false) {
       sqlBtn = document.createElement('button');
       sqlBtn.type = 'button';
       sqlBtn.className = 'dkan-aiq-sql-btn';
@@ -739,7 +742,7 @@
     }
 
     let provBtn = null;
-    if (provenance) {
+    if (provenance && s.showProvenance !== false) {
       provBtn = document.createElement('button');
       provBtn.type = 'button';
       provBtn.className = 'dkan-aiq-prov-btn';
@@ -747,7 +750,7 @@
       actions.appendChild(provBtn);
     }
 
-    if (rows.length) {
+    if (rows.length && s.showDownloadCsv !== false) {
       const csvBtn = document.createElement('button');
       csvBtn.type = 'button';
       csvBtn.className = 'dkan-aiq-csv-btn';
@@ -760,7 +763,7 @@
     container.appendChild(summary);
 
     // API call collapsible panel.
-    if (apiText) {
+    if (apiBtn && apiText) {
       const apiWrap = document.createElement('div');
       apiWrap.className = 'dkan-aiq-api-wrapper';
       apiWrap.hidden = true;
@@ -768,17 +771,19 @@
       apiPre.className = 'dkan-aiq-api-code';
       apiPre.textContent = apiText;
       apiWrap.appendChild(apiPre);
-      const copyApi = document.createElement('button');
-      copyApi.type = 'button';
-      copyApi.className = 'dkan-aiq-api-copy';
-      copyApi.textContent = 'Copy';
-      copyApi.addEventListener('click', () => {
-        navigator.clipboard.writeText(apiText).then(() => {
-          copyApi.textContent = 'Copied!';
-          setTimeout(() => { copyApi.textContent = 'Copy'; }, 1500);
+      if (s.showCopyButtons !== false) {
+        const copyApi = document.createElement('button');
+        copyApi.type = 'button';
+        copyApi.className = 'dkan-aiq-api-copy';
+        copyApi.textContent = 'Copy';
+        copyApi.addEventListener('click', () => {
+          navigator.clipboard.writeText(apiText).then(() => {
+            copyApi.textContent = 'Copied!';
+            setTimeout(() => { copyApi.textContent = 'Copy'; }, 1500);
+          });
         });
-      });
-      apiWrap.appendChild(copyApi);
+        apiWrap.appendChild(copyApi);
+      }
       container.appendChild(apiWrap);
       apiBtn.addEventListener('click', () => {
         const isHidden = apiWrap.hidden;
@@ -789,7 +794,7 @@
     }
 
     // SQL collapsible panel.
-    if (sqlText) {
+    if (sqlBtn && sqlText) {
       const sqlWrap = document.createElement('div');
       sqlWrap.className = 'dkan-aiq-sql-wrapper';
       sqlWrap.hidden = true;
@@ -797,17 +802,19 @@
       sqlPre.className = 'dkan-aiq-sql-code';
       sqlPre.textContent = sqlText;
       sqlWrap.appendChild(sqlPre);
-      const copySql = document.createElement('button');
-      copySql.type = 'button';
-      copySql.className = 'dkan-aiq-sql-copy';
-      copySql.textContent = 'Copy';
-      copySql.addEventListener('click', () => {
-        navigator.clipboard.writeText(sqlText).then(() => {
-          copySql.textContent = 'Copied!';
-          setTimeout(() => { copySql.textContent = 'Copy'; }, 1500);
+      if (s.showCopyButtons !== false) {
+        const copySql = document.createElement('button');
+        copySql.type = 'button';
+        copySql.className = 'dkan-aiq-sql-copy';
+        copySql.textContent = 'Copy';
+        copySql.addEventListener('click', () => {
+          navigator.clipboard.writeText(sqlText).then(() => {
+            copySql.textContent = 'Copied!';
+            setTimeout(() => { copySql.textContent = 'Copy'; }, 1500);
+          });
         });
-      });
-      sqlWrap.appendChild(copySql);
+        sqlWrap.appendChild(copySql);
+      }
       container.appendChild(sqlWrap);
       sqlBtn.addEventListener('click', () => {
         const isHidden = sqlWrap.hidden;

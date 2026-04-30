@@ -52,7 +52,7 @@ function dkan_drupal_ai_query_update_10003(): string {
     return 'No legacy default_model to clear.';
   }
   $config->set('default_model', '')->save();
-  return sprintf('Cleared legacy default_model "%s"; pick a new value at /admin/config/dkan/ai-query.', $current);
+  return sprintf('Cleared legacy default_model "%s"; pick a new value at /admin/dkan/ai-query/settings.', $current);
 }
 
 /**
