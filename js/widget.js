@@ -569,7 +569,10 @@
         clearInterval(pollHandle);
         this.activeRun = null;
         if (resp.ok) {
-          this.renderAssistantText(bubble, resp.body.answer || lastIterationText || '(no answer)');
+          // Refusal artifacts already render their own card via polling, so
+          // don't show "(no answer)" on top of one.
+          const hasRefusal = !!bubble.querySelector('.dkan-aiq-refusal');
+          this.renderAssistantText(bubble, resp.body.answer || lastIterationText || (hasRefusal ? '' : '(no answer)'));
           if (resp.body.conversation_id) {
             this.currentConversationId = resp.body.conversation_id;
             this.refreshSidebar();
@@ -1516,6 +1519,7 @@
         return value;
       }
     }
+    parsed = unwrapDoubleEncodedStrings(parsed);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       // Drop empty-string entries to keep the panel readable.
       const filtered = {};
@@ -1530,6 +1534,40 @@
       return JSON.stringify(filtered, null, 2);
     }
     return JSON.stringify(parsed, null, 2);
+  }
+
+  /**
+   * Some upstream tool-arg serializations double-encode string values, so a
+   * keyword like `foreclosure` arrives as the literal string `"foreclosure"`
+   * (with quotes). Walk the object once and unwrap any string value that
+   * itself parses as a JSON-encoded string.
+   */
+  function unwrapDoubleEncodedStrings(value) {
+    if (typeof value === 'string') {
+      if (value.length >= 2 && value.charAt(0) === '"' && value.charAt(value.length - 1) === '"') {
+        try {
+          const inner = JSON.parse(value);
+          if (typeof inner === 'string') {
+            return inner;
+          }
+        }
+        catch (e) {
+          // not JSON, leave alone
+        }
+      }
+      return value;
+    }
+    if (Array.isArray(value)) {
+      return value.map(unwrapDoubleEncodedStrings);
+    }
+    if (value && typeof value === 'object') {
+      const out = {};
+      Object.keys(value).forEach((k) => {
+        out[k] = unwrapDoubleEncodedStrings(value[k]);
+      });
+      return out;
+    }
+    return value;
   }
 
   /**
@@ -1573,9 +1611,30 @@
     }
     if (name === 'get_datastore_stats') {
       const rows = parsed.row_count || parsed.rows || parsed.total_rows || 0;
-      const cols = parsed.column_count || parsed.columns || 0;
-      if (rows || cols) {
-        return '→ ' + rows.toLocaleString() + ' rows, ' + cols + ' columns';
+      // parsed.columns may be a number, an array of names, or an array of
+      // descriptor objects ({name, stats, …}). Normalize all three to a count
+      // plus a sample of names — never string-coerce the objects directly.
+      let colCount = 0;
+      let colNames = [];
+      if (typeof parsed.column_count === 'number') {
+        colCount = parsed.column_count;
+      }
+      if (Array.isArray(parsed.columns)) {
+        colCount = colCount || parsed.columns.length;
+        colNames = parsed.columns
+          .map((c) => (c && typeof c === 'object' ? (c.name || c.field || '') : String(c)))
+          .filter((n) => n)
+          .slice(0, 5);
+      }
+      else if (typeof parsed.columns === 'number') {
+        colCount = colCount || parsed.columns;
+      }
+      if (rows || colCount) {
+        let out = '→ ' + Number(rows).toLocaleString() + ' rows, ' + colCount + ' columns';
+        if (colNames.length) {
+          out += ': ' + colNames.join(', ') + (colCount > colNames.length ? ', …' : '');
+        }
+        return out;
       }
     }
     if (name === 'list_distributions') {

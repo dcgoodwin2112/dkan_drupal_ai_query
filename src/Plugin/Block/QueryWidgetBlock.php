@@ -93,6 +93,17 @@ class QueryWidgetBlock extends BlockBase implements ContainerFactoryPluginInterf
     $models = $this->providerManager->getSimpleProviderModelOptions('chat', FALSE);
     // Stringify TranslatableMarkup labels for JSON serialization.
     $models = array_map('strval', $models);
+    // The OpenAI provider returns its full models.list() regardless of the
+    // 'chat' operation type, so strip variants that can't run a tool-using
+    // agent loop: image generation, audio/TTS, transcription, realtime,
+    // deep-research, search-api.
+    $models = array_filter($models, function (string $label, string $value): bool {
+      if (!str_starts_with($value, 'openai__')) {
+        return TRUE;
+      }
+      $modelId = substr($value, strlen('openai__'));
+      return !preg_match('/(image|audio|tts|transcribe|realtime|deep-research|search-preview|search-api)/i', $modelId);
+    }, ARRAY_FILTER_USE_BOTH);
 
     // Resolve the default the same way NlQueryController will at submit time:
     // module config → site-wide default for "chat" → empty (JS shows the first
