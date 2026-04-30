@@ -103,7 +103,38 @@ cases:
     expected_answer_pattern: null
     expected_refusal: true
     expected_failure_category: dsl_limitation
-    notes: "DSL limit: requires PERCENTILE_CONT or window function plus decade extraction."
+    notes: "Still a DSL limit even with compute_stats: percentile alone is now answerable (see stats_percentile_gold), but per-decade bucketing requires a derived expression the DSL doesn't support, and compute_stats operates on a column, not per-group buckets."
+
+  # ---------------------------------------------------------------------------
+  # compute_stats cases (v4 prompt). Each targets a stat the DSL cannot express
+  # but compute_stats can: median, percentile, correlation. These pass when the
+  # agent fetches rows with query_datastore then calls compute_stats. Patterns
+  # are intentionally loose on first authoring; tighten after an empirical run.
+  # ---------------------------------------------------------------------------
+
+  - id: stats_percentile_gold
+    question: "What is the 90th percentile of the gold price across the entire dataset?"
+    expected_dataset_id: 5dc1cfcf-8028-476c-a020-f58ec6dd621c
+    expected_columns_used: [price]
+    expected_answer_pattern: '\d'
+    expected_refusal: false
+    notes: "Should call query_datastore (price column, no aggregation) → compute_stats {type:percentile,column:price,p:90}. Pattern is loose; tighten to actual computed value after first empirical run."
+
+  - id: stats_median_violent_crime_rate
+    question: "What is the median violent crime rate per 100,000 people across all cities in the FBI UCR data?"
+    expected_dataset_id: d460252e-d42c-474a-9ea9-5287b1d595f6
+    expected_columns_used: [violent_crime_rate_per_100000_people]
+    expected_answer_pattern: '\d'
+    expected_refusal: false
+    notes: "Should call query_datastore (rate column, no aggregation) → compute_stats {type:median,column:violent_crime_rate_per_100000_people}. Replaces the dsl_above_avg_crime refusal pattern with a positive-stats answer. Pattern is loose; tighten after first run."
+
+  - id: stats_correlation_violent_murder_rate
+    question: "In the FBI UCR Crime in U.S. dataset, across cities, what's the correlation between violent_crime_rate_per_100000_people and murder_rate_per_100000_people?"
+    expected_dataset_id: d460252e-d42c-474a-9ea9-5287b1d595f6
+    expected_columns_used: [violent_crime_rate_per_100000_people, murder_rate_per_100000_people]
+    expected_answer_pattern: '0?\.\d|correlat'
+    expected_refusal: false
+    notes: "Should call query_datastore (both rate columns) → compute_stats {type:correlation,columns:[violent_crime_rate_per_100000_people,murder_rate_per_100000_people]}. Both columns confirmed present via get_datastore_schema. Pattern accepts a numeric correlation coefficient or the word 'correlat'; tighten after first stable run."
 
   # ---------------------------------------------------------------------------
   # Data-dictionary lift cases. Each targets behavior that should improve when
