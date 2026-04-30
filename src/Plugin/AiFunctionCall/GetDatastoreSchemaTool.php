@@ -64,6 +64,15 @@ class GetDatastoreSchemaTool extends FunctionCallBase implements ExecutableFunct
    */
   public function execute() {
     $input = ResourceIdResolver::normalize((string) $this->getContextValue('resource_id'));
+    if ($input === '') {
+      // Catches the case where the LLM emits an empty argument list. A blank
+      // "Could not resolve resource:" error is opaque; this hints at the
+      // discovery tools the agent should reach for instead.
+      $this->setOutput(json_encode([
+        'error' => 'resource_id is required. Call find_dataset_resources("title") or list_datasets() to discover one before calling get_datastore_schema.',
+      ], JSON_UNESCAPED_SLASHES));
+      return;
+    }
     $resolved = $this->resolver->resolve($input);
     if ($resolved === NULL) {
       $this->setOutput(json_encode(['error' => "Could not resolve resource: {$input}"], JSON_UNESCAPED_SLASHES));

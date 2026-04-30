@@ -19,7 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   id: 'dkan_drupal_ai_query:query_datastore',
   function_name: 'query_datastore',
   name: 'Query datastore',
-  description: 'Query a DKAN datastore resource with filters, sorting, pagination, and aggregation. resource_id accepts {identifier}__{version} OR a dataset title for fuzzy lookup. Conditions must be a JSON string array. Operators: =, <>, <, <=, >, >=, like, contains, starts with, in, not in, between. All data is stored as text — string comparisons apply ("9" > "10" alphabetically); use aggregate expressions for true numeric ordering. Maximum 500 rows per call.',
+  description: 'Query a DKAN datastore resource with filters, sorting, pagination, and aggregation. resource_id accepts {identifier}__{version} OR a dataset title for fuzzy lookup. Conditions must be a JSON string array. Operators: =, <>, <, <=, >, >=, like, contains, starts with, in, not in, between. All data is stored as text — string comparisons apply ("9" > "10" alphabetically); use aggregate expressions for true numeric ordering. Default 100 rows; up to 5000 when you need to feed create_chart with a long time series — keep it ≤500 for browsing.',
   group: 'dkan_drupal_ai_query',
   context_definitions: [
     'resource_id' => new ContextDefinition(
@@ -55,7 +55,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
     'limit' => new ContextDefinition(
       data_type: 'integer',
       label: new TranslatableMarkup('Limit'),
-      description: new TranslatableMarkup('Max rows (1-500, default 100).'),
+      description: new TranslatableMarkup('Max rows (1-5000, default 100). Use ≤500 for browsing; raise above 500 only when feeding create_chart with a long time series.'),
       required: FALSE,
     ),
     'offset' => new ContextDefinition(
@@ -109,6 +109,12 @@ class QueryDatastoreTool extends FunctionCallBase implements ExecutableFunctionC
    */
   public function execute() {
     $resourceIdInput = ResourceIdResolver::normalize((string) $this->getContextValue('resource_id'));
+    if ($resourceIdInput === '') {
+      $this->setOutput(json_encode([
+        'error' => 'resource_id is required. Call find_dataset_resources("title") or list_datasets() first to discover one.',
+      ], JSON_UNESCAPED_SLASHES));
+      return;
+    }
     $resolved = $this->resolver->resolve($resourceIdInput);
     if ($resolved === NULL) {
       $this->setOutput(json_encode([
@@ -121,6 +127,9 @@ class QueryDatastoreTool extends FunctionCallBase implements ExecutableFunctionC
     $limit = (int) ($this->getContextValue('limit') ?: 100);
     $offset = (int) ($this->getContextValue('offset') ?: 0);
 
+    // Higher cap than dkan_query_tools' default 500: chart queries need to
+    // span the full time series when the agent requests it. The prompt and
+    // context-definition discourage using this for general browsing.
     $result = $this->datastoreTools->queryDatastore(
       resourceId: $resolved,
       columns: $this->getContextValue('columns') ?: NULL,
@@ -131,6 +140,7 @@ class QueryDatastoreTool extends FunctionCallBase implements ExecutableFunctionC
       offset: $offset,
       expressions: $this->getContextValue('expressions') ?: NULL,
       groupings: $this->getContextValue('groupings') ?: NULL,
+      maxLimit: 5000,
     );
 
     $this->setOutput(json_encode($result, JSON_UNESCAPED_SLASHES));

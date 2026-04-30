@@ -62,6 +62,12 @@ services:
       - '@entity_type.manager'
       - '@logger.channel.dkan_drupal_ai_query'
 
+  dkan_drupal_ai_query.catalog_context_builder:
+    class: Drupal\dkan_drupal_ai_query\Service\CatalogContextBuilder
+    arguments:
+      - '@dkan_query_tools.metastore'
+      - '@cache.default'
+
   dkan_drupal_ai_query.suggestion_generator:
     class: Drupal\dkan_drupal_ai_query\Service\SuggestionGenerator
     arguments:
@@ -83,6 +89,7 @@ services:
       - '@dkan_drupal_ai_query.system_prompt_loader'
       - '@dkan_drupal_ai_query.refusal_collector'
       - '@dkan_drupal_ai_query.unknown_column_counter'
+      - '@dkan_drupal_ai_query.catalog_context_builder'
     tags:
       - { name: 'controller.service_arguments' }
 
