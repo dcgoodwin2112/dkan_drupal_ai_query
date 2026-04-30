@@ -15,6 +15,22 @@ use Psr\Log\LoggerInterface;
 
 class ArtifactCaptureSubscriberTest extends TestCase {
 
+  /**
+   * Capture the first append() call whose entry has the given $type.
+   *
+   * Every onToolFinished now also writes a `tool_call` debug snapshot, so
+   * tests for the data/chart/refusal paths need to filter out that extra
+   * record. Returns a reference into which the matched entry is stored.
+   */
+  protected function bindCaptureByType(ArtifactStorage $artifacts, string $type, &$out): void {
+    $artifacts->method('append')
+      ->willReturnCallback(function (string $tid, array $entry) use (&$out, $type) {
+        if ($entry['type'] === $type && $out === NULL) {
+          $out = $entry;
+        }
+      });
+  }
+
   protected function buildSubscriber(
     ArtifactStorage $artifacts,
     ?ResourceIdResolver $resolver = NULL,
@@ -45,11 +61,7 @@ class ArtifactCaptureSubscriberTest extends TestCase {
   public function testCaptureDataReadsTotalRows(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
     $captured = NULL;
-    $artifacts->expects($this->once())
-      ->method('append')
-      ->willReturnCallback(function (string $tid, array $entry) use (&$captured) {
-        $captured = $entry;
-      });
+    $this->bindCaptureByType($artifacts, 'data', $captured);
 
     $resolver = $this->createMock(ResourceIdResolver::class);
     $resolver->method('resolve')->willReturnArgument(0);
@@ -77,7 +89,13 @@ class ArtifactCaptureSubscriberTest extends TestCase {
 
   public function testCaptureDataIgnoresErrorOutput(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
-    $artifacts->expects($this->never())->method('append');
+    // Even when the tool errors, the debug-panel snapshot still goes through
+    // so the user can see the failed call. The data artifact must be skipped.
+    $appended = [];
+    $artifacts->method('append')
+      ->willReturnCallback(function (string $tid, array $entry) use (&$appended) {
+        $appended[] = $entry;
+      });
 
     $tool = new \FunctionCallStub(
       'query_datastore',
@@ -87,16 +105,16 @@ class ArtifactCaptureSubscriberTest extends TestCase {
 
     $subscriber = $this->buildSubscriber($artifacts);
     $subscriber->onToolFinished(new AgentToolFinishedExecutionEvent('thread-x', $tool));
+
+    $types = array_column($appended, 'type');
+    $this->assertNotContains('data', $types, 'Error output must not produce a data artifact');
+    $this->assertContains('tool_call', $types, 'Tool-call debug snapshot is captured even on error');
   }
 
   public function testCaptureChartParsesJsonString(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
     $captured = NULL;
-    $artifacts->expects($this->once())
-      ->method('append')
-      ->willReturnCallback(function (string $tid, array $entry) use (&$captured) {
-        $captured = $entry;
-      });
+    $this->bindCaptureByType($artifacts, 'chart', $captured);
 
     $spec = [
       '$schema' => 'https://vega.github.io/schema/vega-lite/v5.json',
@@ -116,9 +134,13 @@ class ArtifactCaptureSubscriberTest extends TestCase {
     $this->assertSame('bar', $captured['spec']['mark']);
   }
 
-  public function testNoCaptureForUnrelatedTools(): void {
+  public function testNoDomainArtifactForUnrelatedTools(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
-    $artifacts->expects($this->never())->method('append');
+    $appended = [];
+    $artifacts->method('append')
+      ->willReturnCallback(function (string $tid, array $entry) use (&$appended) {
+        $appended[] = $entry;
+      });
 
     $tool = new \FunctionCallStub(
       'list_datasets',
@@ -128,16 +150,20 @@ class ArtifactCaptureSubscriberTest extends TestCase {
 
     $subscriber = $this->buildSubscriber($artifacts);
     $subscriber->onToolFinished(new AgentToolFinishedExecutionEvent('thread-x', $tool));
+
+    // List/search/etc. tools don't produce a data, chart, or refusal artifact —
+    // only the tool_call snapshot used by the debug panel.
+    $types = array_column($appended, 'type');
+    $this->assertNotContains('data', $types);
+    $this->assertNotContains('chart', $types);
+    $this->assertNotContains('refusal', $types);
+    $this->assertSame(['tool_call'], $types);
   }
 
   public function testCaptureDataAttachesProvenanceBlock(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
     $captured = NULL;
-    $artifacts->expects($this->once())
-      ->method('append')
-      ->willReturnCallback(function (string $tid, array $entry) use (&$captured) {
-        $captured = $entry;
-      });
+    $this->bindCaptureByType($artifacts, 'data', $captured);
 
     $resolver = $this->createMock(ResourceIdResolver::class);
     $resolver->method('resolve')->willReturnArgument(0);
@@ -185,11 +211,7 @@ class ArtifactCaptureSubscriberTest extends TestCase {
   public function testProvenanceForJoinIncludesJoinFields(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
     $captured = NULL;
-    $artifacts->expects($this->once())
-      ->method('append')
-      ->willReturnCallback(function (string $tid, array $entry) use (&$captured) {
-        $captured = $entry;
-      });
+    $this->bindCaptureByType($artifacts, 'data', $captured);
 
     $resolver = $this->createMock(ResourceIdResolver::class);
     $resolver->method('resolve')->willReturnArgument(0);
@@ -219,11 +241,7 @@ class ArtifactCaptureSubscriberTest extends TestCase {
   public function testProvenanceSurfacesSanityFlagsWhenSet(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
     $captured = NULL;
-    $artifacts->expects($this->once())
-      ->method('append')
-      ->willReturnCallback(function (string $tid, array $entry) use (&$captured) {
-        $captured = $entry;
-      });
+    $this->bindCaptureByType($artifacts, 'data', $captured);
 
     $resolver = $this->createMock(ResourceIdResolver::class);
     $resolver->method('resolve')->willReturnArgument(0);

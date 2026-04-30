@@ -296,6 +296,9 @@
       this.dom.input.placeholder = this.defaultPlaceholder;
       this.resetExamplesToDefault();
       this.updateThreadHeader();
+      // Clear debug panel so the prior conversation's tool calls don't
+      // appear next to the first response of this new conversation.
+      this.debugReset();
       if (this.dom.sidebarList) {
         this.dom.sidebarList
           .querySelectorAll('.dkan-aiq-sidebar-entry--active')
@@ -463,7 +466,18 @@
           this.dom.examplesContainer.innerHTML = '';
           this.dom.examplesContainer.hidden = true;
         }
-        (full.messages || []).forEach((m) => {
+        // Sync the dataset selector so the next /start in this conversation
+        // is scoped to the dataset the conversation was originally about.
+        // No-op in single-dataset block placements (no selector rendered).
+        if (this.dom.datasetSelect) {
+          this.dom.datasetSelect.value = full.dataset_id || '';
+        }
+        // Reset the debug panel so stale entries from a prior question or
+        // conversation don't bleed into the replay below.
+        this.debugReset();
+        const messages = full.messages || [];
+        let lastAssistantArtifacts = null;
+        messages.forEach((m) => {
           if (m.role === 'user') {
             this.appendUserBubble(m.content);
           }
@@ -471,11 +485,48 @@
             const bubble = this.appendAssistantBubble();
             this.renderAssistantText(bubble, m.content);
             (m.artifacts || []).forEach((a) => this.renderArtifactInBubble(bubble, a));
+            lastAssistantArtifacts = m.artifacts || [];
           }
         });
+        // Repopulate the global debug panel from the most recent assistant
+        // turn's persisted tool_call artifacts. Earlier turns' tool calls
+        // are intentionally not replayed — the panel mirrors the latest
+        // result, matching the live-question UX.
+        if (lastAssistantArtifacts) {
+          this.replayDebugFromArtifacts(lastAssistantArtifacts);
+        }
         this.updateThreadHeader();
         this.refreshSidebar();
       });
+  };
+
+  /**
+   * Repopulate the debug panel from a message's persisted tool_call records.
+   *
+   * Each `tool_call` artifact is run through the same DOM that
+   * `debugToolStarted` + `debugToolFinished` build for live events, so the
+   * replayed view is visually indistinguishable from the live one.
+   */
+  Widget.prototype.replayDebugFromArtifacts = function (artifacts) {
+    if (!this.dom.debugLog || this.dom.debugPanel.hidden) {
+      return;
+    }
+    artifacts.forEach((a) => {
+      if (!a || a.type !== 'tool_call') {
+        return;
+      }
+      this.debugToolStarted({
+        tool_name: a.tool_name || '',
+        tool_input: a.tool_input || '',
+        tool_id: 'replay-' + this.debugToolCount,
+      });
+      this.debugToolFinished({
+        tool_name: a.tool_name || '',
+        tool_results: a.tool_results || '',
+        tool_id: 'replay-' + (this.debugToolCount),
+      });
+    });
+    this.debugFooter();
   };
 
   Widget.prototype.askQuestion = function (question) {
@@ -673,6 +724,7 @@
     else if (artifact.type === 'refusal') {
       this.renderRefusalInBubble(bubble, artifact);
     }
+    // type === 'tool_call' is debug-panel-only; handled by replayDebugFromMessage.
   };
 
   Widget.prototype.renderTableInBubble = function (bubble, artifact) {
@@ -732,6 +784,7 @@
       apiBtn.type = 'button';
       apiBtn.className = 'dkan-aiq-api-btn';
       apiBtn.textContent = 'Show API call';
+      apiBtn.title = 'Public REST API equivalent — uses the distribution UUID';
       actions.appendChild(apiBtn);
     }
 
@@ -741,6 +794,7 @@
       sqlBtn.type = 'button';
       sqlBtn.className = 'dkan-aiq-sql-btn';
       sqlBtn.textContent = 'Show SQL';
+      sqlBtn.title = 'Equivalent SQL against the internal datastore table — uses the {hash}__{version} resource id';
       actions.appendChild(sqlBtn);
     }
 
@@ -774,6 +828,15 @@
       apiPre.className = 'dkan-aiq-api-code';
       apiPre.textContent = apiText;
       apiWrap.appendChild(apiPre);
+      // Cross-reference: the SQL panel uses the internal {hash}__{version}
+      // resource id, while this API call uses the distribution UUID. Surface
+      // the alternate form so users can reconcile the two views.
+      if (sqlPrimary && sqlPrimary !== apiPrimary) {
+        const note = document.createElement('div');
+        note.className = 'dkan-aiq-id-note';
+        note.textContent = 'Internal datastore resource id: ' + sqlPrimary;
+        apiWrap.appendChild(note);
+      }
       if (s.showCopyButtons !== false) {
         const copyApi = document.createElement('button');
         copyApi.type = 'button';
@@ -805,6 +868,12 @@
       sqlPre.className = 'dkan-aiq-sql-code';
       sqlPre.textContent = sqlText;
       sqlWrap.appendChild(sqlPre);
+      if (apiPrimary && apiPrimary !== sqlPrimary) {
+        const note = document.createElement('div');
+        note.className = 'dkan-aiq-id-note';
+        note.textContent = 'Public distribution UUID: ' + apiPrimary;
+        sqlWrap.appendChild(note);
+      }
       if (s.showCopyButtons !== false) {
         const copySql = document.createElement('button');
         copySql.type = 'button';
