@@ -88,15 +88,56 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
 
     if ($name === 'query_datastore' || $name === 'query_datastore_join') {
       $this->captureData($threadId, $tool, $name);
-      return;
     }
-    if ($name === 'create_chart') {
+    elseif ($name === 'create_chart') {
       $this->captureChart($threadId, $tool);
-      return;
     }
-    if ($name === 'refuse') {
+    elseif ($name === 'refuse') {
       $this->captureRefusal($threadId, $tool);
     }
+
+    // Always record a debug snapshot of the tool call so the frontend can
+    // rebuild its tool-calls panel when a saved conversation is reloaded.
+    $this->captureToolCallSnapshot($threadId, $tool, $name);
+  }
+
+  /**
+   * Persist a compact debug snapshot of a tool call for history replay.
+   *
+   * The live UI gets `tool_started` / `tool_finished` events from the
+   * ai_agents status timeline, but those are session-scoped and gone once
+   * the request ends. Persisting the same shape against the message makes
+   * `loadConversation` able to repopulate the debug panel.
+   */
+  protected function captureToolCallSnapshot(string $threadId, $tool, string $name): void {
+    $args = [];
+    try {
+      foreach ((array) $tool->getContextValues() as $contextName => $value) {
+        if ($value === NULL || $value === '') {
+          continue;
+        }
+        $args[$contextName] = $value;
+      }
+    }
+    catch (\Throwable) {
+      // Some plugins throw when a required context is unset; an empty
+      // input list is fine — the tool name and result still go through.
+    }
+    try {
+      $readable = (string) $tool->getReadableOutput();
+    }
+    catch (\Throwable) {
+      $readable = '';
+    }
+    $this->artifacts->append($threadId, [
+      'type' => 'tool_call',
+      'tool_name' => $name,
+      'tool_input' => $args ? json_encode($args, JSON_UNESCAPED_SLASHES) : '',
+      // Cap the persisted result so a large query doesn't bloat the message
+      // entity. The summary line in the debug panel only needs the head
+      // anyway; the full table is available via the `data` artifact.
+      'tool_results' => $readable !== '' ? mb_substr($readable, 0, 4000) : '',
+    ]);
   }
 
   /**
