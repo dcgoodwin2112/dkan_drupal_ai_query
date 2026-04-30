@@ -98,6 +98,15 @@ class NlQueryController {
     }
     $this->artifacts->delete($threadId);
 
+    $debugLevel = (string) ($this->configFactory->get('dkan_drupal_ai_query.settings')->get('debug_log_level') ?? 'off');
+    if ($debugLevel === 'info' || $debugLevel === 'debug') {
+      $this->logger->info('NL query start: thread=@t uid=@u question=@q', [
+        '@t' => $threadId,
+        '@u' => (int) $this->currentUser->id(),
+        '@q' => mb_substr($question, 0, 500),
+      ]);
+    }
+
     // Resolve or create the conversation that this turn belongs to.
     $priorMessages = [];
     $conversationCreatedNow = FALSE;
@@ -210,6 +219,16 @@ class NlQueryController {
     }
 
     $durationMs = (int) ((hrtime(TRUE) - $start) / 1e6);
+
+    if ($debugLevel === 'info' || $debugLevel === 'debug') {
+      $this->logger->info('NL query end: thread=@t duration_ms=@d solvability=@s answer=@a', [
+        '@t' => $threadId,
+        '@d' => $durationMs,
+        '@s' => (string) $solvability,
+        '@a' => mb_substr($answer, 0, $debugLevel === 'debug' ? 2000 : 200),
+      ]);
+    }
+
     return new JsonResponse([
       'thread_id' => $threadId,
       'conversation_id' => $conversationId,
@@ -239,7 +258,7 @@ class NlQueryController {
    *
    * Resolution order:
    *   1. Explicit per-turn option from the widget ("provider__model").
-   *   2. Module-level default at /admin/config/dkan/ai-query.
+   *   2. Module-level default at /admin/dkan/ai-query/settings.
    *   3. Site-wide default for the chat operation type.
    *   4. Hardcoded fallback (Anthropic Haiku) for cold-start environments.
    */

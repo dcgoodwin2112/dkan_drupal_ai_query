@@ -36,6 +36,7 @@ services:
       - '@dkan_drupal_ai_query.resource_id_resolver'
       - '@dkan.datastore.service'
       - '@dkan_drupal_ai_query.refusal_collector'
+      - '@config.factory'
     tags:
       - { name: event_subscriber }
 

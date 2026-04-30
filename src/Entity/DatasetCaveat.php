@@ -47,10 +47,10 @@ use Drupal\dkan_drupal_ai_query\DatasetCaveatInterface;
  *     "code_lists",
  *   },
  *   links = {
- *     "collection" = "/admin/config/dkan/ai-query/caveats",
- *     "add-form" = "/admin/config/dkan/ai-query/caveats/add",
- *     "edit-form" = "/admin/config/dkan/ai-query/caveats/{dataset_caveat}/edit",
- *     "delete-form" = "/admin/config/dkan/ai-query/caveats/{dataset_caveat}/delete",
+ *     "collection" = "/admin/dkan/ai-query/caveats",
+ *     "add-form" = "/admin/dkan/ai-query/caveats/add",
+ *     "edit-form" = "/admin/dkan/ai-query/caveats/{dataset_caveat}/edit",
+ *     "delete-form" = "/admin/dkan/ai-query/caveats/{dataset_caveat}/delete",
  *   }
  * )
  */
