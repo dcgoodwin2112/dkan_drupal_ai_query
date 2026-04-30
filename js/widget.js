@@ -1736,6 +1736,42 @@
     if (name === 'create_chart') {
       return '→ chart rendered';
     }
+    if (name === 'sample_rows') {
+      const got = parsed.row_count != null ? parsed.row_count : (Array.isArray(parsed.rows) ? parsed.rows.length : null);
+      if (got != null) {
+        return '→ ' + got + ' row' + (got !== 1 ? 's' : '');
+      }
+    }
+    if (name === 'distinct_values') {
+      const n = parsed.value_count != null
+        ? parsed.value_count
+        : (Array.isArray(parsed.values) ? parsed.values.length : null);
+      if (n != null) {
+        return '→ ' + n + ' distinct value' + (n !== 1 ? 's' : '') + (parsed.truncated ? ' (truncated)' : '');
+      }
+    }
+    if (name === 'compute_stats') {
+      const ops = Array.isArray(parsed.results) ? parsed.results.length : 0;
+      const rows = parsed.row_count != null ? parsed.row_count : null;
+      if (ops || rows != null) {
+        return '→ ' + ops + ' op' + (ops !== 1 ? 's' : '') + (rows != null ? ' over ' + rows.toLocaleString() + ' rows' : '');
+      }
+    }
+    if (name === 'get_data_dictionary') {
+      // The metastore returns either a single dictionary or a `dictionaries`
+      // array; in either case, count the field rows so the summary mirrors
+      // get_datastore_schema's "N columns" style.
+      const dicts = Array.isArray(parsed.dictionaries) ? parsed.dictionaries : (parsed.dictionary ? [parsed.dictionary] : null);
+      if (dicts) {
+        const fieldCount = dicts.reduce((acc, d) => acc + (Array.isArray(d.fields) ? d.fields.length : 0), 0);
+        return '→ ' + dicts.length + ' dictionary' + (dicts.length !== 1 ? 'ies' : '') + (fieldCount ? ', ' + fieldCount + ' fields' : '');
+      }
+    }
+    if (name === 'refuse') {
+      // The refusal artifact already renders the visible card; the debug panel
+      // only needs a one-line acknowledgement so the tool entry isn't blank.
+      return '→ refused (' + (parsed.reason_category || 'other') + ')';
+    }
     // Fallbacks.
     if (Array.isArray(parsed)) {
       return '→ ' + parsed.length + ' item' + (parsed.length !== 1 ? 's' : '');

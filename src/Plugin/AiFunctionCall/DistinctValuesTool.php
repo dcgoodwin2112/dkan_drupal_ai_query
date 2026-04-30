@@ -69,6 +69,12 @@ class DistinctValuesTool extends FunctionCallBase implements ExecutableFunctionC
    */
   public function execute() {
     $input = ResourceIdResolver::normalize((string) $this->getContextValue('resource_id'));
+    if ($input === '') {
+      $this->setOutput(json_encode([
+        'error' => 'resource_id is required. Call find_dataset_resources("title") or list_datasets() first to discover one.',
+      ], JSON_UNESCAPED_SLASHES));
+      return;
+    }
     $resolved = $this->resolver->resolve($input);
     if ($resolved === NULL) {
       $this->setOutput(json_encode(['error' => "Could not resolve resource: {$input}"], JSON_UNESCAPED_SLASHES));
