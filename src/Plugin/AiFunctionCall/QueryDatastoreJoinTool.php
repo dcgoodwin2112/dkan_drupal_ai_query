@@ -145,6 +145,7 @@ class QueryDatastoreJoinTool extends FunctionCallBase implements ExecutableFunct
       offset: (int) ($this->getContextValue('offset') ?: 0),
       expressions: $this->getContextValue('expressions') ?: NULL,
       groupings: $this->getContextValue('groupings') ?: NULL,
+      maxLimit: 5000,
     );
     $this->setOutput(json_encode($result, JSON_UNESCAPED_SLASHES));
   }

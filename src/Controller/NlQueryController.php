@@ -11,6 +11,7 @@ use Drupal\ai_agents\Task\Task;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
+use Drupal\dkan_drupal_ai_query\Service\CatalogContextBuilder;
 use Drupal\dkan_drupal_ai_query\Service\ConversationStorage;
 use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
 use Drupal\dkan_drupal_ai_query\Service\SuggestionGenerator;
@@ -49,6 +50,7 @@ class NlQueryController {
     protected SystemPromptLoader $promptLoader,
     protected RefusalCollector $refusals,
     protected UnknownColumnCounter $unknownColumnCounter,
+    protected CatalogContextBuilder $catalogContext,
   ) {}
 
   /**
@@ -142,8 +144,15 @@ class NlQueryController {
     elseif ($datasetId !== '') {
       $hints[] = "Scope queries to dataset_id={$datasetId}.";
     }
+    // Pre-seed the dataset catalog so the agent can name titles in prose
+    // without a list_datasets round trip and can match user references to
+    // the right UUID without find_dataset_resources for known catalogs.
+    $catalog = $this->catalogContext->build();
+    if ($catalog !== '') {
+      $hints[] = $catalog;
+    }
     $taskText = $hints
-      ? implode(' ', $hints) . ' ' . $question
+      ? implode("\n\n", $hints) . "\n\n" . $question
       : $question;
 
     // Persist the user turn before solving so it survives a mid-solve crash.
