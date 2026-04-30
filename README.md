@@ -162,6 +162,34 @@ Drupal's Request Path block-visibility condition does **literal** path matching.
 - **Polling cost.** `/poll` reads from `PrivateTempStore` (DB-backed). At 500 ms cadence × N concurrent conversations, that's ~120 reqs/min/user against the temp store. Manageable; raise the JS `POLL_INTERVAL_MS` to 750–1000 if it shows up in metrics.
 - **No graceful cancellation.** Closing the browser tab does not abort `solve()`. Worth flagging in the UI when implementing real cancel; v1 is best-effort.
 - **Conversation retention.** Set the **Conversation history → Retention (days)** setting to a non-zero value to have `hook_cron` purge unpinned conversations older than that age. Default `0` keeps everything forever — relevant for PII / compliance reviews.
+- **Model dropdown denylist.** The widget's model selector is fed by `AiProviderPluginManager::getSimpleProviderModelOptions('chat', FALSE)`, which on the OpenAI provider returns every model regardless of capability. `QueryWidgetBlock::build()` filters out models whose id matches `/(image|audio|tts|transcribe|realtime|deep-research|search-preview|search-api)/i` so users don't see image / audio / realtime / deep-research variants in a chat dropdown. If a new non-chat OpenAI model family ships, extend the regex in [src/Plugin/Block/QueryWidgetBlock.php](src/Plugin/Block/QueryWidgetBlock.php).
+- **Catalog pre-seeding.** `CatalogContextBuilder` injects an `[uuid → title]` block into every `/start` task text (1h cache, capped at 50 entries). The agent uses titles in prose without a `list_datasets` round trip and matches user references to the right UUID without `find_dataset_resources` for known catalogs. Falls back gracefully when the metastore is unreachable.
+
+## Stats vs queries (compute_stats)
+
+The datastore DSL handles `sum`, `count`, `avg`, `min`, `max` on the full table via aggregate expressions on `query_datastore`. Anything beyond that — **median, percentile, stddev, variance, quartiles, correlation** — must go through the `compute_stats` tool, which runs on rows the agent has already fetched.
+
+Two important guardrails (encoded in the system prompt):
+
+- The agent must NOT eyeball median/percentile from a `query_datastore` row dump; even small tables go through `compute_stats` so the answer is reproducible.
+- `compute_stats` runs on whatever the agent fetched. If `query_datastore` returned the row-cap (default 500, up to 5000 for charting), `compute_stats` is computing on a sample, not the population — the tool's `warnings` array calls this out.
+
+Charts (`create_chart`) may raise `query_datastore`'s `limit` up to 5000 for long time series; keep `limit ≤ 500` for browsing and ad-hoc questions. The 500/5000 split exists so charts don't silently truncate.
+
+## Bumping the system prompt
+
+The agent's system prompt is file-backed at `prompts/query_system_prompt.v{N}.md` and resolved through `SystemPromptLoader`. Versioning is intentional so eval runs and audit tooling can correlate behavior with prompt changes (every persisted message records its `prompt_version`).
+
+To roll a new version:
+
+1. Copy the current prompt: `cp prompts/query_system_prompt.v6.md prompts/query_system_prompt.v7.md`
+2. Edit the new file.
+3. Bump `SystemPromptLoader::DEFAULT_VERSION` (in [src/Service/SystemPromptLoader.php](src/Service/SystemPromptLoader.php)) and the matching test default in [tests/src/Unit/Service/SystemPromptLoaderTest.php](tests/src/Unit/Service/SystemPromptLoaderTest.php).
+4. Sync the file content into the agent config entity: `ddev drush dkan-aiq:sync-prompt`.
+5. Clear cache: `ddev drush cr`.
+6. Run the eval suite to spot routing regressions: `ddev drush dkan-aiq:eval`.
+
+Live ad-hoc overrides for evaluation use `SystemPromptLoader::setOverride('vN')` and don't require a code change. See [docs/system-prompt.md](docs/system-prompt.md) for details.
 
 ## Caveats vs data dictionaries
 

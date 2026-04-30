@@ -18,14 +18,23 @@ class AgentToolFinishedExecutionEvent {
     protected string $runnerId = '',
   ) {}
 
+  /**
+   * Return the agent thread id (PrivateTempStore key in real runs).
+   */
   public function getThreadId(): string {
     return $this->threadId;
   }
 
+  /**
+   * Return the runner id, falling back to thread id when unset.
+   */
   public function getAgentRunnerId(): string {
     return $this->runnerId !== '' ? $this->runnerId : $this->threadId;
   }
 
+  /**
+   * Return the FunctionCall plugin (or stub) that produced the result.
+   */
   public function getTool(): mixed {
     return $this->tool;
   }

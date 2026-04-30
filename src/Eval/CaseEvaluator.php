@@ -63,6 +63,7 @@ class CaseEvaluator {
     string $answer,
     ?string $errorMessage = NULL,
     ?array $structuredRefusal = NULL,
+    array $toolCalls = [],
   ): array {
     if ($errorMessage !== NULL) {
       return [CaseResult::OUTCOME_ERROR, 'execution_error'];
@@ -71,10 +72,19 @@ class CaseEvaluator {
     $isRefusal = $structuredRefusal !== NULL || $this->looksLikeRefusal($answer);
 
     if ($case->expectedRefusal) {
-      if ($isRefusal) {
-        return [CaseResult::OUTCOME_PASS, NULL];
+      if (!$isRefusal) {
+        return [CaseResult::OUTCOME_FAIL, $case->expectedFailureCategory ?? 'should_have_refused'];
       }
-      return [CaseResult::OUTCOME_FAIL, $case->expectedFailureCategory ?? 'should_have_refused'];
+      // Optional category check — pins refusal routing fixes (e.g. off_topic
+      // must go through refuse(category: off_topic), not prose).
+      if ($case->expectedRefusalCategory !== NULL && $case->expectedRefusalCategory !== '') {
+        $actual = $structuredRefusal['reason_category'] ?? NULL;
+        if ($actual !== $case->expectedRefusalCategory) {
+          return [CaseResult::OUTCOME_FAIL, 'wrong_refusal_category'];
+        }
+      }
+      return $this->checkToolCallExpectations($case, $toolCalls)
+        ?? [CaseResult::OUTCOME_PASS, NULL];
     }
 
     if ($isRefusal) {
@@ -96,11 +106,51 @@ class CaseEvaluator {
       }
     }
 
+    if ($case->forbiddenAnswerPattern !== NULL && $case->forbiddenAnswerPattern !== '') {
+      $delim = '/';
+      $pattern = $delim . str_replace($delim, '\\' . $delim, $case->forbiddenAnswerPattern) . $delim . 'i';
+      if (@preg_match($pattern, $answer) === 1) {
+        return [CaseResult::OUTCOME_FAIL, 'forbidden_text_in_answer'];
+      }
+    }
+
     if (trim($answer) === '') {
       return [CaseResult::OUTCOME_FAIL, 'empty_answer'];
     }
 
-    return [CaseResult::OUTCOME_PASS, NULL];
+    return $this->checkToolCallExpectations($case, $toolCalls)
+      ?? [CaseResult::OUTCOME_PASS, NULL];
+  }
+
+  /**
+   * Verify required and forbidden tool calls.
+   *
+   * Pins routing fixes (e.g. "first N must go through query_datastore, not
+   * sample_rows") so a regression in the prompt or in tool descriptions gets
+   * caught the next time the eval suite runs.
+   *
+   * @return array{0:string,1:string}|null
+   *   Failure outcome+category, or NULL when all checks pass.
+   */
+  protected function checkToolCallExpectations(GoldenCase $case, array $toolCalls): ?array {
+    if (!$case->expectedToolCalls && !$case->forbiddenToolCalls) {
+      return NULL;
+    }
+    $invokedTools = array_unique(array_map(
+      static fn(array $c) => (string) ($c['tool'] ?? ''),
+      $toolCalls,
+    ));
+    foreach ($case->expectedToolCalls as $required) {
+      if (!in_array($required, $invokedTools, TRUE)) {
+        return [CaseResult::OUTCOME_FAIL, 'missing_required_tool'];
+      }
+    }
+    foreach ($case->forbiddenToolCalls as $forbidden) {
+      if (in_array($forbidden, $invokedTools, TRUE)) {
+        return [CaseResult::OUTCOME_FAIL, 'used_forbidden_tool'];
+      }
+    }
+    return NULL;
   }
 
   /**
