@@ -888,6 +888,21 @@
   color: #64748b;
 }
 
+/* Collapsed refusals from prior turns: keep history without visual clutter. */
+.dkan-aiq-refusal--historical {
+  padding: 4px 10px;
+  opacity: 0.65;
+}
+
+.dkan-aiq-refusal--historical .dkan-aiq-refusal-explanation,
+.dkan-aiq-refusal--historical .dkan-aiq-refusal-searched {
+  display: none;
+}
+
+.dkan-aiq-refusal--historical .dkan-aiq-refusal-header {
+  margin: 0;
+}
+
 /* Assistant bubble footer: model label + copy */
 .dkan-aiq-bubble-footer {
   display: flex;

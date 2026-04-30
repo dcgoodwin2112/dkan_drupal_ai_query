@@ -66,6 +66,9 @@
   Widget.prototype.init = function () {
     this.applyVisibilityToggles();
     this.defaultPlaceholder = this.dom.input ? (this.dom.input.placeholder || '') : '';
+    this.defaultExamplesHtml = this.dom.examplesContainer
+      ? this.dom.examplesContainer.innerHTML
+      : '';
     this.populateModelSelector();
     this.bindForm();
     this.bindExamples();
@@ -77,10 +80,10 @@
     if (this.historyEnabled) {
       this.root.classList.add('dkan-aiq-widget--with-sidebar');
       this.dom.sidebar.hidden = false;
-      this.dom.threadHeader.hidden = false;
       this.bindSidebar();
       this.refreshSidebar();
     }
+    this.updateThreadHeader();
     if (!this.datasetId) {
       this.populateDatasetSelector();
     }
@@ -253,13 +256,31 @@
   };
 
   Widget.prototype.bindExamples = function () {
-    this.dom.examples.forEach((btn) => {
+    if (!this.dom.examplesContainer) {
+      return;
+    }
+    this.dom.examplesContainer.querySelectorAll('.dkan-aiq-example').forEach((btn) => {
       btn.addEventListener('click', () => {
         const q = btn.getAttribute('data-question') || btn.textContent;
-        this.dom.input.value = q;
         this.askQuestion(q);
       });
     });
+  };
+
+  Widget.prototype.resetExamplesToDefault = function () {
+    if (!this.dom.examplesContainer) {
+      return;
+    }
+    this.dom.examplesContainer.innerHTML = this.defaultExamplesHtml;
+    this.dom.examplesContainer.hidden = false;
+    this.bindExamples();
+  };
+
+  Widget.prototype.updateThreadHeader = function () {
+    if (!this.dom.threadHeader) {
+      return;
+    }
+    this.dom.threadHeader.hidden = this.dom.thread.children.length === 0;
   };
 
   Widget.prototype.bindNewConversation = function () {
@@ -272,6 +293,13 @@
       this.dom.error.hidden = true;
       this.dom.input.value = '';
       this.dom.input.placeholder = this.defaultPlaceholder;
+      this.resetExamplesToDefault();
+      this.updateThreadHeader();
+      if (this.dom.sidebarList) {
+        this.dom.sidebarList
+          .querySelectorAll('.dkan-aiq-sidebar-entry--active')
+          .forEach((e) => e.classList.remove('dkan-aiq-sidebar-entry--active'));
+      }
       this.dom.input.focus();
     });
   };
@@ -430,6 +458,10 @@
         this.dom.thread.innerHTML = '';
         this.dom.error.hidden = true;
         this.dom.input.placeholder = this.followUpPlaceholder;
+        if (this.dom.examplesContainer) {
+          this.dom.examplesContainer.innerHTML = '';
+          this.dom.examplesContainer.hidden = true;
+        }
         (full.messages || []).forEach((m) => {
           if (m.role === 'user') {
             this.appendUserBubble(m.content);
@@ -440,6 +472,7 @@
             (m.artifacts || []).forEach((a) => this.renderArtifactInBubble(bubble, a));
           }
         });
+        this.updateThreadHeader();
         this.refreshSidebar();
       });
   };
@@ -449,6 +482,9 @@
       return;
     }
     this.dom.error.hidden = true;
+    this.dom.thread
+      .querySelectorAll('.dkan-aiq-refusal:not(.dkan-aiq-refusal--historical)')
+      .forEach((el) => el.classList.add('dkan-aiq-refusal--historical'));
     this.appendUserBubble(question);
     const bubble = this.appendAssistantBubble();
     const threadId = 'aiq-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
@@ -544,7 +580,10 @@
         else {
           this.dom.error.textContent = resp.body.error || 'An error occurred.';
           this.dom.error.hidden = false;
-          bubble.classList.add('dkan-aiq-message-error');
+          if (bubble.parentElement) {
+            bubble.parentElement.remove();
+          }
+          this.updateThreadHeader();
         }
         this.debugFooter();
         this.setStatus('');
@@ -556,6 +595,10 @@
         this.activeRun = null;
         this.dom.error.textContent = err.message;
         this.dom.error.hidden = false;
+        if (bubble.parentElement) {
+          bubble.parentElement.remove();
+        }
+        this.updateThreadHeader();
         this.setStatus('');
         this.dom.submit.disabled = false;
       });
@@ -580,6 +623,7 @@
     bubble.textContent = text;
     wrap.appendChild(bubble);
     this.dom.thread.appendChild(wrap);
+    this.updateThreadHeader();
     this.scrollToBottom();
     return bubble;
   };
@@ -1309,7 +1353,6 @@
       chip.className = 'dkan-aiq-suggestion-chip';
       chip.textContent = text;
       chip.addEventListener('click', () => {
-        this.dom.input.value = text;
         this.askQuestion(text);
       });
       wrap.appendChild(chip);
