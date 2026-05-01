@@ -548,6 +548,24 @@
   overflow-x: auto;
 }
 
+.dkan-aiq-method-summary {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: #475569;
+  font-style: italic;
+}
+
+/* Method summary becomes the divider, so the first table directly below it
+   should not paint its own border-top on top of the summary's bottom edge. */
+.dkan-aiq-method-summary + .dkan-aiq-table-container,
+.dkan-aiq-method-summary + .dkan-aiq-aux-tools {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: none;
+}
+
 .dkan-aiq-table-container[hidden] {
   display: none;
 }
@@ -1229,6 +1247,15 @@
   color: #334155;
 }
 
+.dkan-aiq-debug-summary.has-errors {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.dkan-aiq-debug-summary.has-errors::before {
+  content: '⚠ ';
+}
+
 .dkan-aiq-debug-log {
   max-height: 400px;
   overflow-y: auto;
@@ -1242,7 +1269,7 @@
 }
 
 .dkan-aiq-debug-entry {
-  padding: 8px 0;
+  padding: 0;
   border-bottom: 1px solid #f1f5f9;
 }
 
@@ -1252,14 +1279,47 @@
 
 .dkan-aiq-debug-entry.dkan-aiq-debug-error {
   border-left: 3px solid #ef4444;
-  padding-left: 8px;
+}
+
+.dkan-aiq-debug-entry.dkan-aiq-debug-error > .dkan-aiq-debug-header {
+  padding-left: 5px;
+}
+
+/* The whole row is the affordance; suppress the native disclosure marker
+   so name + result chip + meta line up cleanly across entries. */
+.dkan-aiq-debug-entry > summary {
+  list-style: none;
+}
+
+.dkan-aiq-debug-entry > summary::-webkit-details-marker {
+  display: none;
 }
 
 .dkan-aiq-debug-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.dkan-aiq-debug-header:hover {
+  background: #f8fafc;
+}
+
+.dkan-aiq-debug-result-inline {
+  flex: 1;
+  font-family: monospace;
+  font-size: 12px;
+  color: #059669;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.dkan-aiq-debug-result-inline.dkan-aiq-debug-result-error {
+  color: #b91c1c;
 }
 
 .dkan-aiq-debug-name {
@@ -1275,7 +1335,7 @@
 }
 
 .dkan-aiq-debug-args {
-  margin: 4px 0 0;
+  margin: 0 0 8px;
   padding: 6px 8px;
   background: #f8fafc;
   border: 1px solid #f1f5f9;
@@ -1286,6 +1346,11 @@
   color: #334155;
   overflow-x: auto;
   white-space: pre;
+}
+
+.dkan-aiq-debug-args.dkan-aiq-debug-args-empty {
+  color: #94a3b8;
+  font-style: italic;
 }
 
 .dkan-aiq-debug-api,
@@ -1301,32 +1366,91 @@
   letter-spacing: 0.05em;
 }
 
-.dkan-aiq-debug-result {
-  margin-top: 2px;
-  font-size: 12px;
-  color: #059669;
-  font-family: monospace;
-}
-
-.dkan-aiq-debug-result-error {
-  color: #ef4444;
-}
-
-.dkan-aiq-debug-separator {
-  padding: 6px 0 2px;
+.dkan-aiq-debug-step {
   margin-top: 4px;
   border-top: 1px dashed #cbd5e1;
+}
+
+.dkan-aiq-debug-step:first-child {
+  margin-top: 0;
+  border-top: none;
+}
+
+.dkan-aiq-debug-step > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 6px 0 4px;
   font-size: 11px;
-  color: #94a3b8;
+  color: #475569;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  font-weight: 600;
+  user-select: none;
+}
+
+.dkan-aiq-debug-step > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dkan-aiq-debug-step > summary:hover {
+  color: #1e293b;
+}
+
+.dkan-aiq-debug-step > summary::before {
+  content: '▸ ';
+  display: inline-block;
+  font-size: 10px;
+  color: #94a3b8;
+  transition: transform 0.15s ease;
+}
+
+.dkan-aiq-debug-step[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.dkan-aiq-debug-step-list {
+  padding-left: 8px;
+  border-left: 1px solid #e2e8f0;
+  margin-left: 4px;
 }
 
 .dkan-aiq-debug-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 8px 0 0;
   margin-top: 4px;
   border-top: 1px solid #e2e8f0;
   font-size: 12px;
   color: #64748b;
-  text-align: right;
+}
+
+.dkan-aiq-debug-footer-totals {
+  flex: 1;
+  text-align: left;
+}
+
+.dkan-aiq-debug-copy {
+  appearance: none;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dkan-aiq-debug-copy:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.dkan-aiq-debug-copy:disabled {
+  cursor: default;
+  color: #059669;
+  border-color: #86efac;
+  background: #f0fdf4;
 }

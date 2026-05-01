@@ -50,6 +50,9 @@ dkan_drupal_ai_query.settings:
     show_aux_tool_calls:
       type: boolean
       label: 'Show "Behind the scenes" panel'
+    show_method_summary:
+      type: boolean
+      label: 'Show method summary'
     max_iterations:
       type: integer
       label: 'Max agent iterations'
