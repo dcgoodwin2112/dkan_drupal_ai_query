@@ -3,6 +3,7 @@
 namespace Drupal\dkan_drupal_ai_query\Form;
 
 use Drupal\ai\AiProviderPluginManager;
+use Drupal\ai\Enum\AiModelCapability;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -78,8 +79,17 @@ class SettingsForm extends ConfigFormBase {
   public function buildForm(array $form, FormStateInterface $form_state): array {
     $config = $this->config('dkan_drupal_ai_query.settings');
 
-    // Live model list, scoped to providers that are usable for chat.
-    $modelOptions = $this->providerManager->getSimpleProviderModelOptions('chat', FALSE);
+    // Live model list, scoped to providers that are usable for chat AND
+    // models that declare the ChatTools capability — the agent loop only
+    // works with function-calling models, so non-tool variants (image,
+    // audio, transcription, etc.) shouldn't be selectable here either.
+    $modelOptions = $this->providerManager->getSimpleProviderModelOptions(
+      'chat',
+      FALSE,
+      TRUE,
+      [AiModelCapability::ChatTools],
+    );
+    $modelOptions = array_map('strval', $modelOptions);
     $hasModels = !empty($modelOptions);
 
     $description = $hasModels
@@ -105,6 +115,24 @@ class SettingsForm extends ConfigFormBase {
       '#options' => ['' => $this->t('Use global default')] + $modelOptions,
       '#default_value' => (string) ($config->get('default_model') ?? ''),
       '#description' => $description,
+      '#disabled' => !$hasModels,
+    ];
+
+    // Collapsible wrapper so the checkbox list (often long once multiple
+    // providers are configured) doesn't dominate the form. Auto-opens
+    // when a saved restriction exists so admins land on their selection.
+    $savedAllowed = (array) ($config->get('allowed_models') ?? []);
+    $form['provider']['allowed_models_section'] = [
+      '#type' => 'details',
+      '#title' => $this->t('Allowed models'),
+      '#description' => $this->t('Optional. Restricts the widget\'s model dropdown to the models you check below. Leave all unchecked to allow every chat-tools-capable model from configured providers. The default model above is independent of this list — pick a default that is also checked here, or end users will fall back to the first allowed model.'),
+      '#open' => !empty($savedAllowed),
+      '#tree' => FALSE,
+    ];
+    $form['provider']['allowed_models_section']['allowed_models'] = [
+      '#type' => 'checkboxes',
+      '#options' => $modelOptions,
+      '#default_value' => array_values($savedAllowed),
       '#disabled' => !$hasModels,
     ];
 
@@ -159,21 +187,21 @@ class SettingsForm extends ConfigFormBase {
 
     $form['actions_group']['show_api_call'] = [
       '#type' => 'checkbox',
-      '#title' => $this->t('Show / Hide API call button'),
+      '#title' => $this->t('"API call" section in result details'),
       '#default_value' => $config->get('show_api_call') ?? TRUE,
-      '#description' => $this->t('Exposes the underlying DKAN datastore API request the agent issued.'),
+      '#description' => $this->t('Exposes the underlying DKAN datastore API request the agent issued. Appears as a collapsible section inside the result details panel.'),
     ];
 
     $form['actions_group']['show_sql'] = [
       '#type' => 'checkbox',
-      '#title' => $this->t('Show / Hide SQL button'),
+      '#title' => $this->t('"SQL" section in result details'),
       '#default_value' => $config->get('show_sql') ?? TRUE,
-      '#description' => $this->t('Exposes the equivalent SQL for the underlying query.'),
+      '#description' => $this->t('Exposes the equivalent SQL for the underlying query. Appears as a collapsible section inside the result details panel.'),
     ];
 
     $form['actions_group']['show_provenance'] = [
       '#type' => 'checkbox',
-      '#title' => $this->t('Show / Hide provenance button'),
+      '#title' => $this->t('Show / Hide result details button'),
       '#default_value' => $config->get('show_provenance') ?? TRUE,
       '#description' => $this->t('Reveals the dataset, distribution, and resource ids the result is derived from.'),
     ];
@@ -187,9 +215,23 @@ class SettingsForm extends ConfigFormBase {
 
     $form['actions_group']['show_copy_buttons'] = [
       '#type' => 'checkbox',
-      '#title' => $this->t('Copy API / SQL buttons'),
+      '#title' => $this->t('Copy buttons in API call and SQL sections'),
       '#default_value' => $config->get('show_copy_buttons') ?? TRUE,
-      '#description' => $this->t('Adds a clipboard copy action inside the API call and SQL panels.'),
+      '#description' => $this->t('Adds a clipboard copy action inside the API call and SQL sections of the result details panel.'),
+    ];
+
+    $form['actions_group']['show_aux_tool_calls'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Show "Supporting data" panel'),
+      '#default_value' => $config->get('show_aux_tool_calls') ?? FALSE,
+      '#description' => $this->t('Adds a collapsible panel below the answer listing tool calls the agent made that don\'t produce a primary table — computed statistics, data dictionaries, and column-level stats. Off by default; turn on for power-user / admin contexts where users want to verify the agent\'s work.'),
+    ];
+
+    $form['actions_group']['show_simple_table_artifacts'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Render table for non-query tool calls'),
+      '#default_value' => $config->get('show_simple_table_artifacts') ?? TRUE,
+      '#description' => $this->t('When enabled, sample rows, distinct value lookups, column searches, dataset / distribution / schema listings render as in-bubble tables (with CSV download). Disabling this hides the table for those tools — only datastore queries continue to show one.'),
     ];
 
     $form['history'] = [
@@ -266,6 +308,7 @@ class SettingsForm extends ConfigFormBase {
 
     $this->config('dkan_drupal_ai_query.settings')
       ->set('default_model', $form_state->getValue('default_model'))
+      ->set('allowed_models', array_values(array_filter((array) $form_state->getValue('allowed_models'))))
       ->set('show_model_selector', (bool) $form_state->getValue('show_model_selector'))
       ->set('show_examples', (bool) $form_state->getValue('show_examples'))
       ->set('show_debug_panel', (bool) $form_state->getValue('show_debug_panel'))
@@ -277,6 +320,8 @@ class SettingsForm extends ConfigFormBase {
       ->set('show_provenance', (bool) $form_state->getValue('show_provenance'))
       ->set('show_download_csv', (bool) $form_state->getValue('show_download_csv'))
       ->set('show_copy_buttons', (bool) $form_state->getValue('show_copy_buttons'))
+      ->set('show_simple_table_artifacts', (bool) $form_state->getValue('show_simple_table_artifacts'))
+      ->set('show_aux_tool_calls', (bool) $form_state->getValue('show_aux_tool_calls'))
       ->set('max_iterations', $maxIterations)
       ->set('conversation_retention_days', max(0, (int) $form_state->getValue('conversation_retention_days')))
       ->set('debug_log_level', $debugLevel)

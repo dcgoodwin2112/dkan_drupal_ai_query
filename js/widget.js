@@ -16,6 +16,109 @@
 
   const POLL_INTERVAL_MS = 500;
 
+  // Tool names whose data artifact should render as a plain table+CSV with
+  // simplified provenance — no API call / SQL / preview panels (those only
+  // make sense for the two datastore-query tools).
+  const SIMPLE_TABLE_TOOLS = new Set([
+    'sample_rows',
+    'distinct_values',
+    'search_columns',
+    'list_datasets',
+    'list_distributions',
+    'get_datastore_schema',
+  ]);
+
+  // Cell text past this length is truncated in the table view; click expands.
+  const CELL_TRUNCATE_LEN = 80;
+
+  /**
+   * Build a small down-chevron SVG node, sized to live inline beside button
+   * text. Uses currentColor so it inherits the button's text color (and
+   * automatically inverts when the button enters its .is-open active state).
+   * The SVG is aria-hidden — state for assistive tech is conveyed through
+   * the button's aria-expanded attribute, which the click handlers toggle.
+   */
+  function makeChevron() {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 12 12');
+    svg.setAttribute('width', '10');
+    svg.setAttribute('height', '10');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('class', 'dkan-aiq-btn-chevron');
+    const path = document.createElementNS(NS, 'path');
+    path.setAttribute('d', 'M3 4.5l3 3 3-3');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+    return svg;
+  }
+
+  // Friendly labels and gloss strings for the provenance panel. Untranslated
+  // — the widget already ships untranslated UI strings ("Show table" etc.);
+  // an i18n pass would be a separate phase.
+  const TOOL_FRIENDLY_NAMES = {
+    query_datastore: 'Datastore query',
+    query_datastore_join: 'Datastore join query',
+    sample_rows: 'Sample of rows',
+    distinct_values: 'Distinct values',
+    search_columns: 'Column search',
+    list_datasets: 'Dataset list',
+    list_distributions: 'Distribution list',
+    get_datastore_schema: 'Schema',
+  };
+
+  // One-sentence explainer per tool, rendered at the top of the result-details
+  // panel so non-technical users understand where the data came from. Phrased
+  // for an analyst audience: what the tool reads, what it returns, and any
+  // important constraint (e.g. "in the database").
+  const TOOL_DESCRIPTIONS = {
+    query_datastore: 'Runs a structured query against one resource’s datastore table. Filters, sorts, and aggregations happen in the database; only matching rows come back.',
+    query_datastore_join: 'Runs a structured query that joins two datastore tables on a shared column. The join happens in the database; only matching rows come back.',
+    sample_rows: 'Returns a small random sample of rows from the resource so you can eyeball the data.',
+    distinct_values: 'Lists the unique values that appear in one column of the resource.',
+    search_columns: 'Searches column names (and optionally descriptions) across all dataset resources to find columns matching your keyword.',
+    list_datasets: 'Returns a page of datasets from the catalog so you can browse what is available.',
+    list_distributions: 'Lists the distributions — downloadable files or API endpoints — that belong to one dataset.',
+    get_datastore_schema: 'Returns the column definitions for one resource: name, type, and (when available) a description from the data dictionary.',
+  };
+
+  // Friendly labels and intro blurbs for non-table tool calls surfaced in
+  // the "Behind the scenes" disclosure.
+  const AUX_TOOL_FRIENDLY_NAMES = {
+    compute_stats: 'Statistics computed',
+    get_data_dictionary: 'Data dictionary',
+    get_datastore_stats: 'Column-level stats',
+    get_datastore_schema: 'Schema',
+    distinct_values: 'Distinct values',
+  };
+
+  const AUX_TOOL_DESCRIPTIONS = {
+    compute_stats: 'The agent computed these statistics from the query results above (median, stddev, quartiles, etc.).',
+    get_data_dictionary: 'Publisher-supplied field definitions for the resources the agent looked up.',
+    get_datastore_stats: 'Per-column stats the agent peeked at while planning the query — null counts, distinct values, min/max.',
+    get_datastore_schema: 'Column definitions the agent retrieved while planning the query — name, type, and (when available) description.',
+    distinct_values: 'Unique values for a single column the agent looked up while filtering or exploring.',
+  };
+
+  const PROV_LABELS = {
+    executed_at: 'When this ran',
+    tool: 'What was queried',
+    rows: 'Rows returned',
+    sanity_flags: 'Things to know',
+    query_summary: 'Query details',
+  };
+
+  const SANITY_GLOSS = {
+    zero_rows: 'No matching rows.',
+    row_cap_hit: 'Result was capped at the row limit you requested.',
+    all_null_columns: 'These columns came back fully empty: ',
+    coverage_warning: 'Coverage warning: ',
+  };
+
   Drupal.behaviors.dkanAiQueryWidget = {
     attach: function (context) {
       once('dkan-aiq-widget', '.dkan-aiq-widget', context).forEach(function (root) {
@@ -724,6 +827,16 @@
     else if (artifact.type === 'refusal') {
       this.renderRefusalInBubble(bubble, artifact);
     }
+    else if (artifact.type === 'aux_tool') {
+      // Admin-gated; defaults to off in QueryWidgetBlock so public widgets
+      // stay clean. When on, the agent's behind-the-scenes tool calls
+      // (compute_stats, data dictionary, column stats) get a collapsed
+      // disclosure under the main answer.
+      if ((this.settings || {}).showAuxToolCalls === false) {
+        return;
+      }
+      this.renderAuxToolInBubble(bubble, artifact);
+    }
     // type === 'tool_call' is debug-panel-only; handled by replayDebugFromMessage.
   };
 
@@ -733,19 +846,57 @@
     if (rows.length === 0 && !provenance) {
       return;
     }
-    const cols = rows.length ? Object.keys(rows[0] || {}) : [];
-    const input = artifact.input || null;
     const toolName = artifact.tool || 'query_datastore';
+    const isSimpleTool = SIMPLE_TABLE_TOOLS.has(toolName);
 
-    // The API endpoint takes a distribution UUID in its URL path
-    // (the public-facing form), while the SQL panel needs the internal
-    // {hash}__{version} resource id (the actual datastore table name).
-    const apiPrimary = input ? (input.distribution_uuid || input.resolved_resource_id || input.resource_id || '') : '';
-    const apiJoin = input ? (input.join_distribution_uuid || input.resolved_join_resource_id || input.join_resource_id || '') : '';
-    const sqlPrimary = input ? (input.resolved_resource_id || input.resource_id || '') : '';
-    const sqlJoin = input ? (input.resolved_join_resource_id || input.join_resource_id || '') : '';
-    const apiText = input ? buildApiEquivalent(toolName, input, apiPrimary, apiJoin) : null;
-    const sqlText = input ? buildSqlEquivalent(toolName, input, sqlPrimary, sqlJoin) : null;
+    // Admin escape hatch: when the umbrella toggle is off, suppress the
+    // table for the simple-tool family entirely. Datastore queries always
+    // render — they're the headline feature.
+    if (isSimpleTool && (this.settings || {}).showSimpleTableArtifacts === false) {
+      return;
+    }
+    // Honor the capture-time column hint (search_columns, list_datasets, etc.)
+    // so columns appear in a stable order regardless of map iteration. Falls
+    // back to the first row's keys for tools that don't supply a hint.
+    let cols = [];
+    if (Array.isArray(artifact.columns_hint) && artifact.columns_hint.length) {
+      cols = artifact.columns_hint.slice();
+    }
+    else if (rows.length) {
+      cols = Object.keys(rows[0] || {});
+    }
+
+    // Build a column-name => type map. For datastore queries the schema
+    // travels alongside the rows; for get_datastore_schema each row IS a
+    // column descriptor, so we read type from the row itself. Other tools
+    // simply have no type info and the chip is suppressed.
+    const colTypes = {};
+    if (artifact.schema && typeof artifact.schema === 'object') {
+      Object.keys(artifact.schema).forEach((k) => {
+        const entry = artifact.schema[k];
+        if (entry && typeof entry === 'object' && entry.type) {
+          colTypes[k] = entry.type;
+        }
+      });
+    }
+    if (toolName === 'get_datastore_schema') {
+      rows.forEach((row) => {
+        if (row && row.name && row.type) {
+          colTypes[row.name] = row.type;
+        }
+      });
+    }
+
+    const input = artifact.input || null;
+
+    // API and SQL preview only apply to the two datastore-query tools — the
+    // rest don't map to a public datastore endpoint and would render nonsense.
+    const apiPrimary = (!isSimpleTool && input) ? (input.distribution_uuid || input.resolved_resource_id || input.resource_id || '') : '';
+    const apiJoin = (!isSimpleTool && input) ? (input.join_distribution_uuid || input.resolved_join_resource_id || input.join_resource_id || '') : '';
+    const sqlPrimary = (!isSimpleTool && input) ? (input.resolved_resource_id || input.resource_id || '') : '';
+    const sqlJoin = (!isSimpleTool && input) ? (input.resolved_join_resource_id || input.join_resource_id || '') : '';
+    const apiText = (!isSimpleTool && input) ? buildApiEquivalent(toolName, input, apiPrimary, apiJoin) : null;
+    const sqlText = (!isSimpleTool && input) ? buildSqlEquivalent(toolName, input, sqlPrimary, sqlJoin) : null;
 
     const container = document.createElement('div');
     container.className = 'dkan-aiq-table-container';
@@ -754,6 +905,14 @@
     // Summary bar (always visible).
     const summary = document.createElement('div');
     summary.className = 'dkan-aiq-table-summary';
+
+    // Friendly tool name (e.g. "Datastore query · ", "Sample of rows · ")
+    // sits to the left of the row count so users immediately know which
+    // call produced the table.
+    const toolLabel = document.createElement('span');
+    toolLabel.className = 'dkan-aiq-table-tool';
+    toolLabel.textContent = TOOL_FRIENDLY_NAMES[toolName] || toolName;
+    summary.appendChild(toolLabel);
 
     const meta = document.createElement('span');
     meta.className = 'dkan-aiq-table-meta';
@@ -764,46 +923,55 @@
     meta.textContent = countText;
     summary.appendChild(meta);
 
+    if (cols.length) {
+      const shape = document.createElement('span');
+      shape.className = 'dkan-aiq-table-shape';
+      shape.textContent = cols.length + ' column' + (cols.length !== 1 ? 's' : '');
+      summary.appendChild(shape);
+    }
+
     const actions = document.createElement('span');
     actions.className = 'dkan-aiq-table-actions';
 
     const s = this.settings || {};
 
     let toggleBtn = null;
+    let toggleLabel = null;
     if (rows.length && s.showTableToggle !== false) {
       toggleBtn = document.createElement('button');
       toggleBtn.type = 'button';
       toggleBtn.className = 'dkan-aiq-table-toggle';
-      toggleBtn.textContent = 'Show table';
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      toggleBtn.appendChild(makeChevron());
+      // Keep a ref to the trailing text node so the click handler can swap
+      // "Show" / "Hide" without wiping out the chevron SVG sibling.
+      toggleLabel = document.createTextNode(' Show table');
+      toggleBtn.appendChild(toggleLabel);
       actions.appendChild(toggleBtn);
     }
 
-    let apiBtn = null;
-    if (apiText && s.showApiCall !== false) {
-      apiBtn = document.createElement('button');
-      apiBtn.type = 'button';
-      apiBtn.className = 'dkan-aiq-api-btn';
-      apiBtn.textContent = 'Show API call';
-      apiBtn.title = 'Public REST API equivalent — uses the distribution UUID';
-      actions.appendChild(apiBtn);
-    }
-
-    let sqlBtn = null;
-    if (sqlText && s.showSql !== false) {
-      sqlBtn = document.createElement('button');
-      sqlBtn.type = 'button';
-      sqlBtn.className = 'dkan-aiq-sql-btn';
-      sqlBtn.textContent = 'Show SQL';
-      sqlBtn.title = 'Equivalent SQL against the internal datastore table — uses the {hash}__{version} resource id';
-      actions.appendChild(sqlBtn);
-    }
+    // API call and SQL panels were standalone summary-bar buttons. They now
+    // live nested under "Query details" inside the result-details panel, so
+    // we just pre-build the DOM nodes here (when the corresponding setting
+    // is on) and hand them off to renderProvenancePanel.
+    const showCopy = s.showCopyButtons !== false;
+    const apiNode = (apiText && s.showApiCall !== false)
+      ? buildApiPanelNode(apiText, apiPrimary, sqlPrimary, showCopy)
+      : null;
+    const sqlNode = (sqlText && s.showSql !== false)
+      ? buildSqlPanelNode(sqlText, apiPrimary, sqlPrimary, showCopy)
+      : null;
 
     let provBtn = null;
+    let provLabel = null;
     if (provenance && s.showProvenance !== false) {
       provBtn = document.createElement('button');
       provBtn.type = 'button';
       provBtn.className = 'dkan-aiq-prov-btn';
-      provBtn.textContent = 'Show provenance';
+      provBtn.setAttribute('aria-expanded', 'false');
+      provBtn.appendChild(makeChevron());
+      provLabel = document.createTextNode(' Show result details');
+      provBtn.appendChild(provLabel);
       actions.appendChild(provBtn);
     }
 
@@ -819,94 +987,23 @@
     summary.appendChild(actions);
     container.appendChild(summary);
 
-    // API call collapsible panel.
-    if (apiBtn && apiText) {
-      const apiWrap = document.createElement('div');
-      apiWrap.className = 'dkan-aiq-api-wrapper';
-      apiWrap.hidden = true;
-      const apiPre = document.createElement('pre');
-      apiPre.className = 'dkan-aiq-api-code';
-      apiPre.textContent = apiText;
-      apiWrap.appendChild(apiPre);
-      // Cross-reference: the SQL panel uses the internal {hash}__{version}
-      // resource id, while this API call uses the distribution UUID. Surface
-      // the alternate form so users can reconcile the two views.
-      if (sqlPrimary && sqlPrimary !== apiPrimary) {
-        const note = document.createElement('div');
-        note.className = 'dkan-aiq-id-note';
-        note.textContent = 'Internal datastore resource id: ' + sqlPrimary;
-        apiWrap.appendChild(note);
-      }
-      if (s.showCopyButtons !== false) {
-        const copyApi = document.createElement('button');
-        copyApi.type = 'button';
-        copyApi.className = 'dkan-aiq-api-copy';
-        copyApi.textContent = 'Copy';
-        copyApi.addEventListener('click', () => {
-          navigator.clipboard.writeText(apiText).then(() => {
-            copyApi.textContent = 'Copied!';
-            setTimeout(() => { copyApi.textContent = 'Copy'; }, 1500);
-          });
-        });
-        apiWrap.appendChild(copyApi);
-      }
-      container.appendChild(apiWrap);
-      apiBtn.addEventListener('click', () => {
-        const isHidden = apiWrap.hidden;
-        apiWrap.hidden = !isHidden;
-        apiBtn.textContent = isHidden ? 'Hide API call' : 'Show API call';
-        this.scrollToBottom();
-      });
-    }
-
-    // SQL collapsible panel.
-    if (sqlBtn && sqlText) {
-      const sqlWrap = document.createElement('div');
-      sqlWrap.className = 'dkan-aiq-sql-wrapper';
-      sqlWrap.hidden = true;
-      const sqlPre = document.createElement('pre');
-      sqlPre.className = 'dkan-aiq-sql-code';
-      sqlPre.textContent = sqlText;
-      sqlWrap.appendChild(sqlPre);
-      if (apiPrimary && apiPrimary !== sqlPrimary) {
-        const note = document.createElement('div');
-        note.className = 'dkan-aiq-id-note';
-        note.textContent = 'Public distribution UUID: ' + apiPrimary;
-        sqlWrap.appendChild(note);
-      }
-      if (s.showCopyButtons !== false) {
-        const copySql = document.createElement('button');
-        copySql.type = 'button';
-        copySql.className = 'dkan-aiq-sql-copy';
-        copySql.textContent = 'Copy';
-        copySql.addEventListener('click', () => {
-          navigator.clipboard.writeText(sqlText).then(() => {
-            copySql.textContent = 'Copied!';
-            setTimeout(() => { copySql.textContent = 'Copy'; }, 1500);
-          });
-        });
-        sqlWrap.appendChild(copySql);
-      }
-      container.appendChild(sqlWrap);
-      sqlBtn.addEventListener('click', () => {
-        const isHidden = sqlWrap.hidden;
-        sqlWrap.hidden = !isHidden;
-        sqlBtn.textContent = isHidden ? 'Hide SQL' : 'Show SQL';
-        this.scrollToBottom();
-      });
-    }
-
-    // Provenance collapsible panel (Phase 5).
+    // Result details panel — single hub for everything that's not "the
+    // table itself". The API call and SQL nodes (datastore queries only)
+    // get nested inside its "Query details" disclosure; for simple-table
+    // tools both extras are null and only the friendly summary + raw tool
+    // input are shown.
     if (provBtn && provenance) {
       const provWrap = document.createElement('div');
       provWrap.className = 'dkan-aiq-prov-wrapper';
       provWrap.hidden = true;
-      renderProvenancePanel(provWrap, provenance);
+      renderProvenancePanel(provWrap, provenance, { apiNode, sqlNode });
       container.appendChild(provWrap);
       provBtn.addEventListener('click', () => {
         const isHidden = provWrap.hidden;
         provWrap.hidden = !isHidden;
-        provBtn.textContent = isHidden ? 'Hide provenance' : 'Show provenance';
+        provLabel.nodeValue = isHidden ? ' Hide result details' : ' Show result details';
+        provBtn.classList.toggle('is-open', isHidden);
+        provBtn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
         this.scrollToBottom();
       });
     }
@@ -931,6 +1028,12 @@
         const th = document.createElement('th');
         th.dataset.col = col;
         th.textContent = col;
+        if (colTypes[col]) {
+          const typeChip = document.createElement('span');
+          typeChip.className = 'dkan-aiq-col-type';
+          typeChip.textContent = colTypes[col];
+          th.appendChild(typeChip);
+        }
         if (col === sortCol) {
           const ind = document.createElement('span');
           ind.className = 'sort-indicator';
@@ -968,7 +1071,21 @@
         cols.forEach((col) => {
           const td = document.createElement('td');
           const v = row[col];
-          td.textContent = v === null || v === undefined ? '' : String(v);
+          const text = v === null || v === undefined ? '' : String(v);
+          if (text.length > CELL_TRUNCATE_LEN) {
+            // Show a shortened preview in-place. The full value is one click
+            // (or hover for the title tooltip) away.
+            td.classList.add('dkan-aiq-cell-truncated');
+            td.title = text;
+            td.textContent = text.slice(0, CELL_TRUNCATE_LEN) + '…';
+            td.addEventListener('click', () => {
+              const expanded = td.classList.toggle('dkan-aiq-cell-expanded');
+              td.textContent = expanded ? text : (text.slice(0, CELL_TRUNCATE_LEN) + '…');
+            });
+          }
+          else {
+            td.textContent = text;
+          }
           tr.appendChild(td);
         });
         tbody.appendChild(tr);
@@ -981,7 +1098,9 @@
       toggleBtn.addEventListener('click', () => {
         const isHidden = tableWrap.hidden;
         tableWrap.hidden = !isHidden;
-        toggleBtn.textContent = isHidden ? 'Hide table' : 'Show table';
+        toggleLabel.nodeValue = isHidden ? ' Hide table' : ' Show table';
+        toggleBtn.classList.toggle('is-open', isHidden);
+        toggleBtn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
         if (isHidden && !tableWrap.hasChildNodes()) {
           buildTable(rows);
         }
@@ -1244,7 +1363,94 @@
    * when it ran, the structured query shape, total rows, and any
    * sanity flags surfaced by the datastore.
    */
-  function renderProvenancePanel(wrap, prov) {
+  /**
+   * Build the dark code panel for the public REST equivalent of a query.
+   *
+   * Returns a detached <div> with the pre-formatted call text, an optional
+   * cross-reference note (the alternate identifier), and an optional copy
+   * button. Pure DOM construction — the caller decides where to mount it
+   * (today: nested under "Query details" inside the result-details panel).
+   */
+  function buildApiPanelNode(apiText, apiPrimary, sqlPrimary, showCopy) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dkan-aiq-api-wrapper';
+    const pre = document.createElement('pre');
+    pre.className = 'dkan-aiq-api-code';
+    pre.textContent = apiText;
+    wrap.appendChild(pre);
+    // Cross-reference: the SQL panel uses the internal {hash}__{version}
+    // resource id, while this API call uses the distribution UUID. Surface
+    // the alternate form so users can reconcile the two views.
+    if (sqlPrimary && sqlPrimary !== apiPrimary) {
+      const note = document.createElement('div');
+      note.className = 'dkan-aiq-id-note';
+      note.textContent = 'Internal datastore resource id: ' + sqlPrimary;
+      wrap.appendChild(note);
+    }
+    if (showCopy) {
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'dkan-aiq-api-copy';
+      copy.textContent = 'Copy';
+      copy.addEventListener('click', () => {
+        navigator.clipboard.writeText(apiText).then(() => {
+          copy.textContent = 'Copied!';
+          setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
+        });
+      });
+      wrap.appendChild(copy);
+    }
+    return wrap;
+  }
+
+  /**
+   * Build the dark code panel for the SQL equivalent of a query.
+   *
+   * Mirror of buildApiPanelNode: returns a detached <div> with the SQL
+   * text, optional cross-reference note (the public distribution UUID),
+   * and optional copy button.
+   */
+  function buildSqlPanelNode(sqlText, apiPrimary, sqlPrimary, showCopy) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dkan-aiq-sql-wrapper';
+    const pre = document.createElement('pre');
+    pre.className = 'dkan-aiq-sql-code';
+    pre.textContent = sqlText;
+    wrap.appendChild(pre);
+    if (apiPrimary && apiPrimary !== sqlPrimary) {
+      const note = document.createElement('div');
+      note.className = 'dkan-aiq-id-note';
+      note.textContent = 'Public distribution UUID: ' + apiPrimary;
+      wrap.appendChild(note);
+    }
+    if (showCopy) {
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'dkan-aiq-sql-copy';
+      copy.textContent = 'Copy';
+      copy.addEventListener('click', () => {
+        navigator.clipboard.writeText(sqlText).then(() => {
+          copy.textContent = 'Copied!';
+          setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
+        });
+      });
+      wrap.appendChild(copy);
+    }
+    return wrap;
+  }
+
+  function renderProvenancePanel(wrap, prov, extras) {
+    // Lead with a one-sentence explainer of what the tool does, so users
+    // can interpret the structured rows below without having to know what
+    // "datastore query" or "sample_rows" means.
+    const blurb = TOOL_DESCRIPTIONS[prov.tool];
+    if (blurb) {
+      const intro = document.createElement('p');
+      intro.className = 'dkan-aiq-prov-blurb';
+      intro.textContent = blurb;
+      wrap.appendChild(intro);
+    }
+
     const dl = document.createElement('dl');
     dl.className = 'dkan-aiq-prov';
 
@@ -1263,48 +1469,85 @@
     };
 
     if (prov.executed_at) {
-      addRow('Executed', prov.executed_at);
-    }
-    addRow('Tool', prov.tool || '(unknown)');
-    if (prov.row_count != null) {
-      let countText = String(prov.row_count) + ' returned';
-      if (prov.total_rows != null && prov.total_rows !== prov.row_count) {
-        countText += ' / ' + prov.total_rows + ' total';
-      }
-      addRow('Rows', countText);
+      const time = document.createElement('time');
+      time.dateTime = prov.executed_at;
+      // Best-effort localization for the headline; falls back to the raw ISO
+      // string when the input isn't parseable.
+      const parsed = new Date(prov.executed_at);
+      time.textContent = isNaN(parsed.getTime()) ? prov.executed_at : parsed.toLocaleString();
+      addRow(PROV_LABELS.executed_at, time);
     }
 
+    const friendlyTool = TOOL_FRIENDLY_NAMES[prov.tool] || prov.tool || '(unknown)';
+    addRow(PROV_LABELS.tool, friendlyTool);
+
+    if (prov.row_count != null) {
+      let countText = String(prov.row_count);
+      if (prov.total_rows != null && prov.total_rows !== prov.row_count) {
+        countText += ' (of ' + prov.total_rows + ' total)';
+      }
+      addRow(PROV_LABELS.rows, countText);
+    }
+
+    // Sanity flags rendered as full-sentence bullets driven by SANITY_GLOSS,
+    // so analysts read "Result was capped…" instead of "row_cap_hit".
     const flags = prov.sanity_flags || null;
     if (flags) {
-      const flagged = [];
-      if (flags.zero_rows) flagged.push('zero_rows');
-      if (flags.row_cap_hit) flagged.push('row_cap_hit');
+      const sentences = [];
+      if (flags.zero_rows) {
+        sentences.push(SANITY_GLOSS.zero_rows);
+      }
+      if (flags.row_cap_hit) {
+        sentences.push(SANITY_GLOSS.row_cap_hit);
+      }
       if (Array.isArray(flags.all_null_columns) && flags.all_null_columns.length) {
-        flagged.push('all_null_columns: ' + flags.all_null_columns.join(', '));
+        sentences.push(SANITY_GLOSS.all_null_columns + flags.all_null_columns.join(', '));
       }
       if (flags.coverage_warning) {
-        flagged.push('coverage_warning: ' + flags.coverage_warning);
+        sentences.push(SANITY_GLOSS.coverage_warning + flags.coverage_warning);
       }
-      if (flagged.length) {
+      if (sentences.length) {
         const ul = document.createElement('ul');
         ul.className = 'dkan-aiq-prov-flags';
-        flagged.forEach((line) => {
+        sentences.forEach((line) => {
           const li = document.createElement('li');
           li.textContent = line;
           ul.appendChild(li);
         });
-        addRow('Sanity flags', ul);
+        addRow(PROV_LABELS.sanity_flags, ul);
       }
     }
+
+    wrap.appendChild(dl);
+
+    // Power-user disclosures: each sits as its own sibling under the friendly
+    // summary block so analysts can ignore them and developers can pop open
+    // exactly the one they need. Skipped entirely when the section has no
+    // content (e.g. simple-table tools have no API or SQL equivalent).
+    extras = extras || {};
+
+    const addDisclosure = (label, child) => {
+      const details = document.createElement('details');
+      details.className = 'dkan-aiq-prov-details';
+      const summary = document.createElement('summary');
+      summary.textContent = label;
+      details.appendChild(summary);
+      details.appendChild(child);
+      wrap.appendChild(details);
+    };
 
     if (prov.query_summary) {
       const pre = document.createElement('pre');
       pre.className = 'dkan-aiq-prov-query';
       pre.textContent = JSON.stringify(prov.query_summary, null, 2);
-      addRow('Query', pre);
+      addDisclosure(PROV_LABELS.query_summary, pre);
     }
-
-    wrap.appendChild(dl);
+    if (extras.apiNode) {
+      addDisclosure('API call', extras.apiNode);
+    }
+    if (extras.sqlNode) {
+      addDisclosure('SQL', extras.sqlNode);
+    }
   }
 
   function downloadCsv(columns, rows) {
@@ -1414,6 +1657,259 @@
     bubble.appendChild(card);
     this.scrollToBottom();
   };
+
+  /**
+   * Append (or update) the bubble's "Behind the scenes" disclosure with
+   * one entry per aux_tool artifact. The outer details collects all
+   * non-table tool calls for the turn into a single collapsed panel so
+   * the main answer + table stays prominent.
+   */
+  Widget.prototype.renderAuxToolInBubble = function (bubble, artifact) {
+    let outer = bubble.querySelector(':scope > .dkan-aiq-aux-tools');
+    let list;
+    if (!outer) {
+      outer = document.createElement('details');
+      outer.className = 'dkan-aiq-aux-tools';
+      const summary = document.createElement('summary');
+      summary.className = 'dkan-aiq-aux-tools-summary';
+      summary.textContent = 'Supporting data';
+      outer.appendChild(summary);
+      list = document.createElement('div');
+      list.className = 'dkan-aiq-aux-list';
+      outer.appendChild(list);
+      bubble.appendChild(outer);
+    }
+    else {
+      list = outer.querySelector('.dkan-aiq-aux-list');
+    }
+
+    const entry = buildAuxEntry(artifact);
+    list.appendChild(entry);
+
+    // Reflect the running count in the outer summary so the analyst sees
+    // "Supporting data — 3 tool calls" without having to expand first.
+    const count = list.children.length;
+    outer.querySelector('.dkan-aiq-aux-tools-summary').textContent =
+      'Supporting data — ' + count + ' tool call' + (count !== 1 ? 's' : '');
+
+    this.scrollToBottom();
+  };
+
+  /**
+   * Build a single per-tool entry: collapsed details whose summary shows
+   * the friendly tool name + one-line headline; body shows the tool-
+   * specific content + a Raw output disclosure.
+   */
+  function buildAuxEntry(artifact) {
+    const entry = document.createElement('details');
+    entry.className = 'dkan-aiq-aux-entry';
+
+    const friendly = AUX_TOOL_FRIENDLY_NAMES[artifact.tool] || artifact.tool;
+    const headline = (artifact.structured && artifact.structured.headline) || '';
+
+    const summary = document.createElement('summary');
+    const name = document.createElement('span');
+    name.className = 'dkan-aiq-aux-name';
+    name.textContent = friendly;
+    summary.appendChild(name);
+    if (headline) {
+      const sep = document.createElement('span');
+      sep.className = 'dkan-aiq-aux-sep';
+      sep.textContent = ' — ';
+      summary.appendChild(sep);
+      const head = document.createElement('span');
+      head.className = 'dkan-aiq-aux-headline';
+      head.textContent = headline;
+      summary.appendChild(head);
+    }
+    entry.appendChild(summary);
+
+    const blurb = AUX_TOOL_DESCRIPTIONS[artifact.tool];
+    if (blurb) {
+      const intro = document.createElement('p');
+      intro.className = 'dkan-aiq-aux-blurb';
+      intro.textContent = blurb;
+      entry.appendChild(intro);
+    }
+
+    const body = renderAuxBody(artifact);
+    if (body) {
+      entry.appendChild(body);
+    }
+
+    // Raw output disclosure for power users.
+    if (artifact.raw) {
+      const raw = document.createElement('details');
+      raw.className = 'dkan-aiq-aux-raw';
+      const rawSum = document.createElement('summary');
+      rawSum.textContent = 'Raw output';
+      raw.appendChild(rawSum);
+      const pre = document.createElement('pre');
+      pre.className = 'dkan-aiq-prov-query';
+      pre.textContent = JSON.stringify(artifact.raw, null, 2);
+      raw.appendChild(pre);
+      entry.appendChild(raw);
+    }
+
+    return entry;
+  }
+
+  function renderAuxBody(artifact) {
+    const s = artifact.structured || {};
+    if (artifact.tool === 'compute_stats') {
+      return renderComputeStatsBody(s);
+    }
+    if (artifact.tool === 'get_data_dictionary') {
+      return renderDataDictionaryBody(s);
+    }
+    if (artifact.tool === 'get_datastore_stats') {
+      return renderDatastoreStatsBody(s);
+    }
+    if (artifact.tool === 'get_datastore_schema') {
+      return renderSchemaBody(s);
+    }
+    if (artifact.tool === 'distinct_values') {
+      return renderDistinctValuesBody(s);
+    }
+    return null;
+  }
+
+  function renderComputeStatsBody(s) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dkan-aiq-aux-body';
+
+    const warnings = Array.isArray(s.warnings) ? s.warnings : [];
+    if (warnings.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'dkan-aiq-prov-flags';
+      warnings.forEach((w) => {
+        const li = document.createElement('li');
+        li.textContent = w;
+        ul.appendChild(li);
+      });
+      wrap.appendChild(ul);
+    }
+
+    const rows = Array.isArray(s.rows) ? s.rows : [];
+    if (rows.length) {
+      wrap.appendChild(buildAuxMicroTable(
+        ['Operation', 'Column', 'Value', 'Rows skipped'],
+        rows.map((r) => [r.operation, r.column, r.value, r.rows_skipped])
+      ));
+    }
+    return wrap;
+  }
+
+  function renderDataDictionaryBody(s) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dkan-aiq-aux-body';
+
+    const dicts = Array.isArray(s.dictionaries) ? s.dictionaries : [];
+    dicts.forEach((d) => {
+      const section = document.createElement('div');
+      section.className = 'dkan-aiq-aux-dict';
+
+      const heading = document.createElement('div');
+      heading.className = 'dkan-aiq-aux-dict-heading';
+      if (d.url) {
+        const link = document.createElement('a');
+        link.href = d.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = d.title || d.resource_id;
+        heading.appendChild(link);
+      }
+      else {
+        heading.textContent = d.title || d.resource_id;
+      }
+      section.appendChild(heading);
+
+      const fields = Array.isArray(d.fields) ? d.fields : [];
+      if (fields.length) {
+        section.appendChild(buildAuxMicroTable(
+          ['Name', 'Title', 'Type', 'Description'],
+          fields.map((f) => [f.name, f.title, f.type, f.description])
+        ));
+      }
+      wrap.appendChild(section);
+    });
+    return wrap;
+  }
+
+  function renderDatastoreStatsBody(s) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dkan-aiq-aux-body';
+    const cols = Array.isArray(s.columns) ? s.columns : [];
+    if (cols.length) {
+      wrap.appendChild(buildAuxMicroTable(
+        ['Column', 'Type', 'Nulls', 'Distinct', 'Min', 'Max'],
+        cols.map((c) => [c.name, c.type, c.null_count, c.distinct_count, c.min, c.max])
+      ));
+    }
+    return wrap;
+  }
+
+  function renderSchemaBody(s) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dkan-aiq-aux-body';
+    const cols = Array.isArray(s.columns) ? s.columns : [];
+    if (cols.length) {
+      wrap.appendChild(buildAuxMicroTable(
+        ['Column', 'Type', 'Description'],
+        cols.map((c) => [c.name, c.type, c.description])
+      ));
+    }
+    return wrap;
+  }
+
+  function renderDistinctValuesBody(s) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dkan-aiq-aux-body';
+    const values = Array.isArray(s.values) ? s.values : [];
+    if (values.length) {
+      wrap.appendChild(buildAuxMicroTable(
+        ['Value'],
+        values.map((v) => [v])
+      ));
+    }
+    if (s.truncated) {
+      const note = document.createElement('p');
+      note.className = 'dkan-aiq-aux-truncated';
+      note.textContent = 'List truncated — there may be more values not shown.';
+      wrap.appendChild(note);
+    }
+    return wrap;
+  }
+
+  /**
+   * Tiny HTML table used inside aux entries. Reuses .dkan-aiq-table styling
+   * so type / spacing / hover match the main result tables.
+   */
+  function buildAuxMicroTable(headers, rows) {
+    const table = document.createElement('table');
+    table.className = 'dkan-aiq-table dkan-aiq-aux-table';
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    headers.forEach((h) => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      trh.appendChild(th);
+    });
+    thead.appendChild(trh);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    rows.forEach((row) => {
+      const tr = document.createElement('tr');
+      row.forEach((cell) => {
+        const td = document.createElement('td');
+        td.textContent = cell === null || cell === undefined ? '' : String(cell);
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+  }
 
   Widget.prototype.renderFollowUpSuggestions = function (items) {
     const wrap = this.dom.examplesContainer;

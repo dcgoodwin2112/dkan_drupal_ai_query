@@ -3,6 +3,7 @@
 namespace Drupal\dkan_drupal_ai_query\Plugin\Block;
 
 use Drupal\ai\AiProviderPluginManager;
+use Drupal\ai\Enum\AiModelCapability;
 use Drupal\Core\Block\BlockBase;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Form\FormStateInterface;
@@ -88,22 +89,27 @@ class QueryWidgetBlock extends BlockBase implements ContainerFactoryPluginInterf
     $config = $this->configFactory->get('dkan_drupal_ai_query.settings');
 
     // Pull the live "provider__model" map from Drupal AI. Filtered to
-    // providers that are usable (have keys configured); list updates itself
-    // when a provider is enabled, configured, or releases new models.
-    $models = $this->providerManager->getSimpleProviderModelOptions('chat', FALSE);
+    // providers that are usable (have keys configured) and to models that
+    // declare the ChatTools capability — the agent loop only works with
+    // models that support function/tool calling, which excludes OpenAI's
+    // image / audio / transcription / realtime / search variants without
+    // having to maintain a brittle regex against model IDs.
+    $models = $this->providerManager->getSimpleProviderModelOptions(
+      'chat',
+      FALSE,
+      TRUE,
+      [AiModelCapability::ChatTools],
+    );
     // Stringify TranslatableMarkup labels for JSON serialization.
     $models = array_map('strval', $models);
-    // The OpenAI provider returns its full models.list() regardless of the
-    // 'chat' operation type, so strip variants that can't run a tool-using
-    // agent loop: image generation, audio/TTS, transcription, realtime,
-    // deep-research, search-api.
-    $models = array_filter($models, function (string $label, string $value): bool {
-      if (!str_starts_with($value, 'openai__')) {
-        return TRUE;
-      }
-      $modelId = substr($value, strlen('openai__'));
-      return !preg_match('/(image|audio|tts|transcribe|realtime|deep-research|search-preview|search-api)/i', $modelId);
-    }, ARRAY_FILTER_USE_BOTH);
+
+    // Optional admin-curated allow-list: when set, restrict the dropdown
+    // to those models so end users see only the picks the site admin
+    // wants to expose. Empty array = no restriction.
+    $allowed = (array) ($config->get('allowed_models') ?? []);
+    if ($allowed) {
+      $models = array_intersect_key($models, array_flip($allowed));
+    }
 
     // Resolve the default the same way NlQueryController will at submit time:
     // module config → site-wide default for "chat" → empty (JS shows the first
@@ -139,6 +145,8 @@ class QueryWidgetBlock extends BlockBase implements ContainerFactoryPluginInterf
             'showProvenance' => $config->get('show_provenance') ?? TRUE,
             'showDownloadCsv' => $config->get('show_download_csv') ?? TRUE,
             'showCopyButtons' => $config->get('show_copy_buttons') ?? TRUE,
+            'showSimpleTableArtifacts' => $config->get('show_simple_table_artifacts') ?? TRUE,
+            'showAuxToolCalls' => $config->get('show_aux_tool_calls') ?? FALSE,
             'userAuthenticated' => $this->currentUser->isAuthenticated(),
           ],
         ],
