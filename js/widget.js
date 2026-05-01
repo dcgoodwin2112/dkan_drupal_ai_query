@@ -119,6 +119,63 @@
     coverage_warning: 'Coverage warning: ',
   };
 
+  // [singular, plural] phrases per primary tool — used by the method-summary
+  // line above the tables so phrasing reads naturally ("2 datastore queries"
+  // not "2 query_datastores").
+  const TOOL_PLURAL_NAMES = {
+    query_datastore: ['datastore query', 'datastore queries'],
+    query_datastore_join: ['datastore join', 'datastore joins'],
+    sample_rows: ['row sample', 'row samples'],
+    search_columns: ['column search', 'column searches'],
+    list_datasets: ['dataset list', 'dataset lists'],
+    list_distributions: ['distribution list', 'distribution lists'],
+  };
+
+  /**
+   * Render a one-line method summary from a bubble's accumulated artifacts:
+   * "Answered using 2 datastore queries and 1 supporting lookup."
+   *
+   * Returns null when there are no countable artifacts (e.g. only a refusal
+   * card or only debug snapshots), in which case the caller suppresses the
+   * banner entirely.
+   */
+  function buildMethodSummary(artifacts) {
+    const counts = {};
+    let auxCount = 0;
+    let chartCount = 0;
+    artifacts.forEach((a) => {
+      if (!a) return;
+      if (a.type === 'data') {
+        const t = a.tool || 'query_datastore';
+        counts[t] = (counts[t] || 0) + 1;
+      }
+      else if (a.type === 'chart') {
+        chartCount++;
+      }
+      else if (a.type === 'aux_tool') {
+        auxCount++;
+      }
+    });
+    const phrases = [];
+    Object.keys(counts).forEach((tool) => {
+      const n = counts[tool];
+      const pair = TOOL_PLURAL_NAMES[tool] || [tool, tool + 's'];
+      phrases.push(n + ' ' + (n === 1 ? pair[0] : pair[1]));
+    });
+    if (chartCount) {
+      phrases.push(chartCount + ' chart' + (chartCount === 1 ? '' : 's'));
+    }
+    if (auxCount) {
+      phrases.push(auxCount + ' supporting lookup' + (auxCount === 1 ? '' : 's'));
+    }
+    if (!phrases.length) return null;
+    let joined;
+    if (phrases.length === 1) joined = phrases[0];
+    else if (phrases.length === 2) joined = phrases[0] + ' and ' + phrases[1];
+    else joined = phrases.slice(0, -1).join(', ') + ', and ' + phrases[phrases.length - 1];
+    return 'Answered using ' + joined + '.';
+  }
+
   Drupal.behaviors.dkanAiQueryWidget = {
     attach: function (context) {
       once('dkan-aiq-widget', '.dkan-aiq-widget', context).forEach(function (root) {
@@ -671,6 +728,9 @@
       else if (t === 'agent_iteration') {
         this.debugIteration(ev);
       }
+      else if (t === 'ai_provider_response') {
+        this.debugProviderResponse(ev);
+      }
     };
 
     const dataset = this.datasetId || (this.dom.datasetSelect ? this.dom.datasetSelect.value : '');
@@ -838,6 +898,46 @@
       this.renderAuxToolInBubble(bubble, artifact);
     }
     // type === 'tool_call' is debug-panel-only; handled by replayDebugFromMessage.
+
+    // Track every domain-relevant artifact so the method-summary line above
+    // the tables can recompute its phrasing as artifacts stream in.
+    if (artifact.type === 'data' || artifact.type === 'chart' || artifact.type === 'aux_tool') {
+      if (!bubble.__methodArtifacts) bubble.__methodArtifacts = [];
+      bubble.__methodArtifacts.push(artifact);
+      this.updateMethodSummary(bubble);
+    }
+  };
+
+  /**
+   * Find-or-create a single `.dkan-aiq-method-summary` line on the bubble
+   * (placed right after the prose text, before any tables) and refresh its
+   * text from the bubble's accumulated artifacts. Suppressed when the
+   * summary collapses to nothing (e.g. only a refusal card).
+   */
+  Widget.prototype.updateMethodSummary = function (bubble) {
+    const artifacts = bubble.__methodArtifacts || [];
+    const text = (this.settings || {}).showMethodSummary === false
+      ? null
+      : buildMethodSummary(artifacts);
+    let line = bubble.querySelector(':scope > .dkan-aiq-method-summary');
+    if (!text) {
+      if (line) line.remove();
+      return;
+    }
+    if (!line) {
+      line = document.createElement('div');
+      line.className = 'dkan-aiq-method-summary';
+      // Insert directly after the prose text node so the summary is the
+      // visual divider between answer and tables.
+      const textEl = bubble.querySelector(':scope > .dkan-aiq-bubble-text');
+      if (textEl && textEl.nextSibling) {
+        bubble.insertBefore(line, textEl.nextSibling);
+      }
+      else {
+        bubble.appendChild(line);
+      }
+    }
+    line.textContent = text;
   };
 
   Widget.prototype.renderTableInBubble = function (bubble, artifact) {
@@ -1943,6 +2043,141 @@
     this.debugIterationMax = 0;
     this.debugToolCount = 0;
     this.debugTotalMs = 0;
+    this.debugErrorCount = 0;
+    // loopNumber → {group, body, summary, count, ms, loop, tokens} for the
+    // per-step <details> wrappers built lazily by getOrCreateStepGroup.
+    this.debugStepGroups = new Map();
+    // Run-total token usage accumulated from ai_provider_response events.
+    // Cached + reasoning are provider-specific (Anthropic prompt caching,
+    // OpenAI o-series); shown only when non-zero.
+    this.debugTokenUsage = { input: 0, output: 0, total: 0, cached: 0, reasoning: 0 };
+    this.updateDebugPanelSummary();
+  };
+
+  /**
+   * Render a token count in compact form for tight contexts (step
+   * summaries). Footer uses the locale-formatted full number instead.
+   */
+  function formatTokensCompact(n) {
+    if (!n) return '0';
+    if (n < 1000) return String(n);
+    if (n < 10000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return Math.round(n / 1000).toLocaleString() + 'k';
+  }
+
+  /**
+   * Find or build the per-step <details> group for `loop`. Tool entries get
+   * appended into this group's body so a long agent run reads as a list of
+   * collapsible step blocks rather than one flat stream.
+   */
+  Widget.prototype.getOrCreateStepGroup = function (loop) {
+    const key = loop || 1;
+    if (this.debugStepGroups.has(key)) {
+      return this.debugStepGroups.get(key);
+    }
+    const group = document.createElement('details');
+    group.className = 'dkan-aiq-debug-step';
+    group.open = true;
+    const sum = document.createElement('summary');
+    sum.className = 'dkan-aiq-debug-step-summary';
+    sum.textContent = 'Step ' + key;
+    group.appendChild(sum);
+    const body = document.createElement('div');
+    body.className = 'dkan-aiq-debug-step-list';
+    group.appendChild(body);
+    // Keep the footer pinned to the bottom even when new step groups
+    // arrive after it has already been rendered.
+    const footer = this.dom.debugLog.querySelector('.dkan-aiq-debug-footer');
+    if (footer) {
+      this.dom.debugLog.insertBefore(group, footer);
+    }
+    else {
+      this.dom.debugLog.appendChild(group);
+    }
+    const record = {
+      group: group,
+      body: body,
+      summary: sum,
+      count: 0,
+      ms: 0,
+      loop: key,
+      tokens: { input: 0, output: 0, total: 0, cached: 0, reasoning: 0 },
+    };
+    this.debugStepGroups.set(key, record);
+    return record;
+  };
+
+  /**
+   * Refresh a step group's summary line with its running tool count,
+   * cumulative duration, and token total: "Step 2 — 3 tools · 480ms · 1.8k tokens".
+   * Token chip is suppressed when no provider response has been seen yet.
+   */
+  Widget.prototype.updateStepGroupSummary = function (record) {
+    const meta = [record.count + ' tool' + (record.count !== 1 ? 's' : '')];
+    if (record.ms > 0) {
+      meta.push(record.ms.toLocaleString() + 'ms');
+    }
+    if (record.tokens && record.tokens.total > 0) {
+      meta.push(formatTokensCompact(record.tokens.total) + ' tokens');
+    }
+    record.summary.textContent = 'Step ' + record.loop + ' — ' + meta.join(' · ');
+  };
+
+  /**
+   * Accumulate token usage from an ai_provider_response event into both
+   * the run-total and the originating step group, then refresh both
+   * summary lines so the chips update live as the agent runs.
+   */
+  Widget.prototype.debugProviderResponse = function (ev) {
+    if (!this.dom.debugLog || this.dom.debugPanel.hidden) {
+      return;
+    }
+    const usage = (ev.response_data || {}).tokenUsage || {};
+    const fields = ['input', 'output', 'total', 'cached', 'reasoning'];
+    let any = false;
+    fields.forEach((f) => {
+      const n = parseInt(usage[f], 10);
+      if (!isNaN(n) && n > 0) {
+        this.debugTokenUsage[f] += n;
+        any = true;
+      }
+    });
+    if (!any) {
+      return;
+    }
+    const stepRecord = this.getOrCreateStepGroup(ev.loop_count || 1);
+    fields.forEach((f) => {
+      const n = parseInt(usage[f], 10);
+      if (!isNaN(n) && n > 0) {
+        stepRecord.tokens[f] += n;
+      }
+    });
+    this.updateStepGroupSummary(stepRecord);
+    this.debugFooter();
+  };
+
+  /**
+   * Reflect the run's error count in the outer panel summary so an admin
+   * can see at a glance whether the latest turn had failed tool calls
+   * without expanding the panel. Adds a `has-errors` class for styling.
+   */
+  Widget.prototype.updateDebugPanelSummary = function () {
+    if (!this.dom.debugPanel) {
+      return;
+    }
+    const sum = this.dom.debugPanel.querySelector('.dkan-aiq-debug-summary');
+    if (!sum) {
+      return;
+    }
+    const errs = this.debugErrorCount || 0;
+    if (errs > 0) {
+      sum.textContent = 'Agent diagnostics — ' + errs + ' error' + (errs !== 1 ? 's' : '');
+      sum.classList.add('has-errors');
+    }
+    else {
+      sum.textContent = 'Agent diagnostics';
+      sum.classList.remove('has-errors');
+    }
   };
 
   Widget.prototype.debugIteration = function (ev) {
@@ -1951,18 +2186,13 @@
     }
     const loop = ev.loop_count || 0;
     if (loop && loop !== this.debugIterationLast) {
-      // Match the original UX: a separator only between iterations, not
-      // before the very first one.
-      if (this.debugIterationLast > 0) {
-        const sep = document.createElement('div');
-        sep.className = 'dkan-aiq-debug-separator';
-        sep.textContent = 'Step ' + loop + ' — Analyzing results';
-        this.dom.debugLog.appendChild(sep);
-      }
       this.debugIterationLast = loop;
       if (loop > this.debugIterationMax) {
         this.debugIterationMax = loop;
       }
+      // Materialize the step group up front so it appears in order even
+      // when no tool calls fire for an iteration (rare but possible).
+      this.getOrCreateStepGroup(loop);
     }
   };
 
@@ -1971,34 +2201,52 @@
       return;
     }
     const toolId = ev.tool_id || ('tool-' + this.debugToolCount);
-    const entry = document.createElement('div');
+    // Each entry is a <details> so successful calls collapse to a single
+    // line — name + result chip + meta — and only errored calls auto-open
+    // (see debugToolFinished).
+    const entry = document.createElement('details');
     entry.className = 'dkan-aiq-debug-entry';
 
-    const header = document.createElement('div');
+    const header = document.createElement('summary');
     header.className = 'dkan-aiq-debug-header';
     const nameEl = document.createElement('span');
     nameEl.className = 'dkan-aiq-debug-name';
     nameEl.textContent = ev.tool_name || '';
+    // Inline result chip — populated by debugToolFinished. Sits between
+    // name and meta so the row reads "tool_name → 25 rows  step 1 · 234ms".
+    const resultEl = document.createElement('span');
+    resultEl.className = 'dkan-aiq-debug-result-inline';
     const metaEl = document.createElement('span');
     metaEl.className = 'dkan-aiq-debug-meta';
-    metaEl.textContent = this.debugIterationLast ? ('step ' + this.debugIterationLast) : '';
+    // Filled in on debugToolFinished with the duration. Step number is
+    // implied by the surrounding "Step N" group, so it's not repeated here.
+    metaEl.textContent = '';
     header.appendChild(nameEl);
+    header.appendChild(resultEl);
     header.appendChild(metaEl);
     entry.appendChild(header);
 
     const formatted = formatJsonString(ev.tool_input);
-    if (formatted) {
-      const pre = document.createElement('pre');
-      pre.className = 'dkan-aiq-debug-args';
-      pre.textContent = formatted;
-      entry.appendChild(pre);
+    const pre = document.createElement('pre');
+    pre.className = 'dkan-aiq-debug-args';
+    pre.textContent = formatted || '(no input args)';
+    if (!formatted) {
+      pre.classList.add('dkan-aiq-debug-args-empty');
     }
+    entry.appendChild(pre);
 
-    this.dom.debugLog.appendChild(entry);
+    // Drop the entry into its step group rather than the panel root, so
+    // multi-step runs render as collapsible Step N blocks. When no
+    // agent_iteration event has fired yet (replay or simple runs), this
+    // lazily creates a "Step 1" group.
+    const stepRecord = this.getOrCreateStepGroup(this.debugIterationLast || 1);
+    stepRecord.body.appendChild(entry);
     this.debugPending[toolId] = {
       entry: entry,
       meta: metaEl,
+      result: resultEl,
       startedAt: typeof ev.time === 'number' ? ev.time : null,
+      step: stepRecord,
     };
   };
 
@@ -2017,39 +2265,48 @@
       durationMs = Math.max(0, Math.round((ev.time - pending.startedAt) * 1000));
     }
 
-    if (entry && pending && pending.meta) {
-      const stepText = this.debugIterationLast ? ('step ' + this.debugIterationLast) : '';
-      const parts = [];
-      if (stepText) {
-        parts.push(stepText);
-      }
-      if (durationMs != null) {
-        parts.push(durationMs + 'ms');
-      }
-      pending.meta.textContent = parts.join(' · ');
+    if (entry && pending && pending.meta && durationMs != null) {
+      pending.meta.textContent = durationMs + 'ms';
     }
 
-    // Result summary line.
+    // Result summary chip — lives in the entry's <summary> so successful
+    // calls communicate "→ N rows" without having to expand. Errors get
+    // both the chip and the entry auto-opened so the failure is visible.
     const summary = formatToolResultSummary(ev.tool_name, ev.tool_results);
     const isError = summary.startsWith('→ Error');
-    if (entry && summary) {
-      const result = document.createElement('div');
-      result.className = 'dkan-aiq-debug-result' + (isError ? ' dkan-aiq-debug-result-error' : '');
-      result.textContent = summary;
-      entry.appendChild(result);
+    if (entry && pending && pending.result) {
+      pending.result.textContent = summary || '';
+      if (isError) {
+        pending.result.classList.add('dkan-aiq-debug-result-error');
+      }
     }
     if (entry && isError) {
       entry.classList.add('dkan-aiq-debug-error');
+      entry.open = true;
+      this.debugErrorCount = (this.debugErrorCount || 0) + 1;
+      this.updateDebugPanelSummary();
     }
 
     this.debugToolCount++;
     if (durationMs != null) {
       this.debugTotalMs += durationMs;
     }
+    if (pending && pending.step) {
+      pending.step.count++;
+      if (durationMs != null) {
+        pending.step.ms += durationMs;
+      }
+      this.updateStepGroupSummary(pending.step);
+    }
   };
 
   Widget.prototype.debugFooter = function () {
-    if (!this.dom.debugLog || this.dom.debugPanel.hidden || this.debugToolCount === 0) {
+    if (!this.dom.debugLog || this.dom.debugPanel.hidden) {
+      return;
+    }
+    const tu = this.debugTokenUsage || {};
+    const hasTokens = (tu.input || 0) + (tu.output || 0) + (tu.total || 0) > 0;
+    if (this.debugToolCount === 0 && !hasTokens) {
       return;
     }
     const existing = this.dom.debugLog.querySelector('.dkan-aiq-debug-footer');
@@ -2058,13 +2315,150 @@
     }
     const footer = document.createElement('div');
     footer.className = 'dkan-aiq-debug-footer';
-    const parts = [
+
+    const totals = document.createElement('span');
+    totals.className = 'dkan-aiq-debug-footer-totals';
+    const parts = [];
+    if (this.debugToolCount > 0) {
+      parts.push(this.debugToolCount + ' tool call' + (this.debugToolCount !== 1 ? 's' : ''));
+    }
+    if (this.debugIterationMax > 0) {
+      parts.push(this.debugIterationMax + ' step' + (this.debugIterationMax !== 1 ? 's' : ''));
+    }
+    if (this.debugTotalMs > 0) {
+      parts.push(this.debugTotalMs.toLocaleString() + 'ms');
+    }
+    if (this.debugErrorCount > 0) {
+      parts.push(this.debugErrorCount + ' error' + (this.debugErrorCount !== 1 ? 's' : ''));
+    }
+    if (hasTokens) {
+      const tokenParts = [];
+      if (tu.input > 0) tokenParts.push(tu.input.toLocaleString() + ' in');
+      if (tu.output > 0) tokenParts.push(tu.output.toLocaleString() + ' out');
+      if (tu.total > 0) tokenParts.push(tu.total.toLocaleString() + ' total');
+      if (tu.cached > 0) tokenParts.push(tu.cached.toLocaleString() + ' cached');
+      if (tu.reasoning > 0) tokenParts.push(tu.reasoning.toLocaleString() + ' reasoning');
+      parts.push(tokenParts.join(' · ') + ' tokens');
+    }
+    totals.textContent = parts.join(' · ');
+    footer.appendChild(totals);
+
+    // "Copy diagnostics" button — serializes the rendered log to plain text
+    // for pasting into bug reports. Synthesizes from this.debugLog DOM so the
+    // copy reflects exactly what the operator is looking at.
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'dkan-aiq-debug-copy';
+    copyBtn.textContent = 'Copy diagnostics';
+    const widget = this;
+    copyBtn.addEventListener('click', function () {
+      const text = widget.serializeDebugLog();
+      const restore = function () {
+        copyBtn.textContent = 'Copy diagnostics';
+        copyBtn.disabled = false;
+      };
+      const flash = function (msg) {
+        copyBtn.textContent = msg;
+        copyBtn.disabled = true;
+        setTimeout(restore, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          function () { flash('Copied!'); },
+          function () { flash('Copy failed'); }
+        );
+      }
+      else {
+        flash('Clipboard unavailable');
+      }
+    });
+    footer.appendChild(copyBtn);
+
+    this.dom.debugLog.appendChild(footer);
+  };
+
+  /**
+   * Build a plain-text dump of the diagnostics log for the clipboard.
+   * Reads off the rendered DOM (rather than re-walking events) so the
+   * output reflects exactly what the operator is currently viewing,
+   * including any iteration separators and the totals footer.
+   */
+  Widget.prototype.serializeDebugLog = function () {
+    const lines = [];
+    const errs = this.debugErrorCount || 0;
+    lines.push('Agent diagnostics');
+    lines.push('=================');
+    const totals = [
       this.debugToolCount + ' tool call' + (this.debugToolCount !== 1 ? 's' : ''),
       this.debugIterationMax + ' step' + (this.debugIterationMax !== 1 ? 's' : ''),
       this.debugTotalMs.toLocaleString() + 'ms total',
     ];
-    footer.textContent = parts.join(' · ');
-    this.dom.debugLog.appendChild(footer);
+    if (errs > 0) {
+      totals.push(errs + ' error' + (errs !== 1 ? 's' : ''));
+    }
+    lines.push(totals.join(' · '));
+    const tu = this.debugTokenUsage || {};
+    if ((tu.input || 0) + (tu.output || 0) + (tu.total || 0) > 0) {
+      const tParts = [];
+      if (tu.input > 0) tParts.push(tu.input.toLocaleString() + ' in');
+      if (tu.output > 0) tParts.push(tu.output.toLocaleString() + ' out');
+      if (tu.total > 0) tParts.push(tu.total.toLocaleString() + ' total');
+      if (tu.cached > 0) tParts.push(tu.cached.toLocaleString() + ' cached');
+      if (tu.reasoning > 0) tParts.push(tu.reasoning.toLocaleString() + ' reasoning');
+      lines.push('Tokens: ' + tParts.join(' · '));
+    }
+    lines.push('');
+
+    let idx = 0;
+    const serializeEntry = function (node) {
+      idx++;
+      const name = (node.querySelector('.dkan-aiq-debug-name') || {}).textContent || '';
+      const meta = (node.querySelector('.dkan-aiq-debug-meta') || {}).textContent || '';
+      const result = (node.querySelector('.dkan-aiq-debug-result-inline') || {}).textContent || '';
+      const isError = node.classList.contains('dkan-aiq-debug-error');
+      const prefix = isError ? '[!]' : '[' + idx + ']';
+      const headerParts = [prefix, name];
+      if (meta) {
+        headerParts.push('(' + meta + ')');
+      }
+      if (result) {
+        headerParts.push(result);
+      }
+      lines.push(headerParts.join(' '));
+      const args = node.querySelector('.dkan-aiq-debug-args');
+      if (args) {
+        const argsText = args.textContent || '';
+        const indented = argsText.split('\n').map(function (l) { return '    ' + l; }).join('\n');
+        lines.push('    args:');
+        lines.push(indented);
+      }
+      lines.push('');
+    };
+
+    const stepGroups = this.dom.debugLog.querySelectorAll(':scope > .dkan-aiq-debug-step');
+    if (stepGroups.length) {
+      stepGroups.forEach(function (group) {
+        const stepSummary = (group.querySelector(':scope > .dkan-aiq-debug-step-summary') || {}).textContent || '';
+        if (stepSummary) {
+          lines.push('--- ' + stepSummary + ' ---');
+          lines.push('');
+        }
+        const entries = group.querySelectorAll(':scope > .dkan-aiq-debug-step-list > .dkan-aiq-debug-entry');
+        entries.forEach(serializeEntry);
+      });
+    }
+    else {
+      // Fallback: flat children (covers any path where entries land outside
+      // a step group, e.g. legacy state during a transition).
+      const children = this.dom.debugLog.children;
+      for (let i = 0; i < children.length; i++) {
+        const node = children[i];
+        if (node.classList.contains('dkan-aiq-debug-entry')) {
+          serializeEntry(node);
+        }
+      }
+    }
+    return lines.join('\n').replace(/\n+$/, '\n');
   };
 
   /**

@@ -165,9 +165,9 @@ class SettingsForm extends ConfigFormBase {
 
     $form['chrome']['show_debug_panel'] = [
       '#type' => 'checkbox',
-      '#title' => $this->t('Show tool-calls debug panel'),
+      '#title' => $this->t('Show "Agent diagnostics" panel'),
       '#default_value' => $config->get('show_debug_panel') ?? FALSE,
-      '#description' => $this->t('Display a collapsible panel showing tool calls and arguments to end users.'),
+      '#description' => $this->t('Display a collapsible panel below the conversation showing per-tool timing, step structure, errors, and raw arguments. Aimed at developers and operators debugging agent runs — not end users.'),
     ];
 
     $form['actions_group'] = [
@@ -234,6 +234,13 @@ class SettingsForm extends ConfigFormBase {
       '#description' => $this->t('When enabled, sample rows, distinct value lookups, column searches, dataset / distribution / schema listings render as in-bubble tables (with CSV download). Disabling this hides the table for those tools — only datastore queries continue to show one.'),
     ];
 
+    $form['actions_group']['show_method_summary'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Show method summary'),
+      '#default_value' => $config->get('show_method_summary') ?? TRUE,
+      '#description' => $this->t('Adds a one-line summary above the tables describing how the agent reached its answer ("Answered using 2 datastore queries and 1 supporting lookup.").'),
+    ];
+
     $form['history'] = [
       '#type' => 'details',
       '#title' => $this->t('Conversation history'),
@@ -277,7 +284,7 @@ class SettingsForm extends ConfigFormBase {
     $form['logging'] = [
       '#type' => 'details',
       '#title' => $this->t('Logging'),
-      '#description' => $this->t('Server-side logging to the <code>dkan_drupal_ai_query</code> channel. View entries with <code>drush watchdog:show --type=dkan_drupal_ai_query</code>. Independent of the user-facing tool-calls debug panel above.'),
+      '#description' => $this->t('Server-side logging to the <code>dkan_drupal_ai_query</code> channel. View entries with <code>drush watchdog:show --type=dkan_drupal_ai_query</code>. Independent of the in-widget Agent diagnostics panel above.'),
       '#open' => FALSE,
       '#tree' => FALSE,
     ];
@@ -322,6 +329,7 @@ class SettingsForm extends ConfigFormBase {
       ->set('show_copy_buttons', (bool) $form_state->getValue('show_copy_buttons'))
       ->set('show_simple_table_artifacts', (bool) $form_state->getValue('show_simple_table_artifacts'))
       ->set('show_aux_tool_calls', (bool) $form_state->getValue('show_aux_tool_calls'))
+      ->set('show_method_summary', (bool) $form_state->getValue('show_method_summary'))
       ->set('max_iterations', $maxIterations)
       ->set('conversation_retention_days', max(0, (int) $form_state->getValue('conversation_retention_days')))
       ->set('debug_log_level', $debugLevel)
