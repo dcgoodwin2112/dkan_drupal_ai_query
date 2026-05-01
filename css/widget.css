@@ -118,7 +118,7 @@
 
 .dkan-aiq-sidebar-dataset {
   font-size: 11px;
-  color: #94a3b8;
+  color: #475569;
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -131,7 +131,7 @@
   justify-content: space-between;
   margin-top: 4px;
   font-size: 12px;
-  color: #94a3b8;
+  color: #475569;
 }
 
 .dkan-aiq-sidebar-actions {
@@ -534,9 +534,16 @@
   color: #94a3b8;
 }
 
-/* Data table (inside assistant bubble) */
+/* Data table (inside assistant bubble).
+ *
+ * Hairline rule + top padding visually separates the prose answer from the
+ * first table, and successive tables from each other when the agent
+ * produces more than one. Adjacent dividers between stacked tables are
+ * intentional — they reinforce that each is its own "section". */
 .dkan-aiq-table-container {
   margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
   max-width: 100%;
   overflow-x: auto;
 }
@@ -583,12 +590,22 @@
   background: rgba(0, 0, 0, 0.02);
 }
 
-/* Table summary bar (collapsed state) */
+/* Table summary bar (collapsed state).
+ *
+ * Fixed-column grid so the tool label, row count, and column count line up
+ * vertically across separate message bubbles. Minimum widths are sized to
+ * the longest expected content; longer values can grow into the column via
+ * minmax(min, max-content). The trailing 1fr column hosts the action
+ * buttons and pushes them to the far right. */
 .dkan-aiq-table-summary {
-  display: flex;
+  display: grid;
+  grid-template-columns:
+    minmax(150px, max-content)
+    minmax(110px, max-content)
+    minmax(90px, max-content)
+    1fr;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
   padding: 6px 0;
 }
 
@@ -596,11 +613,56 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  justify-self: end;
 }
 
 .dkan-aiq-table-meta {
   font-size: 13px;
+  color: #475569;
+}
+
+/* Tool-name label (e.g. "Datastore query"); occupies the first grid column. */
+.dkan-aiq-table-tool {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Column-count chip; third grid column. Grid gaps handle visual separation,
+ * so no need for the old margin/border tricks. */
+.dkan-aiq-table-shape {
+  font-size: 12px;
+  color: #475569;
+}
+
+/* Type chip in <th>: small uppercase tag after the column name. */
+.dkan-aiq-col-type {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: #64748b;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 3px;
+  font-weight: normal;
+}
+
+/* Truncated cell: shows an ellipsis tail; clicking expands to full text. */
+.dkan-aiq-cell-truncated {
+  cursor: pointer;
+}
+
+.dkan-aiq-cell-truncated:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.dkan-aiq-cell-expanded {
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .dkan-aiq-table-toggle {
@@ -617,6 +679,19 @@
 .dkan-aiq-table-toggle:hover {
   background: #2563eb;
   color: #fff;
+}
+
+/* Active "open" state: invert fill so the panel-is-showing button visually
+ * stands apart from the closed siblings. Combined with the rotated
+ * chevron, the state is conveyed by both shape and color. */
+.dkan-aiq-table-toggle.is-open {
+  background: #2563eb;
+  color: #fff;
+}
+
+.dkan-aiq-table-toggle.is-open:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .dkan-aiq-table-wrapper {
@@ -668,22 +743,6 @@
   border-color: #93c5fd;
 }
 
-.dkan-aiq-api-btn {
-  padding: 4px 10px;
-  font-size: 12px;
-  color: #475569;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.dkan-aiq-api-btn:hover {
-  color: #2563eb;
-  border-color: #2563eb;
-}
-
 .dkan-aiq-api-wrapper {
   position: relative;
   margin-top: 8px;
@@ -721,22 +780,6 @@
 .dkan-aiq-api-copy:hover {
   color: #e2e8f0;
   background: #475569;
-}
-
-.dkan-aiq-sql-btn {
-  padding: 4px 10px;
-  font-size: 12px;
-  color: #475569;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.dkan-aiq-sql-btn:hover {
-  color: #2563eb;
-  border-color: #2563eb;
 }
 
 .dkan-aiq-sql-wrapper {
@@ -808,6 +851,34 @@
   border-color: #2563eb;
 }
 
+/* Active "open" state for the result-details button: filled slate to
+ * distinguish from the blue table toggle and from its own closed state. */
+.dkan-aiq-prov-btn.is-open {
+  background: #475569;
+  color: #fff;
+  border-color: #475569;
+}
+
+.dkan-aiq-prov-btn.is-open:hover {
+  background: #334155;
+  border-color: #334155;
+  color: #fff;
+}
+
+/* Inline chevron used by the table-toggle and prov-btn buttons. Rotates
+ * 180° (down chevron → up chevron) when the parent button is in its
+ * .is-open state. The transition keeps the flip from feeling abrupt. */
+.dkan-aiq-btn-chevron {
+  display: inline-block;
+  vertical-align: -1px;
+  transition: transform 0.15s ease;
+  margin-right: 2px;
+}
+
+.is-open > .dkan-aiq-btn-chevron {
+  transform: rotate(-180deg);
+}
+
 .dkan-aiq-prov-wrapper {
   margin-top: 8px;
   padding: 12px;
@@ -816,6 +887,19 @@
   border-radius: 6px;
   font-size: 12px;
   color: #1e293b;
+}
+
+/* Plain-English explainer of what the tool does, sits above the structured
+ * detail grid so users get context before scanning the rows. */
+.dkan-aiq-prov-blurb {
+  margin: 0 0 10px 0;
+  padding: 8px 10px;
+  background: #ffffff;
+  border-left: 3px solid #cbd5e1;
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #334155;
 }
 
 .dkan-aiq-prov {
@@ -853,6 +937,167 @@
   word-break: break-word;
   overflow-x: auto;
   max-width: 100%;
+}
+
+/* Power-user disclosures: Query details (raw tool input), API call, and SQL.
+ * Each sits as its own sibling section under the friendly summary block —
+ * developers expand exactly the one they need without nesting. */
+.dkan-aiq-prov-details {
+  margin-top: 8px;
+}
+
+.dkan-aiq-prov-details > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.dkan-aiq-prov-details > summary:hover {
+  color: #2563eb;
+}
+
+.dkan-aiq-prov-details[open] > summary {
+  margin-bottom: 6px;
+}
+
+/* The dark code wrappers (built by buildApiPanelNode / buildSqlPanelNode)
+ * now live directly inside a disclosure; the disclosure summary already
+ * provides the spacing, so flatten the wrapper's top margin. */
+.dkan-aiq-prov-details > .dkan-aiq-api-wrapper,
+.dkan-aiq-prov-details > .dkan-aiq-sql-wrapper {
+  margin-top: 0;
+}
+
+/* "Behind the scenes" disclosure: collects every aux_tool artifact for the
+ * turn into one collapsed panel below the main answer. Visually parallel to
+ * the result-details panel but distinct enough that users don't confuse the
+ * two — these are *additional* tool calls, not provenance for the main one. */
+.dkan-aiq-aux-tools {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #1e293b;
+}
+
+.dkan-aiq-aux-tools-summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #475569;
+  user-select: none;
+  padding: 2px 0;
+}
+
+.dkan-aiq-aux-tools-summary:hover {
+  color: #2563eb;
+}
+
+.dkan-aiq-aux-tools[open] > .dkan-aiq-aux-tools-summary {
+  margin-bottom: 8px;
+}
+
+.dkan-aiq-aux-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* One per aux tool call. Indented and left-bordered to read as a child
+ * of the outer panel without using a nested grid. */
+.dkan-aiq-aux-entry {
+  margin-left: 4px;
+  padding: 4px 0 4px 8px;
+  border-left: 2px solid #e2e8f0;
+}
+
+.dkan-aiq-aux-entry > summary {
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 0;
+}
+
+.dkan-aiq-aux-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dkan-aiq-aux-sep {
+  color: #94a3b8;
+}
+
+.dkan-aiq-aux-headline {
+  font-size: 12px;
+  color: #475569;
+}
+
+.dkan-aiq-aux-blurb {
+  margin: 6px 0;
+  padding: 6px 8px;
+  background: #ffffff;
+  border-left: 3px solid #cbd5e1;
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.dkan-aiq-aux-body {
+  margin: 4px 0;
+}
+
+.dkan-aiq-aux-table {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+/* Multiple data dictionaries stack — give each its own breathing room. */
+.dkan-aiq-aux-dict + .dkan-aiq-aux-dict {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.dkan-aiq-aux-dict-heading {
+  font-weight: 600;
+  font-size: 12px;
+  color: #475569;
+  margin-bottom: 4px;
+}
+
+.dkan-aiq-aux-dict-heading a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.dkan-aiq-aux-dict-heading a:hover {
+  text-decoration: underline;
+}
+
+.dkan-aiq-aux-raw {
+  margin-top: 6px;
+}
+
+.dkan-aiq-aux-raw > summary {
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  padding: 2px 0;
+}
+
+.dkan-aiq-aux-raw > summary:hover {
+  color: #2563eb;
 }
 
 /* Refusal card (Phase 5) */

@@ -16,13 +16,70 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  * Captures table data and chart specs from tool executions.
  *
  * - For query_datastore / query_datastore_join: writes the parsed result
- *   (when not an error) as a 'data' artifact. The poll endpoint surfaces it
- *   so the UI can render an interactive table without bloating the LLM
- *   conversation with the full payload.
+ *   (when not an error) as a 'data' artifact with full input + provenance so
+ *   the UI can render the interactive table, API/SQL preview, and audit
+ *   panel.
+ * - For the SIMPLE_TABLE_TOOLS set (sample_rows, distinct_values,
+ *   search_columns, list_datasets, list_distributions, get_datastore_schema):
+ *   writes a slimmer 'data' artifact carrying just the rows, a column hint,
+ *   and a stripped provenance block. The UI renders these as table+CSV only
+ *   (no API/SQL preview, since those tools don't map to a public datastore
+ *   query).
  * - For create_chart: pulls the Vega-Lite spec out of the tool's context
  *   (the LLM-visible result was a stub) and writes it as a 'chart' artifact.
  */
 class ArtifactCaptureSubscriber implements EventSubscriberInterface {
+
+  /**
+   * Per-tool table-capture config for non-datastore-query tools.
+   *
+   * Keyed by tool name. Each entry tells captureSimpleData() how to extract
+   * rows (`rows_key`), the total-row count (`count_key`), the displayed
+   * column order (`columns`, NULL = use row keys as-is), and any reshape
+   * to convert the LLM-facing JSON shape into rows of objects.
+   */
+  /**
+   * Tool names that emit an 'aux_tool' artifact instead of a primary table.
+   *
+   * These tools produce structured-but-non-tabular results that are useful
+   * to surface in the UI's "Behind the scenes" disclosure (verifying agent
+   * computations, reading data dictionaries, etc.) but don't deserve their
+   * own top-level table render.
+   */
+  protected const AUX_TOOLS = [
+    'compute_stats',
+    'get_data_dictionary',
+    'get_datastore_stats',
+    'get_datastore_schema',
+    'distinct_values',
+  ];
+
+  protected const SIMPLE_TABLE_TOOLS = [
+    'sample_rows' => [
+      'rows_key' => 'rows',
+      'count_key' => 'row_count',
+      'columns' => NULL,
+      'reshape' => NULL,
+    ],
+    'search_columns' => [
+      'rows_key' => 'matches',
+      'count_key' => 'total_matches',
+      'columns' => ['dataset_title', 'resource_id', 'column_name', 'column_type', 'matched_in'],
+      'reshape' => NULL,
+    ],
+    'list_datasets' => [
+      'rows_key' => 'datasets',
+      'count_key' => 'total',
+      'columns' => ['identifier', 'title', 'description', 'distributions'],
+      'reshape' => 'reshapeListDatasets',
+    ],
+    'list_distributions' => [
+      'rows_key' => 'distributions',
+      'count_key' => NULL,
+      'columns' => ['identifier', 'resource_id', 'title', 'mediaType'],
+      'reshape' => NULL,
+    ],
+  ];
 
   /**
    * Per-instance cache of resolved table names: resource_id => table_name.
@@ -88,6 +145,12 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
 
     if ($name === 'query_datastore' || $name === 'query_datastore_join') {
       $this->captureData($threadId, $tool, $name);
+    }
+    elseif (isset(self::SIMPLE_TABLE_TOOLS[$name])) {
+      $this->captureSimpleData($threadId, $tool, $name, self::SIMPLE_TABLE_TOOLS[$name]);
+    }
+    elseif (in_array($name, self::AUX_TOOLS, TRUE)) {
+      $this->captureAuxTool($threadId, $tool, $name);
     }
     elseif ($name === 'create_chart') {
       $this->captureChart($threadId, $tool);
@@ -310,6 +373,302 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
       }
     }
     return $summary;
+  }
+
+  /**
+   * Capture a 'data' artifact for the simple-table tool family.
+   *
+   * Mirrors captureData() but skips the REST/SQL preview path (those tools
+   * don't map to a public datastore query) and produces a stripped
+   * provenance block without the query_summary.
+   */
+  protected function captureSimpleData(string $threadId, $tool, string $toolName, array $cfg): void {
+    $raw = $tool->getReadableOutput();
+    if (!$raw) {
+      return;
+    }
+    $decoded = json_decode($raw, TRUE);
+    if (!is_array($decoded) || isset($decoded['error'])) {
+      return;
+    }
+
+    $rows = $decoded[$cfg['rows_key']] ?? [];
+    if (!is_array($rows)) {
+      return;
+    }
+
+    if (!empty($cfg['reshape']) && method_exists($this, $cfg['reshape'])) {
+      $rows = $this->{$cfg['reshape']}($rows, $decoded);
+    }
+
+    // The simple-table tools accept at most a resource_id; keeping this
+    // small lets the UI still surface "what was queried" without dragging
+    // in the query_datastore preview panels.
+    $input = [];
+    foreach (['resource_id', 'column', 'query', 'keyword', 'limit', 'dataset_id'] as $contextName) {
+      try {
+        $value = $tool->getContextValue($contextName);
+      }
+      catch (\Throwable) {
+        continue;
+      }
+      if ($value === NULL || $value === '') {
+        continue;
+      }
+      $input[$contextName] = $value;
+    }
+
+    $totalRows = $cfg['count_key'] !== NULL && isset($decoded[$cfg['count_key']])
+      ? (int) $decoded[$cfg['count_key']]
+      : count($rows);
+
+    $this->artifacts->append($threadId, [
+      'type' => 'data',
+      'tool' => $toolName,
+      'rows' => $rows,
+      'count' => $totalRows,
+      'schema' => NULL,
+      'columns_hint' => $cfg['columns'] ?? NULL,
+      'input' => $input ?: NULL,
+      'provenance' => $this->buildSimpleProvenance($toolName, $decoded, count($rows), $totalRows),
+    ]);
+  }
+
+  /**
+   * Stripped provenance for simple-table tools.
+   *
+   * No query_summary — these tools don't carry conditions/expressions/sort.
+   * Sanity flags pass through when the tool happens to attach them.
+   */
+  protected function buildSimpleProvenance(string $toolName, array $decoded, int $returnedRows, int $totalRows): array {
+    return [
+      'executed_at' => gmdate('c'),
+      'tool' => $toolName,
+      'row_count' => $returnedRows,
+      'total_rows' => $totalRows,
+      'sanity_flags' => $decoded['sanity_flags'] ?? NULL,
+    ];
+  }
+
+  /**
+   * Reshape list_datasets' nested distributions to a count cell.
+   *
+   * The full distributions array would blow out the cell; users browsing the
+   * dataset list want to see counts. The full list is a click away via the
+   * separate list_distributions tool.
+   */
+  protected function reshapeListDatasets(array $datasets, array $decoded): array {
+    $out = [];
+    foreach ($datasets as $dataset) {
+      $row = [
+        'identifier' => $dataset['identifier'] ?? '',
+        'title' => $dataset['title'] ?? '',
+        'description' => $dataset['description'] ?? '',
+        'distributions' => is_array($dataset['distributions'] ?? NULL) ? count($dataset['distributions']) : 0,
+      ];
+      $out[] = $row;
+    }
+    return $out;
+  }
+
+  /**
+   * Capture an 'aux_tool' artifact for non-tabular tools.
+   *
+   * Decodes the tool's JSON output and dispatches to a per-tool structurer
+   * that produces a UI-friendly shape: headline, structured rows, optional
+   * warnings. The original decoded payload is preserved as `raw` so the
+   * widget can offer a raw-output disclosure for power users.
+   */
+  protected function captureAuxTool(string $threadId, $tool, string $toolName): void {
+    $raw = $tool->getReadableOutput();
+    if (!$raw) {
+      return;
+    }
+    $decoded = json_decode($raw, TRUE);
+    if (!is_array($decoded) || isset($decoded['error'])) {
+      return;
+    }
+
+    $structured = match ($toolName) {
+      'compute_stats' => $this->structureComputeStats($decoded),
+      'get_data_dictionary' => $this->structureDataDictionary($decoded),
+      'get_datastore_stats' => $this->structureDatastoreStats($decoded),
+      'get_datastore_schema' => $this->structureSchema($decoded),
+      'distinct_values' => $this->structureDistinctValues($decoded),
+      default => NULL,
+    };
+    if ($structured === NULL) {
+      return;
+    }
+
+    $this->artifacts->append($threadId, [
+      'type' => 'aux_tool',
+      'tool' => $toolName,
+      'executed_at' => gmdate('c'),
+      'structured' => $structured,
+      'raw' => $decoded,
+    ]);
+  }
+
+  /**
+   * Structure a compute_stats payload for the UI.
+   *
+   * Polymorphic `value` field (number for median/stddev, object for
+   * quartiles) is normalised to a display string here so the JS render
+   * path doesn't need branching logic per operation type.
+   */
+  protected function structureComputeStats(array $decoded): array {
+    $rowCount = (int) ($decoded['row_count'] ?? 0);
+    $resultsRaw = is_array($decoded['results'] ?? NULL) ? $decoded['results'] : [];
+    $rows = [];
+    foreach ($resultsRaw as $r) {
+      if (!is_array($r)) {
+        continue;
+      }
+      $value = $r['value'] ?? NULL;
+      if (is_array($value)) {
+        // Quartiles: {q1, q2, q3, iqr}.
+        $parts = [];
+        foreach (['q1', 'q2', 'q3', 'iqr'] as $k) {
+          if (isset($value[$k])) {
+            $parts[] = strtoupper($k) === 'IQR'
+              ? 'IQR=' . $value[$k]
+              : $k . '=' . $value[$k];
+          }
+        }
+        $valueDisplay = implode(', ', $parts);
+      }
+      else {
+        $valueDisplay = $value === NULL ? '' : (string) $value;
+      }
+      // ComputeStatsTool emits `op` for the operation name; older payloads
+      // used `type`. Read both for safety.
+      $rows[] = [
+        'operation' => (string) ($r['op'] ?? ($r['type'] ?? '')),
+        'column' => (string) ($r['column'] ?? ($r['columns'] ?? '')),
+        'value' => $valueDisplay,
+        'rows_skipped' => (int) ($r['rows_skipped'] ?? 0),
+      ];
+    }
+    return [
+      'headline' => count($rows) . ' statistic' . (count($rows) !== 1 ? 's' : '') . ' computed across ' . $rowCount . ' row' . ($rowCount !== 1 ? 's' : ''),
+      'warnings' => array_values(array_filter((array) ($decoded['warnings'] ?? []))),
+      'rows' => $rows,
+    ];
+  }
+
+  /**
+   * Structure a get_data_dictionary payload for the UI.
+   *
+   * Flattens the nested {resource_id => dictionary} map into an indexed
+   * array of {title, url, fields} objects so the JS can iterate and render
+   * a section per dictionary without map-key juggling.
+   */
+  protected function structureDataDictionary(array $decoded): array {
+    $dictsRaw = is_array($decoded['dictionaries'] ?? NULL) ? $decoded['dictionaries'] : [];
+    $dicts = [];
+    $totalFields = 0;
+    foreach ($dictsRaw as $resourceId => $entry) {
+      if (!is_array($entry)) {
+        continue;
+      }
+      $fieldsRaw = is_array($entry['fields'] ?? NULL) ? $entry['fields'] : [];
+      $fields = [];
+      foreach ($fieldsRaw as $f) {
+        if (!is_array($f)) {
+          continue;
+        }
+        $fields[] = [
+          'name' => (string) ($f['name'] ?? ''),
+          'title' => (string) ($f['title'] ?? ''),
+          'type' => (string) ($f['type'] ?? ''),
+          'description' => (string) ($f['description'] ?? ''),
+        ];
+      }
+      $dicts[] = [
+        'resource_id' => (string) $resourceId,
+        'title' => (string) ($entry['title'] ?? $resourceId),
+        'url' => (string) ($entry['url'] ?? ''),
+        'fields' => $fields,
+      ];
+      $totalFields += count($fields);
+    }
+    return [
+      'headline' => $totalFields . ' field definition' . ($totalFields !== 1 ? 's' : '') . ' across ' . count($dicts) . ' resource' . (count($dicts) !== 1 ? 's' : ''),
+      'dictionaries' => $dicts,
+    ];
+  }
+
+  /**
+   * Structure a get_datastore_stats payload for the UI.
+   */
+  protected function structureDatastoreStats(array $decoded): array {
+    $totalRows = (int) ($decoded['total_rows'] ?? 0);
+    $columnsRaw = is_array($decoded['columns'] ?? NULL) ? $decoded['columns'] : [];
+    $columns = [];
+    foreach ($columnsRaw as $c) {
+      if (!is_array($c)) {
+        continue;
+      }
+      $columns[] = [
+        'name' => (string) ($c['name'] ?? ''),
+        'type' => (string) ($c['type'] ?? ''),
+        'null_count' => (int) ($c['null_count'] ?? 0),
+        'distinct_count' => (int) ($c['distinct_count'] ?? 0),
+        'min' => $c['min'] ?? '',
+        'max' => $c['max'] ?? '',
+      ];
+    }
+    return [
+      'headline' => 'Stats for ' . count($columns) . ' column' . (count($columns) !== 1 ? 's' : '') . ' in a table of ' . $totalRows . ' row' . ($totalRows !== 1 ? 's' : ''),
+      'total_rows' => $totalRows,
+      'columns' => $columns,
+    ];
+  }
+
+  /**
+   * Structure a get_datastore_schema payload for the UI.
+   */
+  protected function structureSchema(array $decoded): array {
+    $columnsRaw = is_array($decoded['columns'] ?? NULL) ? $decoded['columns'] : [];
+    $columns = [];
+    foreach ($columnsRaw as $c) {
+      if (!is_array($c)) {
+        continue;
+      }
+      $columns[] = [
+        'name' => (string) ($c['name'] ?? ''),
+        'type' => (string) ($c['type'] ?? ''),
+        'description' => (string) ($c['description'] ?? ''),
+      ];
+    }
+    return [
+      'headline' => count($columns) . ' column' . (count($columns) !== 1 ? 's' : ''),
+      'columns' => $columns,
+    ];
+  }
+
+  /**
+   * Structure a distinct_values payload for the UI.
+   */
+  protected function structureDistinctValues(array $decoded): array {
+    $values = is_array($decoded['values'] ?? NULL) ? $decoded['values'] : [];
+    $column = (string) ($decoded['column'] ?? '');
+    $count = (int) ($decoded['value_count'] ?? count($values));
+    $truncated = !empty($decoded['truncated']);
+    $headline = $count . ' distinct value' . ($count !== 1 ? 's' : '');
+    if ($column !== '') {
+      $headline .= " for '$column'";
+    }
+    if ($truncated) {
+      $headline .= ' (truncated)';
+    }
+    return [
+      'headline' => $headline,
+      'column' => $column,
+      'truncated' => $truncated,
+      'values' => array_values($values),
+    ];
   }
 
   /**

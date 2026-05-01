@@ -5,6 +5,12 @@ dkan_drupal_ai_query.settings:
     default_model:
       type: string
       label: 'Default model'
+    allowed_models:
+      type: sequence
+      label: 'Allowed models'
+      sequence:
+        type: string
+        label: 'Provider__model option'
     show_model_selector:
       type: boolean
       label: 'Show model selector'
@@ -38,6 +44,12 @@ dkan_drupal_ai_query.settings:
     show_copy_buttons:
       type: boolean
       label: 'Copy API / SQL buttons'
+    show_simple_table_artifacts:
+      type: boolean
+      label: 'Render table for non-query tool calls'
+    show_aux_tool_calls:
+      type: boolean
+      label: 'Show "Behind the scenes" panel'
     max_iterations:
       type: integer
       label: 'Max agent iterations'
