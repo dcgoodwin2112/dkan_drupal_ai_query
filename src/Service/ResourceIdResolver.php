@@ -21,6 +21,14 @@ class ResourceIdResolver {
   private const MAX_DATASETS = 2000;
 
   /**
+   * Cap on candidate count returned in a `multiple_matches` payload.
+   *
+   * Larger result sets push the LLM toward refining the search term
+   * (`refine_hint`) rather than picking blindly from a long list.
+   */
+  private const MAX_CANDIDATES = 5;
+
+  /**
    * Per-instance cache of every dataset summary, populated on first need.
    *
    * @var array|null
@@ -187,22 +195,75 @@ class ResourceIdResolver {
 
   /**
    * Find a dataset by partial title and return its distributions.
+   *
+   * Three response shapes:
+   * - `{error: ...}` — no titles matched.
+   * - `{dataset_id, title, distributions}` — exactly one match (or a single
+   *    case-insensitive exact match wins over partial matches).
+   * - `{multiple_matches: [...], match_count, refine_hint}` — two or more
+   *    titles matched; the agent must disambiguate before resolving an id.
+   *
+   * Returning the first partial match silently risks answering the wrong
+   * dataset's question — so when the search is genuinely ambiguous, this
+   * surfaces the candidates and forces the caller to narrow.
    */
   public function findDatasetResources(string $title): array {
     $title = strtolower(trim($title));
     if ($title === '') {
       return ['error' => 'Title search term is required.'];
     }
+    $exact = [];
+    $partial = [];
     foreach ($this->getAllDatasets() as $ds) {
-      if (str_contains(strtolower($ds['title'] ?? ''), $title)) {
-        return [
-          'dataset_id' => $ds['identifier'],
-          'title' => $ds['title'],
-          'distributions' => $this->getDistributions($ds['identifier']),
-        ];
+      $candidate = strtolower((string) ($ds['title'] ?? ''));
+      if ($candidate === '') {
+        continue;
+      }
+      if ($candidate === $title) {
+        $exact[] = $ds;
+      }
+      elseif (str_contains($candidate, $title)) {
+        $partial[] = $ds;
       }
     }
-    return ['error' => "No dataset found matching: $title"];
+
+    // Single exact title match always wins over any partial matches.
+    if (count($exact) === 1) {
+      return $this->singleMatch($exact[0]);
+    }
+    $matches = $exact ?: $partial;
+    $count = count($matches);
+    if ($count === 0) {
+      return ['error' => "No dataset found matching: $title"];
+    }
+    if ($count === 1) {
+      return $this->singleMatch($matches[0]);
+    }
+    return [
+      'multiple_matches' => array_map(
+        fn(array $ds): array => [
+          'dataset_id' => $ds['identifier'] ?? NULL,
+          'title' => $ds['title'] ?? NULL,
+        ],
+        array_slice($matches, 0, self::MAX_CANDIDATES),
+      ),
+      'match_count' => $count,
+      'refine_hint' => sprintf(
+        'Multiple datasets match "%s". Ask the user which one they meant, or call find_dataset_resources again with a more specific title.',
+        $title,
+      ),
+    ];
+  }
+
+  /**
+   * Build the single-match response shape.
+   */
+  protected function singleMatch(array $dataset): array {
+    return [
+      'dataset_id' => $dataset['identifier'],
+      'title' => $dataset['title'],
+      'distributions' => $this->getDistributions($dataset['identifier']),
+    ];
   }
 
   /**

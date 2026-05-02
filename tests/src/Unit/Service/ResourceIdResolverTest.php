@@ -166,6 +166,118 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertNull($resolver->resolveToDatasetUuid('nope__123'));
   }
 
+  public function testFindDatasetResourcesReturnsMultipleMatchesOnAmbiguity(): void {
+    // Two titles contain "asthma" — neither is an exact match for the
+    // search term, so the resolver must surface both candidates rather
+    // than silently picking the first.
+    $datasets = [
+      ['identifier' => 'd1', 'title' => 'Asthma Prevalence'],
+      ['identifier' => 'd2', 'title' => 'Childhood Asthma Hospitalizations'],
+    ];
+    $distributions = [
+      'd1' => [['resource_id' => 'rid-1__1', 'identifier' => 'dist1']],
+      'd2' => [['resource_id' => 'rid-2__1', 'identifier' => 'dist2']],
+    ];
+    $resolver = new ResourceIdResolver(
+      $this->buildMetastore($datasets, $distributions),
+      $this->buildDatastore([]),
+    );
+    $result = $resolver->findDatasetResources('asthma');
+    $this->assertArrayHasKey('multiple_matches', $result);
+    $this->assertSame(2, $result['match_count']);
+    $this->assertArrayHasKey('refine_hint', $result);
+    $this->assertCount(2, $result['multiple_matches']);
+    $this->assertEquals(
+      [
+        ['dataset_id' => 'd1', 'title' => 'Asthma Prevalence'],
+        ['dataset_id' => 'd2', 'title' => 'Childhood Asthma Hospitalizations'],
+      ],
+      $result['multiple_matches'],
+    );
+    // Critically: no dataset_id / distributions keys — the agent must not
+    // be able to fall through to a downstream call without disambiguating.
+    $this->assertArrayNotHasKey('dataset_id', $result);
+    $this->assertArrayNotHasKey('distributions', $result);
+  }
+
+  public function testFindDatasetResourcesExactMatchWinsOverPartial(): void {
+    // The literal title "Asthma" should beat the substring match against
+    // "Asthma Prevalence" — exact wins, so the result is unambiguous.
+    $datasets = [
+      ['identifier' => 'd1', 'title' => 'Asthma Prevalence'],
+      ['identifier' => 'd2', 'title' => 'Asthma'],
+    ];
+    $distributions = [
+      'd2' => [['resource_id' => 'rid-2__1', 'identifier' => 'dist2']],
+    ];
+    $resolver = new ResourceIdResolver(
+      $this->buildMetastore($datasets, $distributions),
+      $this->buildDatastore([]),
+    );
+    $result = $resolver->findDatasetResources('asthma');
+    $this->assertArrayNotHasKey('multiple_matches', $result);
+    $this->assertSame('d2', $result['dataset_id']);
+    $this->assertSame('Asthma', $result['title']);
+  }
+
+  public function testFindDatasetResourcesCapsCandidateList(): void {
+    // 8 datasets containing "set" but only the first 5 should appear in
+    // the candidates list; match_count still reports the full total so
+    // the agent knows it needs a more specific search term.
+    $datasets = [];
+    for ($i = 1; $i <= 8; $i++) {
+      $datasets[] = ['identifier' => "d$i", 'title' => "Dataset $i"];
+    }
+    $resolver = new ResourceIdResolver(
+      $this->buildMetastore($datasets),
+      $this->buildDatastore([]),
+    );
+    $result = $resolver->findDatasetResources('dataset');
+    $this->assertArrayHasKey('multiple_matches', $result);
+    $this->assertCount(5, $result['multiple_matches']);
+    $this->assertSame(8, $result['match_count']);
+  }
+
+  public function testFindDatasetResourcesReturnsErrorWhenNothingMatches(): void {
+    $datasets = [['identifier' => 'd1', 'title' => 'Crime Data']];
+    $resolver = new ResourceIdResolver(
+      $this->buildMetastore($datasets),
+      $this->buildDatastore([]),
+    );
+    $result = $resolver->findDatasetResources('nope');
+    $this->assertArrayHasKey('error', $result);
+  }
+
+  public function testResolveReturnsNullWhenTitleIsAmbiguous(): void {
+    // resolve() must NOT silently pick the first match — the whole
+    // point of multiple_matches is to refuse a guess.
+    $datasets = [
+      ['identifier' => 'd1', 'title' => 'Asthma Prevalence'],
+      ['identifier' => 'd2', 'title' => 'Childhood Asthma Hospitalizations'],
+    ];
+    $distributions = [
+      'd1' => [['resource_id' => 'rid-1__1']],
+      'd2' => [['resource_id' => 'rid-2__1']],
+    ];
+    $resolver = new ResourceIdResolver(
+      $this->buildMetastore($datasets, $distributions),
+      $this->buildDatastore(['rid-1__1' => 'done', 'rid-2__1' => 'done']),
+    );
+    $this->assertNull($resolver->resolve('asthma'));
+  }
+
+  public function testResolveToDatasetUuidReturnsNullWhenTitleIsAmbiguous(): void {
+    $datasets = [
+      ['identifier' => 'd1', 'title' => 'Asthma Prevalence'],
+      ['identifier' => 'd2', 'title' => 'Childhood Asthma Hospitalizations'],
+    ];
+    $resolver = new ResourceIdResolver(
+      $this->buildMetastore($datasets),
+      $this->buildDatastore([]),
+    );
+    $this->assertNull($resolver->resolveToDatasetUuid('asthma'));
+  }
+
   public function testLoggerWarningOnMaxDatasetsCap(): void {
     // Pretend the catalog is huge by reporting a total beyond the cap.
     $datasets = [];
