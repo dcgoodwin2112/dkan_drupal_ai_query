@@ -19,7 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   id: 'dkan_drupal_ai_query:get_data_dictionary',
   function_name: 'get_data_dictionary',
   name: 'Get data dictionary',
-  description: 'Get the data dictionary linked to a dataset or distribution. Returns curated field titles, descriptions, and declared types. get_datastore_schema already merges dictionary fields per column — call this when you need the full dictionary independent of the datastore schema.',
+  description: 'Get the standalone data dictionary linked to a dataset or distribution. In most cases you do NOT need this — get_datastore_schema already merges per-column dictionary fields (dictionary_title, dictionary_description, dictionary_type). Call this only when you need the dictionary URL or the dictionary fields list independent of any single resource.',
   group: 'dkan_drupal_ai_query',
   context_definitions: [
     'resource_id' => new ContextDefinition(

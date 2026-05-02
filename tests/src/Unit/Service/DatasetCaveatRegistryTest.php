@@ -103,6 +103,52 @@ class DatasetCaveatRegistryTest extends TestCase {
     $this->assertEquals(['x' => 'B'], $registry->getColumnCaveats('b-2'));
   }
 
+  public function testAttachAddsCaveatsWhenPopulated(): void {
+    $registry = $this->makeRegistry([
+      'abc_123' => $this->caveat('abc-123', [
+        'suppression' => 'Counts <10 suppressed.',
+        'column_caveats' => ['rate' => 'Per 100k.'],
+      ]),
+    ]);
+    $payload = ['distributions' => [['resource_id' => 'rid__1']]];
+    $merged = $registry->attach($payload, 'abc-123');
+    $this->assertArrayHasKey('caveats', $merged);
+    $this->assertEquals('Counts <10 suppressed.', $merged['caveats']['suppression']);
+    $this->assertSame($payload['distributions'], $merged['distributions']);
+  }
+
+  public function testAttachSkipsWhenNoRecord(): void {
+    $registry = $this->makeRegistry([]);
+    $payload = ['distributions' => [['resource_id' => 'rid__1']]];
+    $merged = $registry->attach($payload, 'no-such-uuid');
+    $this->assertArrayNotHasKey('caveats', $merged);
+    $this->assertSame($payload, $merged);
+  }
+
+  public function testAttachSkipsWhenRecordExistsButBlank(): void {
+    // Empty caveat record (saved entity, all fields blank). The registry
+    // returns [] to distinguish from "no record" (NULL), but attach() must
+    // not surface a `caveats: []` key — neither shape carries actionable
+    // guidance for the agent.
+    $registry = $this->makeRegistry([
+      'abc_123' => $this->caveat('abc-123', []),
+    ]);
+    $payload = ['distributions' => []];
+    $merged = $registry->attach($payload, 'abc-123');
+    $this->assertArrayNotHasKey('caveats', $merged);
+  }
+
+  public function testAttachOverwritesExistingCaveatsKey(): void {
+    // Defensive: if a caller has already populated `caveats`, the registry's
+    // authoritative record wins.
+    $registry = $this->makeRegistry([
+      'abc_123' => $this->caveat('abc-123', ['suppression' => 'fresh']),
+    ]);
+    $payload = ['caveats' => ['stale' => 'value']];
+    $merged = $registry->attach($payload, 'abc-123');
+    $this->assertSame(['suppression' => 'fresh'], $merged['caveats']);
+  }
+
   public function testResetCacheForcesReload(): void {
     $storage = $this->createMock(EntityStorageInterface::class);
     $storage->expects($this->exactly(2))
