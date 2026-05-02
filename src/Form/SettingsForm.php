@@ -227,6 +227,13 @@ class SettingsForm extends ConfigFormBase {
       '#description' => $this->t('Adds a collapsible panel below the answer listing tool calls the agent made that don\'t produce a primary table — computed statistics, data dictionaries, and column-level stats. Off by default; turn on for power-user / admin contexts where users want to verify the agent\'s work.'),
     ];
 
+    $form['actions_group']['show_rest_playground_sidebar'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Show REST API playground sidebar'),
+      '#default_value' => $config->get('show_rest_playground_sidebar') ?? FALSE,
+      '#description' => $this->t('Adds a "Try in API playground" button to datastore query results. Opens a right-side sidebar with the editable REST request body and a Run button so users can experiment with the same call — tweak conditions, change pagination, re-run, and inspect the raw JSON response. Off by default; turn on for power-user / internal contexts.'),
+    ];
+
     $form['actions_group']['show_simple_table_artifacts'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Render table for non-query tool calls'),
@@ -329,6 +336,7 @@ class SettingsForm extends ConfigFormBase {
       ->set('show_copy_buttons', (bool) $form_state->getValue('show_copy_buttons'))
       ->set('show_simple_table_artifacts', (bool) $form_state->getValue('show_simple_table_artifacts'))
       ->set('show_aux_tool_calls', (bool) $form_state->getValue('show_aux_tool_calls'))
+      ->set('show_rest_playground_sidebar', (bool) $form_state->getValue('show_rest_playground_sidebar'))
       ->set('show_method_summary', (bool) $form_state->getValue('show_method_summary'))
       ->set('max_iterations', $maxIterations)
       ->set('conversation_retention_days', max(0, (int) $form_state->getValue('conversation_retention_days')))

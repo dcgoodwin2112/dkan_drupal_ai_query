@@ -629,9 +629,16 @@
 
 .dkan-aiq-table-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   justify-self: end;
+}
+
+/* Don't let action button labels word-break in narrow contexts (the chat
+ * thread squeezes when both history and playground sidebars are open). */
+.dkan-aiq-table-actions button {
+  white-space: nowrap;
 }
 
 .dkan-aiq-table-meta {
@@ -1453,4 +1460,504 @@
   color: #059669;
   border-color: #86efac;
   background: #f0fdf4;
+}
+
+/* ==========================================================================
+   REST API playground sidebar
+   ----------------------------------------------------------------------------
+   Hidden by default. Becomes visible when the widget root carries the
+   `--with-playground` modifier (set by openPlayground()). At narrow viewports
+   it drops out of flow and overlays as a right drawer so it doesn't squeeze
+   the chat into a usability cliff.
+   ========================================================================== */
+
+.dkan-aiq-playground-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #475569;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #2563eb;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.dkan-aiq-playground-btn:hover {
+  color: #2563eb;
+  border-color: #2563eb;
+  border-left-color: #1d4ed8;
+}
+
+.dkan-aiq-playground-sidebar {
+  flex: 0 0 420px;
+  max-width: 420px;
+  height: 100%;
+  background: #fbfbfd;
+  border-left: 1px solid #e5e7eb;
+  display: none;
+  flex-direction: column;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.dkan-aiq-widget--with-playground {
+  /* Bump the widget cap so the chat doesn't shrink when the sidebar opens.
+     Compounds with --with-sidebar (history) when both are visible. */
+  max-width: var(--dkan-aiq-max-width-playground, 1700px);
+}
+
+.dkan-aiq-widget--with-playground.dkan-aiq-widget--with-sidebar {
+  max-width: var(--dkan-aiq-max-width-both, 1900px);
+}
+
+.dkan-aiq-widget--with-playground .dkan-aiq-playground-sidebar {
+  display: flex;
+}
+
+@media (max-width: 1100px) {
+  .dkan-aiq-widget--with-playground .dkan-aiq-playground-sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    box-shadow: -4px 0 16px rgba(15, 23, 42, 0.18);
+    z-index: 200;
+  }
+}
+
+.dkan-aiq-playground-header {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px 14px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 6px 8px;
+  align-items: center;
+  z-index: 1;
+}
+
+.dkan-aiq-playground-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1e293b;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.dkan-aiq-playground-close {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.dkan-aiq-playground-close:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.dkan-aiq-playground-endpoint {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.dkan-aiq-playground-method {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.dkan-aiq-playground-method.is-post {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.dkan-aiq-playground-method.is-get {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.dkan-aiq-playground-url {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #334155;
+  word-break: break-all;
+  min-width: 0;
+}
+
+.dkan-aiq-playground-editor-wrap {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dkan-aiq-playground-editor-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.dkan-aiq-playground-body {
+  width: 100%;
+  min-height: 220px;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #0f172a;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  box-sizing: border-box;
+  resize: vertical;
+  white-space: pre;
+  overflow: auto;
+}
+
+.dkan-aiq-playground-body:focus {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+  border-color: #2563eb;
+}
+
+.dkan-aiq-playground-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dkan-aiq-playground-run,
+.dkan-aiq-playground-reset {
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.dkan-aiq-playground-run {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.dkan-aiq-playground-run:hover:not(:disabled) {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.dkan-aiq-playground-run:disabled {
+  background: #94a3b8;
+  border-color: #94a3b8;
+  cursor: default;
+}
+
+.dkan-aiq-playground-reset {
+  background: #fff;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.dkan-aiq-playground-reset:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.dkan-aiq-playground-error {
+  font-size: 12px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+
+.dkan-aiq-playground-response {
+  border-top: 1px solid #e2e8f0;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dkan-aiq-playground-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dkan-aiq-playground-status {
+  display: inline-block;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+
+.dkan-aiq-playground-status.is-2xx {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.dkan-aiq-playground-status.is-4xx {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.dkan-aiq-playground-status.is-5xx {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.dkan-aiq-playground-status.is-error {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.dkan-aiq-playground-status.is-info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.dkan-aiq-playground-duration {
+  font-size: 12px;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+.dkan-aiq-playground-hint {
+  font-size: 11px;
+  color: #92400e;
+  background: #fef3c7;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+.dkan-aiq-playground-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dkan-aiq-playground-tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.dkan-aiq-playground-tab:hover {
+  color: #1e293b;
+}
+
+.dkan-aiq-playground-tab.is-active {
+  color: #1e40af;
+  border-bottom-color: #2563eb;
+  font-weight: 600;
+}
+
+.dkan-aiq-playground-tabpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dkan-aiq-playground-table-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dkan-aiq-playground-table-scroll {
+  max-height: 400px;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+}
+
+.dkan-aiq-playground-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  background: #fff;
+}
+
+.dkan-aiq-playground-table th,
+.dkan-aiq-playground-table td {
+  padding: 4px 8px;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dkan-aiq-playground-table td.is-truncated {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.dkan-aiq-playground-table th {
+  background: #f3f4f6;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+
+.dkan-aiq-playground-table td.is-truncated {
+  cursor: pointer;
+  color: #1d4ed8;
+}
+
+.dkan-aiq-playground-table-footer {
+  font-size: 11px;
+  color: #6b7280;
+  align-self: flex-start;
+}
+
+.dkan-aiq-playground-empty {
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.dkan-aiq-playground-code-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dkan-aiq-playground-lang-picker {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-self: flex-start;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.dkan-aiq-playground-lang-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid #e5e7eb;
+  cursor: pointer;
+  color: #374151;
+  font-family: inherit;
+}
+
+.dkan-aiq-playground-lang-btn:last-child {
+  border-right: 0;
+}
+
+.dkan-aiq-playground-lang-btn:hover {
+  background: #f3f4f6;
+}
+
+.dkan-aiq-playground-lang-btn.is-active {
+  background: #1f2937;
+  color: #fff;
+}
+
+.dkan-aiq-playground-pre {
+  margin: 0;
+  padding: 10px 12px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.45;
+  border-radius: 6px;
+  overflow: auto;
+  max-height: 400px;
+  white-space: pre;
+}
+
+.dkan-aiq-playground-nonjson {
+  font-size: 11px;
+  color: #92400e;
+  background: #fef3c7;
+  padding: 4px 8px;
+  border-radius: 3px;
+  align-self: flex-start;
+}
+
+.dkan-aiq-playground-truncated {
+  font-size: 12px;
+  color: #92400e;
+  background: #fef3c7;
+  padding: 6px 10px;
+  border: 1px solid #fde68a;
+  border-radius: 4px;
+}
+
+.dkan-aiq-playground-copy,
+.dkan-aiq-playground-download {
+  align-self: flex-start;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: #fff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dkan-aiq-playground-copy:hover,
+.dkan-aiq-playground-download:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.dkan-aiq-playground-headers {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 12px;
+  row-gap: 4px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.dkan-aiq-playground-headers dt {
+  font-weight: 600;
+  color: #475569;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.dkan-aiq-playground-headers dd {
+  margin: 0;
+  color: #1e293b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
 }

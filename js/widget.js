@@ -28,6 +28,31 @@
     'get_datastore_schema',
   ]);
 
+  // Tools that can be replayed and edited in the right-side REST playground
+  // sidebar. Same boundary as today's "Show API call" panel — only the two
+  // datastore-query tools have a public REST endpoint that's worth tinkering
+  // with; everything else is internal LLM helper plumbing.
+  const PLAYGROUND_ELIGIBLE_TOOLS = new Set([
+    'query_datastore',
+    'query_datastore_join',
+    'search_datasets',
+  ]);
+
+  // Cap displayed response body so a large datastore response (10k rows) doesn't
+  // freeze the browser by stuffing 50 MB into a single <pre>.
+  const PLAYGROUND_RESPONSE_DISPLAY_CAP = 500 * 1024;
+
+  // Languages offered in the playground's Code tab. cURL stays first as the
+  // universal baseline; the rest are ordered by rough usage frequency among
+  // DKAN's data-integration audience.
+  const PLAYGROUND_CODE_LANGUAGES = [
+    { id: 'curl',   label: 'cURL',       copyLabel: 'Copy cURL' },
+    { id: 'httpie', label: 'HTTPie',     copyLabel: 'Copy HTTPie' },
+    { id: 'python', label: 'Python',     copyLabel: 'Copy Python' },
+    { id: 'js',     label: 'JavaScript', copyLabel: 'Copy JavaScript' },
+    { id: 'php',    label: 'PHP',        copyLabel: 'Copy PHP' },
+  ];
+
   // Cell text past this length is truncated in the table view; click expands.
   const CELL_TRUNCATE_LEN = 80;
 
@@ -66,6 +91,7 @@
     sample_rows: 'Sample of rows',
     distinct_values: 'Distinct values',
     search_columns: 'Column search',
+    search_datasets: 'Dataset search',
     list_datasets: 'Dataset list',
     list_distributions: 'Distribution list',
     get_datastore_schema: 'Schema',
@@ -81,6 +107,7 @@
     sample_rows: 'Returns a small random sample of rows from the resource so you can eyeball the data.',
     distinct_values: 'Lists the unique values that appear in one column of the resource.',
     search_columns: 'Searches column names (and optionally descriptions) across all dataset resources to find columns matching your keyword.',
+    search_datasets: 'Searches the catalog by keyword and returns matching datasets with their identifier, title, description, and distribution count.',
     list_datasets: 'Returns a page of datasets from the catalog so you can browse what is available.',
     list_distributions: 'Lists the distributions — downloadable files or API endpoints — that belong to one dataset.',
     get_datastore_schema: 'Returns the column definitions for one resource: name, type, and (when available) a description from the data dictionary.',
@@ -198,6 +225,31 @@
     this.datasetMap = {};
     this.cachedConversations = [];
     this.followUpPlaceholder = 'Ask a follow-up...';
+
+    // Right-side REST API playground sidebar. Lazily created on first
+    // open from a "Try in API playground" button on a datastore result.
+    // Single-tab playground: opening a new request from a different bubble
+    // replaces the editor (with a confirm-dirty prompt). Closing preserves
+    // the last view so re-opening doesn't lose work.
+    this.playground = {
+      open: false,
+      el: null,
+      editor: null,
+      responseHost: null,
+      runBtn: null,
+      resetBtn: null,
+      errorEl: null,
+      methodEl: null,
+      urlEl: null,
+      current: null,
+      dirty: false,
+    };
+
+    // Last-picked language in the playground's Code tab. Persists across
+    // playground open/close cycles within this widget instance only — not
+    // across page reloads. Lives on the Widget root (not nested in
+    // this.playground) so it survives if that state is ever reset.
+    this.playgroundCodeLang = 'curl';
 
     this.dom = {
       sidebar: root.querySelector('.dkan-aiq-sidebar'),
@@ -995,7 +1047,8 @@
     const apiJoin = (!isSimpleTool && input) ? (input.join_distribution_uuid || input.resolved_join_resource_id || input.join_resource_id || '') : '';
     const sqlPrimary = (!isSimpleTool && input) ? (input.resolved_resource_id || input.resource_id || '') : '';
     const sqlJoin = (!isSimpleTool && input) ? (input.resolved_join_resource_id || input.join_resource_id || '') : '';
-    const apiText = (!isSimpleTool && input) ? buildApiEquivalent(toolName, input, apiPrimary, apiJoin) : null;
+    const apiCall = (!isSimpleTool && input) ? buildApiEquivalent(toolName, input, apiPrimary, apiJoin) : null;
+    const apiText = apiCall ? formatApiEquivalent(apiCall) : null;
     const sqlText = (!isSimpleTool && input) ? buildSqlEquivalent(toolName, input, sqlPrimary, sqlJoin) : null;
 
     const container = document.createElement('div');
@@ -1082,6 +1135,27 @@
       csvBtn.textContent = 'Download CSV';
       csvBtn.addEventListener('click', () => { downloadCsv(cols, rows); });
       actions.appendChild(csvBtn);
+    }
+
+    // Playground trigger: only on datastore-query tools (the rest don't have a
+    // public REST equivalent that's worth tinkering with), only when the
+    // admin toggle is on, and only when we have the captured input the
+    // playground would replay. The button reuses the structured api-call
+    // shape we already built above for the "Show API call" panel.
+    if (apiCall && s.showRestPlaygroundSidebar !== false && PLAYGROUND_ELIGIBLE_TOOLS.has(toolName)) {
+      const playgroundBtn = document.createElement('button');
+      playgroundBtn.type = 'button';
+      playgroundBtn.className = 'dkan-aiq-playground-btn';
+      playgroundBtn.textContent = 'API playground';
+      playgroundBtn.addEventListener('click', () => {
+        this.openPlayground({
+          tool: toolName,
+          method: apiCall.method,
+          url: apiCall.url,
+          body: apiCall.body,
+        });
+      });
+      actions.appendChild(playgroundBtn);
     }
 
     summary.appendChild(actions);
@@ -1220,7 +1294,36 @@
     return { resource: defaultResource, property: trimmed };
   }
 
+  /**
+   * Return the structured REST equivalent of a datastore tool call.
+   *
+   * Returns `{method, url, body}` where `url` is a relative path (so the
+   * playground can pass it straight to fetch()) and `body` is the JSON
+   * payload as a JS object. The display panel and the playground both
+   * consume this — render with `formatApiEquivalent()` for the existing
+   * text-panel UI; pass straight to fetch() for the playground.
+   */
   function buildApiEquivalent(toolName, input, resolvedResourceId, resolvedJoinId) {
+    // search_datasets maps to /api/1/search (GET with query string params),
+    // not the datastore-query POST. Body is the params object; runPlayground
+    // serializes it to a query string at fetch time.
+    if (toolName === 'search_datasets') {
+      const params = {};
+      if (input.keyword != null && input.keyword !== '') {
+        params.fulltext = input.keyword;
+      }
+      if (input.page) {
+        params.page = input.page;
+      }
+      // DKAN's REST API uses page-size (hyphen); the FunctionCall input uses
+      // page_size (underscore). Translate here so the playground shows the
+      // wire format.
+      if (input.page_size) {
+        params['page-size'] = input.page_size;
+      }
+      return { method: 'GET', url: '/api/1/search', body: params };
+    }
+
     const resourceId = resolvedResourceId || input.resource_id || '';
     const joinId = resolvedJoinId || input.join_resource_id || '';
     const isJoin = toolName === 'query_datastore_join' && joinId;
@@ -1320,13 +1423,28 @@
     body.results = true;
     body.keys = true;
 
-    const endpoint = isJoin
-      ? 'POST /api/1/datastore/query'
-      : 'POST /api/1/datastore/query/' + resourceId;
-    return endpoint + '\n' + JSON.stringify(body, null, 2);
+    const url = isJoin
+      ? '/api/1/datastore/query'
+      : '/api/1/datastore/query/' + resourceId;
+    return { method: 'POST', url: url, body: body };
+  }
+
+  /**
+   * Render an api-equivalent object as the text shown in the "Show API call"
+   * code panel. Kept separate from buildApiEquivalent() so the playground
+   * can consume the structured form without re-parsing.
+   */
+  function formatApiEquivalent(api) {
+    return api.method + ' ' + api.url + '\n' + JSON.stringify(api.body, null, 2);
   }
 
   function buildSqlEquivalent(toolName, input, resolvedResourceId, resolvedJoinId) {
+    // SQL preview only applies to the two datastore-query tools. Anything
+    // else (search, list, etc.) doesn't map to SQL, so return null and the
+    // caller skips rendering the SQL panel.
+    if (toolName !== 'query_datastore' && toolName !== 'query_datastore_join') {
+      return null;
+    }
     const resourceId = resolvedResourceId || input.resource_id || 'resource';
     const joinId = resolvedJoinId || input.join_resource_id || '';
     const isJoin = toolName === 'query_datastore_join' && joinId;
@@ -2033,6 +2151,776 @@
       wrap.appendChild(chip);
     });
   };
+
+  /**
+   * Lazy-build the right-side REST playground sidebar DOM.
+   *
+   * Mounted as a sibling of `.dkan-aiq-sidebar` and `.dkan-aiq-main` inside
+   * `.dkan-aiq-widget`. Hidden by default; the `--with-playground` modifier
+   * class on the widget root is what makes it visible.
+   */
+  Widget.prototype.ensurePlaygroundSidebar = function () {
+    if (this.playground.el) {
+      return this.playground.el;
+    }
+    const aside = document.createElement('aside');
+    aside.className = 'dkan-aiq-playground-sidebar';
+    aside.setAttribute('aria-label', 'REST API playground');
+    aside.setAttribute('aria-hidden', 'true');
+
+    // Header — friendly title, method+url chip, close button.
+    const header = document.createElement('div');
+    header.className = 'dkan-aiq-playground-header';
+    const title = document.createElement('div');
+    title.className = 'dkan-aiq-playground-title';
+    title.textContent = 'API playground';
+    const endpoint = document.createElement('div');
+    endpoint.className = 'dkan-aiq-playground-endpoint';
+    const methodEl = document.createElement('span');
+    methodEl.className = 'dkan-aiq-playground-method';
+    const urlEl = document.createElement('code');
+    urlEl.className = 'dkan-aiq-playground-url';
+    endpoint.appendChild(methodEl);
+    endpoint.appendChild(urlEl);
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'dkan-aiq-playground-close';
+    closeBtn.setAttribute('aria-label', 'Close playground');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.addEventListener('click', () => { this.closePlayground(); });
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+    header.appendChild(endpoint);
+    aside.appendChild(header);
+
+    // Editor — JSON textarea + Run/Reset + inline error slot.
+    const editorWrap = document.createElement('div');
+    editorWrap.className = 'dkan-aiq-playground-editor-wrap';
+    const editorLabel = document.createElement('label');
+    editorLabel.className = 'dkan-aiq-playground-editor-label';
+    editorLabel.textContent = 'Request body (JSON)';
+    const textareaId = 'dkan-aiq-playground-body-' + Math.random().toString(36).slice(2, 8);
+    editorLabel.setAttribute('for', textareaId);
+    const textarea = document.createElement('textarea');
+    textarea.id = textareaId;
+    textarea.className = 'dkan-aiq-playground-body';
+    textarea.setAttribute('spellcheck', 'false');
+    textarea.setAttribute('autocomplete', 'off');
+    textarea.addEventListener('input', () => { this.playground.dirty = true; });
+    const actions = document.createElement('div');
+    actions.className = 'dkan-aiq-playground-actions';
+    const runBtn = document.createElement('button');
+    runBtn.type = 'button';
+    runBtn.className = 'dkan-aiq-playground-run';
+    runBtn.textContent = 'Run';
+    runBtn.addEventListener('click', () => { this.runPlayground(); });
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'dkan-aiq-playground-reset';
+    resetBtn.textContent = 'Reset';
+    resetBtn.addEventListener('click', () => {
+      const cur = this.playground.current;
+      if (!cur || cur.originalBodyJson == null) return;
+      textarea.value = cur.originalBodyJson;
+      this.playground.dirty = false;
+      errorEl.hidden = true;
+      this.playground.responseHost.hidden = true;
+      this.playground.responseHost.innerHTML = '';
+    });
+    actions.appendChild(runBtn);
+    actions.appendChild(resetBtn);
+    const errorEl = document.createElement('div');
+    errorEl.className = 'dkan-aiq-playground-error';
+    errorEl.hidden = true;
+    editorWrap.appendChild(editorLabel);
+    editorWrap.appendChild(textarea);
+    editorWrap.appendChild(actions);
+    editorWrap.appendChild(errorEl);
+    aside.appendChild(editorWrap);
+
+    // Response area — populated by renderPlaygroundResponse on each Run.
+    const responseHost = document.createElement('div');
+    responseHost.className = 'dkan-aiq-playground-response';
+    responseHost.hidden = true;
+    aside.appendChild(responseHost);
+
+    this.root.appendChild(aside);
+    this.playground.el = aside;
+    this.playground.editor = textarea;
+    this.playground.responseHost = responseHost;
+    this.playground.runBtn = runBtn;
+    this.playground.resetBtn = resetBtn;
+    this.playground.errorEl = errorEl;
+    this.playground.methodEl = methodEl;
+    this.playground.urlEl = urlEl;
+    return aside;
+  };
+
+  Widget.prototype.openPlayground = function (request) {
+    this.ensurePlaygroundSidebar();
+    if (this.playground.dirty && !window.confirm('Discard your unsaved edits in the API playground?')) {
+      return;
+    }
+    const bodyJson = JSON.stringify(request.body, null, 2);
+    this.playground.current = {
+      tool: request.tool,
+      method: request.method,
+      url: request.url,
+      body: request.body,
+      originalBodyJson: bodyJson,
+    };
+    this.playground.editor.value = bodyJson;
+    this.playground.dirty = false;
+    this.playground.errorEl.hidden = true;
+    this.playground.errorEl.textContent = '';
+    this.playground.responseHost.hidden = true;
+    this.playground.responseHost.innerHTML = '';
+    this.playground.methodEl.textContent = request.method;
+    this.playground.methodEl.className = 'dkan-aiq-playground-method is-' + request.method.toLowerCase();
+    this.playground.urlEl.textContent = request.url;
+    this.root.classList.add('dkan-aiq-widget--with-playground');
+    this.playground.el.setAttribute('aria-hidden', 'false');
+    this.playground.open = true;
+    // Defer focus so the slide-in transition doesn't fight it.
+    setTimeout(() => { this.playground.editor.focus(); }, 50);
+  };
+
+  Widget.prototype.closePlayground = function () {
+    if (!this.playground.el) return;
+    this.root.classList.remove('dkan-aiq-widget--with-playground');
+    this.playground.el.setAttribute('aria-hidden', 'true');
+    this.playground.open = false;
+  };
+
+  Widget.prototype.runPlayground = function () {
+    const cur = this.playground.current;
+    if (!cur) return;
+    const raw = this.playground.editor.value;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    }
+    catch (e) {
+      this.playground.errorEl.hidden = false;
+      this.playground.errorEl.textContent = 'Invalid JSON: ' + e.message;
+      return;
+    }
+    this.playground.errorEl.hidden = true;
+    cur.body = parsed;
+
+    // Defensive cross-origin guard. The url comes from buildApiEquivalent()
+    // which always returns a relative path today, but if a future change
+    // ever produced an absolute URL pointing elsewhere, fetch would still
+    // happily fire and bypass same-origin assumptions about the user's
+    // session cookies.
+    if (/^https?:/i.test(cur.url)) {
+      try {
+        const u = new URL(cur.url);
+        if (u.origin !== window.location.origin) {
+          this.playground.errorEl.hidden = false;
+          this.playground.errorEl.textContent = 'Cross-origin requests are not supported in the playground.';
+          return;
+        }
+      }
+      catch (e) {
+        this.playground.errorEl.hidden = false;
+        this.playground.errorEl.textContent = 'Could not parse request URL: ' + e.message;
+        return;
+      }
+    }
+
+    // For GET requests the editor body is a params object; serialize to a
+    // query string and bake it into the URL so the actual fetch and the
+    // snippet generators (which all show URL verbatim for GET) see the same
+    // thing the user is about to send.
+    let runReq;
+    if (cur.method === 'GET') {
+      const qs = new URLSearchParams();
+      Object.keys(cur.body || {}).forEach((k) => {
+        const v = cur.body[k];
+        if (Array.isArray(v)) {
+          v.forEach((item) => qs.append(k, String(item)));
+        }
+        else if (v != null) {
+          qs.append(k, String(v));
+        }
+      });
+      const qsStr = qs.toString();
+      runReq = { method: 'GET', url: cur.url + (qsStr ? '?' + qsStr : ''), body: cur.body };
+    }
+    else {
+      runReq = { method: cur.method, url: cur.url, body: cur.body };
+    }
+
+    this.playground.runBtn.disabled = true;
+    this.playground.runBtn.textContent = 'Running…';
+    Promise.resolve(this.csrfToken || ensureCsrfToken()).then((tokenOrEmpty) => {
+      const csrfToken = typeof tokenOrEmpty === 'string' ? tokenOrEmpty : '';
+      return runPlaygroundRequest(runReq, csrfToken)
+        .then((result) => {
+          this.playground.responseHost.hidden = false;
+          this.playground.responseHost.innerHTML = '';
+          renderPlaygroundResponse(this, this.playground.responseHost, runReq, result, csrfToken);
+        });
+    }).catch((err) => {
+      this.playground.errorEl.hidden = false;
+      this.playground.errorEl.textContent = 'Playground error: ' + (err && err.message ? err.message : String(err));
+    }).then(() => {
+      this.playground.runBtn.disabled = false;
+      this.playground.runBtn.textContent = 'Run';
+    });
+  };
+
+  /**
+   * Execute a REST request and capture status/headers/body for display.
+   *
+   * Always resolves (never rejects) — network errors come back as
+   * {networkError, durationMs} so the response renderer has one code path.
+   */
+  function runPlaygroundRequest(req, csrfToken) {
+    const headers = { 'Accept': 'application/json' };
+    let bodyText;
+    if (req.method !== 'GET') {
+      headers['Content-Type'] = 'application/json';
+      bodyText = JSON.stringify(req.body);
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
+    }
+    const start = performance.now();
+    return fetch(req.url, {
+      method: req.method,
+      headers: headers,
+      body: bodyText,
+      credentials: 'same-origin',
+    })
+      .then((response) => {
+        const durationMs = Math.round(performance.now() - start);
+        const headerMap = {};
+        response.headers.forEach((v, k) => { headerMap[k] = v; });
+        return response.text().then((text) => {
+          let parsedBody = null;
+          try { parsedBody = JSON.parse(text); }
+          catch (e) { /* leave null; renderer falls back to raw text */ }
+          return {
+            status: response.status,
+            statusText: response.statusText,
+            headers: headerMap,
+            bodyText: text,
+            parsedBody: parsedBody,
+            durationMs: durationMs,
+            networkError: null,
+          };
+        });
+      })
+      .catch((err) => {
+        return {
+          status: null,
+          statusText: null,
+          headers: {},
+          bodyText: '',
+          parsedBody: null,
+          durationMs: Math.round(performance.now() - start),
+          networkError: err && err.message ? err.message : String(err),
+        };
+      });
+  }
+
+  /**
+   * Render a playground request's response into `host`.
+   *
+   * Tabs: Body (pretty JSON, with a 500 KB display cap + Download fallback),
+   * Code (copyable snippet in cURL / HTTPie / Python / JavaScript / PHP),
+   * Headers (key/value list).
+   */
+  function renderPlaygroundResponse(widget, host, request, result, csrfToken) {
+    // Status row.
+    const statusRow = document.createElement('div');
+    statusRow.className = 'dkan-aiq-playground-status-row';
+    const badge = document.createElement('span');
+    badge.className = 'dkan-aiq-playground-status';
+    if (result.networkError) {
+      badge.classList.add('is-error');
+      badge.textContent = 'Network error';
+    }
+    else {
+      const cls = result.status >= 500 ? 'is-5xx' : (result.status >= 400 ? 'is-4xx' : (result.status >= 200 ? 'is-2xx' : 'is-info'));
+      badge.classList.add(cls);
+      badge.textContent = result.status + ' ' + (result.statusText || '');
+    }
+    statusRow.appendChild(badge);
+    const dur = document.createElement('span');
+    dur.className = 'dkan-aiq-playground-duration';
+    dur.textContent = result.durationMs + ' ms';
+    statusRow.appendChild(dur);
+    if (result.status === 403 && !csrfToken) {
+      const hint = document.createElement('span');
+      hint.className = 'dkan-aiq-playground-hint';
+      hint.textContent = 'Tip: this endpoint may require a CSRF token, but the widget could not fetch one.';
+      statusRow.appendChild(hint);
+    }
+    host.appendChild(statusRow);
+
+    // Tab strip.
+    const tabs = document.createElement('div');
+    tabs.className = 'dkan-aiq-playground-tabs';
+    const panel = document.createElement('div');
+    panel.className = 'dkan-aiq-playground-tabpanel';
+    const tabSpecs = [
+      { id: 'body', label: 'Body', render: () => renderPlaygroundBody(result) },
+    ];
+    // Table tab is only added when the response has tabular rows. Handles
+    // both array-shaped results (datastore) and object-shaped results
+    // (/api/1/search keyed by URI). Skipped on errors or non-tabular endpoints.
+    if (extractPlaygroundRows(result.parsedBody).length > 0) {
+      tabSpecs.push({ id: 'table', label: 'Table', render: () => renderPlaygroundTable(result.parsedBody) });
+    }
+    tabSpecs.push({ id: 'code', label: 'Code', render: () => renderPlaygroundCode(widget, request, csrfToken) });
+    tabSpecs.push({ id: 'headers', label: 'Headers', render: () => renderPlaygroundHeaders(result.headers) });
+    tabSpecs.forEach((spec, i) => {
+      const tab = document.createElement('button');
+      tab.type = 'button';
+      tab.className = 'dkan-aiq-playground-tab' + (i === 0 ? ' is-active' : '');
+      tab.textContent = spec.label;
+      tab.addEventListener('click', () => {
+        tabs.querySelectorAll('.dkan-aiq-playground-tab').forEach((t) => t.classList.remove('is-active'));
+        tab.classList.add('is-active');
+        panel.innerHTML = '';
+        panel.appendChild(spec.render());
+      });
+      tabs.appendChild(tab);
+    });
+    host.appendChild(tabs);
+    panel.appendChild(tabSpecs[0].render());
+    host.appendChild(panel);
+  }
+
+  /**
+   * Coerce the response's `results` field into a flat array of row objects.
+   * DKAN's datastore returns an array; /api/1/search returns an object keyed
+   * by dataset URI whose values are the dataset records — both shapes are
+   * "tabular" and we display them the same way.
+   */
+  function extractPlaygroundRows(parsedBody) {
+    if (!parsedBody) return [];
+    const r = parsedBody.results;
+    if (Array.isArray(r)) return r;
+    if (r && typeof r === 'object') return Object.values(r);
+    return [];
+  }
+
+  /**
+   * Render the response's `results` as a plain HTML table. Only invoked when
+   * extractPlaygroundRows returns a non-empty array; the tab itself isn't
+   * added otherwise. Cell truncation matches the bubble tables
+   * (CELL_TRUNCATE_LEN, click to expand).
+   */
+  function renderPlaygroundTable(parsedBody) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dkan-aiq-playground-table-tab';
+
+    const rows = extractPlaygroundRows(parsedBody);
+    if (rows.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'dkan-aiq-playground-empty';
+      empty.textContent = 'No rows in response.';
+      wrap.appendChild(empty);
+      return wrap;
+    }
+
+    // Union of keys across the first ~20 rows so heterogeneous responses
+    // don't lose late-appearing columns.
+    const cols = [];
+    const seen = new Set();
+    rows.slice(0, 20).forEach((r) => {
+      if (r && typeof r === 'object') {
+        Object.keys(r).forEach((k) => {
+          if (!seen.has(k)) { seen.add(k); cols.push(k); }
+        });
+      }
+    });
+
+    const table = document.createElement('table');
+    table.className = 'dkan-aiq-playground-table';
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    cols.forEach((c) => {
+      const th = document.createElement('th');
+      th.textContent = c;
+      trh.appendChild(th);
+    });
+    thead.appendChild(trh);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    rows.forEach((r) => {
+      const tr = document.createElement('tr');
+      cols.forEach((c) => {
+        const td = document.createElement('td');
+        const v = r ? r[c] : '';
+        const text = (v == null) ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+        if (text.length > CELL_TRUNCATE_LEN) {
+          td.textContent = text.slice(0, CELL_TRUNCATE_LEN) + '…';
+          td.classList.add('is-truncated');
+          td.title = 'Click to expand';
+          let expanded = false;
+          td.addEventListener('click', () => {
+            expanded = !expanded;
+            td.textContent = expanded ? text : (text.slice(0, CELL_TRUNCATE_LEN) + '…');
+          });
+        }
+        else {
+          td.textContent = text;
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    const scroll = document.createElement('div');
+    scroll.className = 'dkan-aiq-playground-table-scroll';
+    scroll.appendChild(table);
+    wrap.appendChild(scroll);
+
+    const footer = document.createElement('div');
+    footer.className = 'dkan-aiq-playground-table-footer';
+    const total = parsedBody.count != null ? parsedBody.count
+                : (parsedBody.total != null ? parsedBody.total : null);
+    footer.textContent = total != null
+      ? rows.length + ' of ' + total + ' rows'
+      : rows.length + ' rows';
+    wrap.appendChild(footer);
+
+    return wrap;
+  }
+
+  function renderPlaygroundBody(result) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dkan-aiq-playground-body-tab';
+    if (result.networkError) {
+      const err = document.createElement('div');
+      err.className = 'dkan-aiq-playground-error';
+      err.textContent = result.networkError;
+      wrap.appendChild(err);
+      return wrap;
+    }
+    const fullText = result.parsedBody !== null
+      ? JSON.stringify(result.parsedBody, null, 2)
+      : result.bodyText;
+    const truncated = fullText.length > PLAYGROUND_RESPONSE_DISPLAY_CAP;
+    const display = truncated ? fullText.slice(0, PLAYGROUND_RESPONSE_DISPLAY_CAP) + '\n\n…[truncated]' : fullText;
+    if (result.parsedBody === null && result.bodyText) {
+      const note = document.createElement('div');
+      note.className = 'dkan-aiq-playground-nonjson';
+      note.textContent = '(non-JSON response)';
+      wrap.appendChild(note);
+    }
+    const pre = document.createElement('pre');
+    pre.className = 'dkan-aiq-playground-pre';
+    pre.textContent = display;
+    wrap.appendChild(pre);
+    if (truncated) {
+      const note = document.createElement('div');
+      note.className = 'dkan-aiq-playground-truncated';
+      note.textContent = 'Response truncated for display — use Download to get the full payload.';
+      wrap.appendChild(note);
+      const dl = document.createElement('button');
+      dl.type = 'button';
+      dl.className = 'dkan-aiq-playground-download';
+      dl.textContent = 'Download response';
+      dl.addEventListener('click', () => {
+        const blob = new Blob([fullText], { type: result.parsedBody !== null ? 'application/json' : 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'playground-response-' + Date.now() + (result.parsedBody !== null ? '.json' : '.txt');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+      });
+      wrap.appendChild(dl);
+    }
+    if (result.bodyText) {
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'dkan-aiq-playground-copy';
+      copy.textContent = 'Copy body';
+      copy.addEventListener('click', () => {
+        navigator.clipboard.writeText(fullText).then(() => {
+          copy.textContent = 'Copied!';
+          setTimeout(() => { copy.textContent = 'Copy body'; }, 1500);
+        });
+      });
+      wrap.appendChild(copy);
+    }
+    return wrap;
+  }
+
+  /**
+   * Render the Code tab: a segmented language picker on top, the snippet in
+   * a <pre>, and a Copy button below. Last-picked language persists on the
+   * widget so jumping between bubbles stays on the same language.
+   */
+  function renderPlaygroundCode(widget, request, csrfToken) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dkan-aiq-playground-code-tab';
+
+    const picker = document.createElement('div');
+    picker.className = 'dkan-aiq-playground-lang-picker';
+    picker.setAttribute('role', 'tablist');
+    picker.setAttribute('aria-label', 'Code language');
+
+    const pre = document.createElement('pre');
+    pre.className = 'dkan-aiq-playground-pre';
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'dkan-aiq-playground-copy';
+
+    const langButtons = new Map();
+
+    function paint(langId) {
+      widget.playgroundCodeLang = langId;
+      const lang = PLAYGROUND_CODE_LANGUAGES.find((l) => l.id === langId)
+        || PLAYGROUND_CODE_LANGUAGES[0];
+      const code = buildPlaygroundCodeSnippet(lang.id, request, csrfToken);
+      pre.textContent = code;
+      copy.textContent = lang.copyLabel;
+      copy.dataset.snippet = code;
+      langButtons.forEach((btn, id) => {
+        const active = id === lang.id;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+    }
+
+    PLAYGROUND_CODE_LANGUAGES.forEach((lang) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dkan-aiq-playground-lang-btn';
+      btn.setAttribute('role', 'tab');
+      btn.dataset.lang = lang.id;
+      btn.textContent = lang.label;
+      btn.addEventListener('click', () => paint(lang.id));
+      picker.appendChild(btn);
+      langButtons.set(lang.id, btn);
+    });
+
+    copy.addEventListener('click', () => {
+      const snippet = copy.dataset.snippet || '';
+      const original = copy.textContent;
+      navigator.clipboard.writeText(snippet).then(() => {
+        copy.textContent = 'Copied!';
+        setTimeout(() => { copy.textContent = original; }, 1500);
+      });
+    });
+
+    wrap.appendChild(picker);
+    wrap.appendChild(pre);
+    wrap.appendChild(copy);
+
+    const initial = (widget.playgroundCodeLang
+      && PLAYGROUND_CODE_LANGUAGES.some((l) => l.id === widget.playgroundCodeLang))
+      ? widget.playgroundCodeLang
+      : 'curl';
+    paint(initial);
+
+    return wrap;
+  }
+
+  function renderPlaygroundHeaders(headers) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dkan-aiq-playground-headers-tab';
+    const dl = document.createElement('dl');
+    dl.className = 'dkan-aiq-playground-headers';
+    Object.keys(headers).sort().forEach((k) => {
+      const dt = document.createElement('dt');
+      dt.textContent = k;
+      const dd = document.createElement('dd');
+      dd.textContent = headers[k];
+      dl.appendChild(dt);
+      dl.appendChild(dd);
+    });
+    wrap.appendChild(dl);
+    return wrap;
+  }
+
+  /**
+   * Resolve a playground request URL to an absolute URL so snippets can be
+   * pasted into any environment (cURL, requests, fetch in Node, etc.). The
+   * playground itself fetches with the relative URL; snippets never can.
+   */
+  function playgroundAbsUrl(req) {
+    return /^https?:/i.test(req.url) ? req.url : (window.location.origin + req.url);
+  }
+
+  /**
+   * Compose a multi-line `curl` invocation for the given request.
+   *
+   * Single-quote the body so embedded double quotes survive the shell. Quotes
+   * inside the body are escaped via the standard `'\''` POSIX trick.
+   */
+  function buildCurlCommand(req, csrfToken) {
+    const absUrl = playgroundAbsUrl(req);
+    const lines = ['curl -X ' + req.method + " '" + absUrl + "' \\"];
+    lines.push("  -H 'Accept: application/json' \\");
+    if (req.method !== 'GET') {
+      lines.push("  -H 'Content-Type: application/json' \\");
+      if (csrfToken) {
+        lines.push("  -H 'X-CSRF-Token: " + csrfToken + "' \\");
+      }
+      const bodyJson = JSON.stringify(req.body);
+      const escaped = bodyJson.replace(/'/g, "'\\''");
+      lines.push("  --data-raw '" + escaped + "'");
+    }
+    else {
+      // Drop the trailing backslash from the previous line for GET requests.
+      lines[lines.length - 1] = lines[lines.length - 1].replace(/ \\$/, '');
+    }
+    return lines.join('\n');
+  }
+
+  /**
+   * HTTPie 3.0+ invocation. Header lines use HTTPie's `Name:value` syntax;
+   * the body rides on `--raw=` so it survives intact regardless of nesting.
+   */
+  function buildHttpieCommand(req, csrfToken) {
+    const absUrl = playgroundAbsUrl(req);
+    // Build all body lines first, then join with a trailing-backslash
+    // continuation so the final line never has a stray slash. Avoids the
+    // contortion of conditionally appending " \\" on every push.
+    const parts = ["http " + req.method + " '" + absUrl + "'"];
+    parts.push("  Accept:application/json");
+    if (req.method !== 'GET') {
+      parts.push("  Content-Type:application/json");
+      if (csrfToken) {
+        parts.push("  X-CSRF-Token:" + csrfToken);
+      }
+      const bodyJson = JSON.stringify(req.body);
+      const escaped = bodyJson.replace(/'/g, "'\\''");
+      parts.push("  --raw='" + escaped + "'");
+    }
+    return parts.join(' \\\n');
+  }
+
+  /**
+   * Python `requests` snippet. Body is emitted as a triple-quoted JSON string
+   * (rather than translated to a dict literal) — keeps booleans, nulls, and
+   * nested structures byte-identical to what the playground actually sends.
+   */
+  function buildPythonRequestsCode(req, csrfToken) {
+    const absUrl = playgroundAbsUrl(req);
+    const out = ['import requests', ''];
+    out.push('url = "' + absUrl + '"');
+    const headerLines = ['    "Accept": "application/json",'];
+    if (req.method !== 'GET') {
+      headerLines.push('    "Content-Type": "application/json",');
+      if (csrfToken) {
+        headerLines.push('    "X-CSRF-Token": "' + csrfToken + '",');
+      }
+    }
+    out.push('headers = {');
+    out.push.apply(out, headerLines);
+    out.push('}');
+    if (req.method !== 'GET') {
+      // Triple-quoted string keeps embedded " from JSON safe. JSON cannot
+      // contain unescaped """ so the literal is unambiguous in practice.
+      const bodyPretty = JSON.stringify(req.body, null, 2);
+      out.push('body = """' + bodyPretty + '"""');
+      out.push('');
+      out.push('response = requests.' + req.method.toLowerCase() + '(url, headers=headers, data=body)');
+    }
+    else {
+      out.push('');
+      out.push('response = requests.get(url, headers=headers)');
+    }
+    out.push('print(response.status_code)');
+    out.push('print(response.json())');
+    return out.join('\n');
+  }
+
+  /**
+   * JavaScript `fetch` snippet. The body is inlined as a JS object literal
+   * (JSON is a strict subset of JS object syntax for our cases) and wrapped
+   * in `JSON.stringify` so the wire format is identical to what the playground
+   * actually sends.
+   */
+  function buildJavaScriptFetchCode(req, csrfToken) {
+    const absUrl = playgroundAbsUrl(req);
+    const out = [];
+    out.push("const response = await fetch('" + absUrl + "', {");
+    out.push("  method: '" + req.method + "',");
+    out.push("  credentials: 'same-origin',");
+    out.push("  headers: {");
+    out.push("    'Accept': 'application/json',");
+    if (req.method !== 'GET') {
+      out.push("    'Content-Type': 'application/json',");
+      if (csrfToken) {
+        out.push("    'X-CSRF-Token': '" + csrfToken + "',");
+      }
+    }
+    out.push("  },");
+    if (req.method !== 'GET') {
+      const bodyJson = JSON.stringify(req.body);
+      out.push("  body: JSON.stringify(" + bodyJson + "),");
+    }
+    out.push("});");
+    out.push("const data = await response.json();");
+    out.push("console.log(data);");
+    return out.join('\n');
+  }
+
+  /**
+   * PHP cURL snippet. Body is emitted as a single-quoted PHP string with
+   * `\` and `'` escaped — JSON-escaped Unicode (\uXXXX) contains backslashes
+   * so the `\\` escape matters even when the body looks innocuous.
+   */
+  function buildPhpCurlCode(req, csrfToken) {
+    const absUrl = playgroundAbsUrl(req);
+    const out = [];
+    out.push("$ch = curl_init('" + absUrl + "');");
+    out.push("curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);");
+    if (req.method !== 'GET') {
+      if (req.method === 'POST') {
+        out.push("curl_setopt($ch, CURLOPT_POST, true);");
+      }
+      else {
+        out.push("curl_setopt($ch, CURLOPT_CUSTOMREQUEST, '" + req.method + "');");
+      }
+      const bodyJson = JSON.stringify(req.body);
+      const phpEscaped = bodyJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      out.push("curl_setopt($ch, CURLOPT_POSTFIELDS, '" + phpEscaped + "');");
+    }
+    out.push("curl_setopt($ch, CURLOPT_HTTPHEADER, [");
+    out.push("    'Accept: application/json',");
+    if (req.method !== 'GET') {
+      out.push("    'Content-Type: application/json',");
+      if (csrfToken) {
+        out.push("    'X-CSRF-Token: " + csrfToken + "',");
+      }
+    }
+    out.push("]);");
+    out.push("$response = curl_exec($ch);");
+    out.push("$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);");
+    out.push("curl_close($ch);");
+    out.push('echo $status . "\\n" . $response;');
+    return out.join('\n');
+  }
+
+  /**
+   * Dispatcher used by the Code tab to pick a generator by language id.
+   * Falls back to cURL for unknown ids so a stale `playgroundCodeLang` from
+   * a future build doesn't break the panel.
+   */
+  function buildPlaygroundCodeSnippet(lang, req, csrfToken) {
+    switch (lang) {
+      case 'httpie': return buildHttpieCommand(req, csrfToken);
+      case 'python': return buildPythonRequestsCode(req, csrfToken);
+      case 'js':     return buildJavaScriptFetchCode(req, csrfToken);
+      case 'php':    return buildPhpCurlCode(req, csrfToken);
+      case 'curl':
+      default:       return buildCurlCommand(req, csrfToken);
+    }
+  }
 
   Widget.prototype.debugReset = function () {
     if (this.dom.debugLog) {
