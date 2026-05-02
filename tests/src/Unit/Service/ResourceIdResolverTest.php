@@ -125,6 +125,47 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertArrayHasKey('error', $result);
   }
 
+  public function testResolveToDatasetUuidFromUuid(): void {
+    $datasets = [
+      ['identifier' => 'aaaa-1111', 'title' => 'Alpha'],
+      ['identifier' => 'bbbb-2222', 'title' => 'Beta'],
+    ];
+    $resolver = new ResourceIdResolver(
+      $this->buildMetastore($datasets),
+      $this->buildDatastore([]),
+    );
+    $this->assertEquals('bbbb-2222', $resolver->resolveToDatasetUuid('bbbb-2222'));
+  }
+
+  public function testResolveToDatasetUuidFromResourceId(): void {
+    $datasets = [['identifier' => 'd1', 'title' => 'Crime']];
+    $distributions = ['d1' => [['resource_id' => 'rid__1', 'identifier' => 'dist1']]];
+    $resolver = new ResourceIdResolver(
+      $this->buildMetastore($datasets, $distributions),
+      $this->buildDatastore(['rid__1' => 'done']),
+    );
+    $this->assertEquals('d1', $resolver->resolveToDatasetUuid('rid__1'));
+  }
+
+  public function testResolveToDatasetUuidFromTitle(): void {
+    $datasets = [['identifier' => 'd1', 'title' => 'Shark Tagging']];
+    $distributions = ['d1' => [['resource_id' => 'rid__1', 'identifier' => 'dist1']]];
+    $resolver = new ResourceIdResolver(
+      $this->buildMetastore($datasets, $distributions),
+      $this->buildDatastore(['rid__1' => 'done']),
+    );
+    $this->assertEquals('d1', $resolver->resolveToDatasetUuid('shark'));
+  }
+
+  public function testResolveToDatasetUuidReturnsNullOnMiss(): void {
+    $resolver = new ResourceIdResolver(
+      $this->buildMetastore([]),
+      $this->buildDatastore([]),
+    );
+    $this->assertNull($resolver->resolveToDatasetUuid('no-such-id'));
+    $this->assertNull($resolver->resolveToDatasetUuid('nope__123'));
+  }
+
   public function testLoggerWarningOnMaxDatasetsCap(): void {
     // Pretend the catalog is huge by reporting a total beyond the cap.
     $datasets = [];

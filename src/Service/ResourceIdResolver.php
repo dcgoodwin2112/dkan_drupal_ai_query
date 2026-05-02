@@ -153,6 +153,39 @@ class ResourceIdResolver {
   }
 
   /**
+   * Resolve any input form (UUID, resource_id, title) to a dataset UUID.
+   *
+   * Lets ID-taking tools accept the same fuzzy formats the datastore tools
+   * already do, so the LLM never has to remember which tool wants which
+   * identifier flavor. Order:
+   * 1. Direct dataset-UUID match against the catalog.
+   * 2. resource_id (`{hash}__{version}`) — resolved through resolve() and
+   *    mapped back to its parent dataset.
+   * 3. Fuzzy title substring match.
+   *
+   * @return string|null
+   *   The dataset UUID, or NULL if no match.
+   */
+  public function resolveToDatasetUuid(string $input): ?string {
+    foreach ($this->getAllDatasets() as $ds) {
+      if (($ds['identifier'] ?? '') === $input) {
+        return $input;
+      }
+    }
+    if (str_contains($input, '__')) {
+      $resolved = $this->resolve($input);
+      if ($resolved !== NULL) {
+        return $this->resolveDatasetUuid($resolved);
+      }
+    }
+    $result = $this->findDatasetResources($input);
+    if (!isset($result['error'])) {
+      return $result['dataset_id'] ?? NULL;
+    }
+    return NULL;
+  }
+
+  /**
    * Find a dataset by partial title and return its distributions.
    */
   public function findDatasetResources(string $title): array {
