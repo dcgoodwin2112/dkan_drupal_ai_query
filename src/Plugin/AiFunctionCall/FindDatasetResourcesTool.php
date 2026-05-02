@@ -58,10 +58,7 @@ class FindDatasetResourcesTool extends FunctionCallBase implements ExecutableFun
   public function execute() {
     $result = $this->resolver->findDatasetResources((string) $this->getContextValue('title'));
     if (isset($result['dataset_id'])) {
-      $caveats = $this->caveats->getCaveats($result['dataset_id']);
-      if ($caveats) {
-        $result['caveats'] = $caveats;
-      }
+      $result = $this->caveats->attach($result, $result['dataset_id']);
     }
     $this->setOutput(json_encode($result, JSON_UNESCAPED_SLASHES));
   }
