@@ -9,6 +9,7 @@ use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\ai_agents\PluginManager\AiAgentManager;
 use Drupal\ai_agents\Task\Task;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
+use Drupal\dkan_drupal_ai_query\Service\CatalogContextBuilder;
 use Drupal\dkan_drupal_ai_query\Service\EvalToolCallCollector;
 use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
 use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
@@ -41,6 +42,7 @@ class EvalRunner {
     protected SystemPromptLoader $promptLoader,
     protected UnknownColumnCounter $unknownColumnCounter,
     protected EvalToolCallCollector $toolCalls,
+    protected CatalogContextBuilder $catalogContext,
   ) {}
 
   /**
@@ -103,7 +105,15 @@ class EvalRunner {
     try {
       $provider = $this->providerManager->createInstance($providerId);
       $agent = $this->agentManager->createInstance('dkan_data_query');
-      $agent->setTask(new Task($case->question));
+      // Mirror NlQueryController: prepend the catalog block so the agent
+      // sees the same pre-seeded context the production endpoint hands it.
+      // Without this, eval results diverge from production (Bundle 2's
+      // catalog inlining is invisible to the runner).
+      $catalog = $this->catalogContext->build();
+      $taskText = $catalog !== ''
+        ? $catalog . "\n\n" . $case->question
+        : $case->question;
+      $agent->setTask(new Task($taskText));
       $agent->setAiProvider($provider);
       $agent->setModelName($modelId);
       $agent->setAiConfiguration(['temperature' => 0]);
