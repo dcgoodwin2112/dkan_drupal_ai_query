@@ -137,3 +137,4 @@ services:
       - '@dkan_drupal_ai_query.system_prompt_loader'
       - '@dkan_drupal_ai_query.unknown_column_counter'
       - '@dkan_drupal_ai_query.eval.tool_call_collector'
+      - '@dkan_drupal_ai_query.catalog_context_builder'
