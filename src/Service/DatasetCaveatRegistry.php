@@ -61,6 +61,33 @@ class DatasetCaveatRegistry {
   }
 
   /**
+   * Merge a dataset's caveats into a tool response payload.
+   *
+   * Lets ID-taking tools (find_dataset_resources, list_distributions, …)
+   * surface the same compliance / coverage warnings without each one
+   * reimplementing the lookup-and-merge predicate. Empty caveat records
+   * (a saved entity with all fields blank) are intentionally NOT
+   * attached — the agent gains nothing from a `caveats: []` key, and we
+   * want to preserve the registry's "no record" / "blank record"
+   * distinction at the read API, not leak it into every tool's output.
+   *
+   * @param array $payload
+   *   The tool's response array.
+   * @param string $datasetUuid
+   *   The dataset whose caveats to attach.
+   *
+   * @return array
+   *   The payload, with a `caveats` key added if a populated record exists.
+   */
+  public function attach(array $payload, string $datasetUuid): array {
+    $caveats = $this->getCaveats($datasetUuid);
+    if ($caveats) {
+      $payload['caveats'] = $caveats;
+    }
+    return $payload;
+  }
+
+  /**
    * Return the list of dataset UUIDs that have caveat records.
    *
    * @return string[]
