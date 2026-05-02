@@ -42,6 +42,10 @@
   // freeze the browser by stuffing 50 MB into a single <pre>.
   const PLAYGROUND_RESPONSE_DISPLAY_CAP = 500 * 1024;
 
+  // Cap on per-widget run history. Five gives users enough to flip back
+  // through a recent iteration cycle without dominating the sidebar.
+  const PLAYGROUND_HISTORY_CAP = 5;
+
   // Languages offered in the playground's Code tab. cURL stays first as the
   // universal baseline; the rest are ordered by rough usage frequency among
   // DKAN's data-integration audience.
@@ -238,9 +242,13 @@
       responseHost: null,
       runBtn: null,
       resetBtn: null,
+      openTabBtn: null,
       errorEl: null,
       methodEl: null,
       urlEl: null,
+      historyEl: null,
+      historyListEl: null,
+      historySummaryEl: null,
       current: null,
       dirty: false,
     };
@@ -250,6 +258,11 @@
     // across page reloads. Lives on the Widget root (not nested in
     // this.playground) so it survives if that state is ever reset.
     this.playgroundCodeLang = 'curl';
+
+    // Last N runs in the playground, LRU. Persists across playground
+    // close/reopen within this widget instance only — not across page
+    // reloads. Each entry: {request, result, csrfToken, timestamp}.
+    this.playgroundHistory = [];
 
     this.dom = {
       sidebar: root.querySelector('.dkan-aiq-sidebar'),
@@ -2229,6 +2242,17 @@
     });
     actions.appendChild(runBtn);
     actions.appendChild(resetBtn);
+    // Open-URL button: GET requests can be re-issued from a new browser tab
+    // (handy for sharing, bookmarking, or running outside the playground).
+    // Hidden for POST since browsers can't address-bar-submit a body.
+    const openTabBtn = document.createElement('button');
+    openTabBtn.type = 'button';
+    openTabBtn.className = 'dkan-aiq-playground-open-tab';
+    openTabBtn.textContent = 'Open URL ↗';
+    openTabBtn.title = 'Open this GET request in a new browser tab';
+    openTabBtn.hidden = true;
+    openTabBtn.addEventListener('click', () => { this.openPlaygroundInNewTab(); });
+    actions.appendChild(openTabBtn);
     const errorEl = document.createElement('div');
     errorEl.className = 'dkan-aiq-playground-error';
     errorEl.hidden = true;
@@ -2237,6 +2261,20 @@
     editorWrap.appendChild(actions);
     editorWrap.appendChild(errorEl);
     aside.appendChild(editorWrap);
+
+    // History dropdown — hidden until the first run. Click an entry to
+    // restore body + cached response without re-fetching.
+    const historyWrap = document.createElement('details');
+    historyWrap.className = 'dkan-aiq-playground-history';
+    historyWrap.hidden = true;
+    const historySummary = document.createElement('summary');
+    historySummary.className = 'dkan-aiq-playground-history-summary';
+    historySummary.textContent = 'Recent runs';
+    historyWrap.appendChild(historySummary);
+    const historyList = document.createElement('ol');
+    historyList.className = 'dkan-aiq-playground-history-list';
+    historyWrap.appendChild(historyList);
+    aside.appendChild(historyWrap);
 
     // Response area — populated by renderPlaygroundResponse on each Run.
     const responseHost = document.createElement('div');
@@ -2250,9 +2288,16 @@
     this.playground.responseHost = responseHost;
     this.playground.runBtn = runBtn;
     this.playground.resetBtn = resetBtn;
+    this.playground.openTabBtn = openTabBtn;
     this.playground.errorEl = errorEl;
     this.playground.methodEl = methodEl;
     this.playground.urlEl = urlEl;
+    this.playground.historyEl = historyWrap;
+    this.playground.historyListEl = historyList;
+    this.playground.historySummaryEl = historySummary;
+    // History UI may already be populated from a previous open in the same
+    // widget instance — render it now so re-opening preserves the dropdown.
+    this.refreshPlaygroundHistoryUI();
     return aside;
   };
 
@@ -2278,6 +2323,7 @@
     this.playground.methodEl.textContent = request.method;
     this.playground.methodEl.className = 'dkan-aiq-playground-method is-' + request.method.toLowerCase();
     this.playground.urlEl.textContent = request.url;
+    this.playground.openTabBtn.hidden = (request.method !== 'GET');
     this.root.classList.add('dkan-aiq-widget--with-playground');
     this.playground.el.setAttribute('aria-hidden', 'false');
     this.playground.open = true;
@@ -2335,17 +2381,7 @@
     // thing the user is about to send.
     let runReq;
     if (cur.method === 'GET') {
-      const qs = new URLSearchParams();
-      Object.keys(cur.body || {}).forEach((k) => {
-        const v = cur.body[k];
-        if (Array.isArray(v)) {
-          v.forEach((item) => qs.append(k, String(item)));
-        }
-        else if (v != null) {
-          qs.append(k, String(v));
-        }
-      });
-      const qsStr = qs.toString();
+      const qsStr = paramsToQueryString(cur.body);
       runReq = { method: 'GET', url: cur.url + (qsStr ? '?' + qsStr : ''), body: cur.body };
     }
     else {
@@ -2361,6 +2397,7 @@
           this.playground.responseHost.hidden = false;
           this.playground.responseHost.innerHTML = '';
           renderPlaygroundResponse(this, this.playground.responseHost, runReq, result, csrfToken);
+          this.recordPlaygroundRun(runReq, result, csrfToken);
         });
     }).catch((err) => {
       this.playground.errorEl.hidden = false;
@@ -2369,6 +2406,183 @@
       this.playground.runBtn.disabled = false;
       this.playground.runBtn.textContent = 'Run';
     });
+  };
+
+  /**
+   * Open the current GET request in a new browser tab. Reads the editor
+   * body, validates it as JSON (same inline-error path as Run), serializes
+   * to a query string with the shared encoder, and opens the absolute URL
+   * with noopener/noreferrer. No-op for POST.
+   */
+  Widget.prototype.openPlaygroundInNewTab = function () {
+    const cur = this.playground.current;
+    if (!cur || cur.method !== 'GET') return;
+    let parsed;
+    try {
+      parsed = JSON.parse(this.playground.editor.value);
+    }
+    catch (e) {
+      this.playground.errorEl.hidden = false;
+      this.playground.errorEl.textContent = 'Invalid JSON: ' + e.message;
+      return;
+    }
+    this.playground.errorEl.hidden = true;
+    const qsStr = paramsToQueryString(parsed);
+    const fullUrl = cur.url + (qsStr ? '?' + qsStr : '');
+    // Promote to absolute so window.open behaves identically regardless of
+    // the page's base href; same-origin by construction.
+    const absUrl = /^https?:/i.test(fullUrl) ? fullUrl : (window.location.origin + fullUrl);
+    window.open(absUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  /**
+   * Serialize an object of {key: value | array} into a URL query string.
+   * Shared by runPlayground (for GET fetches) and openPlaygroundInNewTab
+   * (for new-tab URL composition) so encoding is identical in both paths.
+   */
+  function paramsToQueryString(obj) {
+    const qs = new URLSearchParams();
+    Object.keys(obj || {}).forEach((k) => {
+      const v = obj[k];
+      if (Array.isArray(v)) {
+        v.forEach((item) => qs.append(k, String(item)));
+      }
+      else if (v != null) {
+        qs.append(k, String(v));
+      }
+    });
+    return qs.toString();
+  }
+
+  /**
+   * Map a playground response result to its status badge CSS class.
+   * Network errors get is-error, 2xx is-2xx, 4xx is-4xx, 5xx is-5xx,
+   * everything else (1xx/3xx) is-info.
+   */
+  function statusClassFor(result) {
+    if (result.networkError) return 'is-error';
+    if (result.status >= 500) return 'is-5xx';
+    if (result.status >= 400) return 'is-4xx';
+    if (result.status >= 200) return 'is-2xx';
+    return 'is-info';
+  }
+
+  /**
+   * Shorten a URL for the history dropdown. Strips a leading /api/1/ and any
+   * query string; falls back to the last path segment if still too long.
+   * Cap is generous (~48 chars) since the dropdown row has a generous
+   * 1fr column.
+   */
+  function shortenUrl(url) {
+    let u = url.split('?')[0];
+    u = u.replace(/^\/api\/1\//, '');
+    if (u.length > 48) {
+      const segs = u.split('/');
+      u = '…/' + segs[segs.length - 1];
+    }
+    return u;
+  }
+
+  /**
+   * Format a millisecond timestamp as "Ns ago" / "Nm ago" / "Nh ago".
+   * Caps at hours; the playground state doesn't survive longer than a
+   * session anyway.
+   */
+  function formatTimeAgo(ts) {
+    const sec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (sec < 5) return 'just now';
+    if (sec < 60) return sec + 's ago';
+    const min = Math.floor(sec / 60);
+    if (min < 60) return min + 'm ago';
+    const hr = Math.floor(min / 60);
+    return hr + 'h ago';
+  }
+
+  /**
+   * Record a completed playground run into the per-instance history. The
+   * UI is refreshed so the dropdown reflects the new entry. LRU-trimmed
+   * to PLAYGROUND_HISTORY_CAP.
+   */
+  Widget.prototype.recordPlaygroundRun = function (request, result, csrfToken) {
+    this.playgroundHistory.unshift({
+      request: { method: request.method, url: request.url, body: request.body },
+      result: result,
+      csrfToken: csrfToken,
+      timestamp: Date.now(),
+    });
+    if (this.playgroundHistory.length > PLAYGROUND_HISTORY_CAP) {
+      this.playgroundHistory.length = PLAYGROUND_HISTORY_CAP;
+    }
+    this.refreshPlaygroundHistoryUI();
+  };
+
+  /**
+   * Rebuild the history dropdown from this.playgroundHistory. Hides the
+   * <details> when empty so the sidebar doesn't show an inert affordance.
+   */
+  Widget.prototype.refreshPlaygroundHistoryUI = function () {
+    if (!this.playground.historyEl) return;
+    const list = this.playground.historyListEl;
+    list.innerHTML = '';
+    if (this.playgroundHistory.length === 0) {
+      this.playground.historyEl.hidden = true;
+      return;
+    }
+    this.playground.historyEl.hidden = false;
+    this.playground.historySummaryEl.textContent = 'Recent runs (' + this.playgroundHistory.length + ')';
+    this.playgroundHistory.forEach((entry) => {
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dkan-aiq-playground-history-item';
+      const status = document.createElement('span');
+      status.className = 'dkan-aiq-playground-history-status ' + statusClassFor(entry.result);
+      status.textContent = entry.result.networkError ? 'ERR' : String(entry.result.status);
+      btn.appendChild(status);
+      const endpoint = document.createElement('span');
+      endpoint.className = 'dkan-aiq-playground-history-endpoint';
+      endpoint.textContent = entry.request.method + ' ' + shortenUrl(entry.request.url);
+      btn.appendChild(endpoint);
+      const dur = document.createElement('span');
+      dur.className = 'dkan-aiq-playground-history-dur';
+      dur.textContent = entry.result.durationMs + 'ms';
+      btn.appendChild(dur);
+      const ago = document.createElement('span');
+      ago.className = 'dkan-aiq-playground-history-ago';
+      ago.textContent = formatTimeAgo(entry.timestamp);
+      btn.appendChild(ago);
+      btn.addEventListener('click', () => this.restorePlaygroundRun(entry));
+      li.appendChild(btn);
+      list.appendChild(li);
+    });
+  };
+
+  /**
+   * Load a historical entry's request + response back into the playground
+   * without re-fetching. Updates the editor, header, response area, and
+   * Open-URL button visibility; clears the dirty flag because we're loading
+   * a known state.
+   */
+  Widget.prototype.restorePlaygroundRun = function (entry) {
+    const bodyJson = JSON.stringify(entry.request.body, null, 2);
+    this.playground.current = {
+      method: entry.request.method,
+      url: entry.request.url.split('?')[0],
+      body: entry.request.body,
+      originalBodyJson: bodyJson,
+    };
+    this.playground.editor.value = bodyJson;
+    this.playground.dirty = false;
+    this.playground.errorEl.hidden = true;
+    this.playground.methodEl.textContent = entry.request.method;
+    this.playground.methodEl.className = 'dkan-aiq-playground-method is-' + entry.request.method.toLowerCase();
+    this.playground.urlEl.textContent = this.playground.current.url;
+    if (this.playground.openTabBtn) {
+      this.playground.openTabBtn.hidden = (entry.request.method !== 'GET');
+    }
+    this.playground.responseHost.hidden = false;
+    this.playground.responseHost.innerHTML = '';
+    renderPlaygroundResponse(this, this.playground.responseHost, entry.request, entry.result, entry.csrfToken);
   };
 
   /**

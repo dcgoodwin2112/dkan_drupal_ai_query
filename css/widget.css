@@ -1683,6 +1683,21 @@
   border-color: #94a3b8;
 }
 
+.dkan-aiq-playground-open-tab {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: #fff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dkan-aiq-playground-open-tab:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
 .dkan-aiq-playground-error {
   font-size: 12px;
   color: #b91c1c;
@@ -1960,4 +1975,107 @@
   color: #1e293b;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   word-break: break-all;
+}
+
+/* Run history dropdown — sits between editor and response, hidden until
+ * the first run records an entry. Uses native <details>/<summary> so
+ * keyboard + screen-reader interaction is free. */
+.dkan-aiq-playground-history {
+  margin-top: 4px;
+  padding: 6px 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.dkan-aiq-playground-history[hidden] {
+  display: none;
+}
+
+.dkan-aiq-playground-history-summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: #6b7280;
+  padding: 2px 0;
+  user-select: none;
+}
+
+.dkan-aiq-playground-history-summary:hover {
+  color: #374151;
+}
+
+.dkan-aiq-playground-history-list {
+  list-style: none;
+  margin: 4px 0 0 0;
+  padding: 0;
+}
+
+.dkan-aiq-playground-history-list li {
+  margin: 0;
+}
+
+.dkan-aiq-playground-history-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 4px 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  color: #374151;
+  text-align: left;
+}
+
+.dkan-aiq-playground-history-item:hover {
+  background: #f3f4f6;
+}
+
+.dkan-aiq-playground-history-status {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.dkan-aiq-playground-history-status.is-2xx {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.dkan-aiq-playground-history-status.is-4xx {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dkan-aiq-playground-history-status.is-5xx {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.dkan-aiq-playground-history-status.is-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.dkan-aiq-playground-history-status.is-info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.dkan-aiq-playground-history-endpoint {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.dkan-aiq-playground-history-dur,
+.dkan-aiq-playground-history-ago {
+  color: #9ca3af;
+  font-size: 10px;
 }
