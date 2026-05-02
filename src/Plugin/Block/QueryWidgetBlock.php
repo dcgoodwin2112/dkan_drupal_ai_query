@@ -147,6 +147,7 @@ class QueryWidgetBlock extends BlockBase implements ContainerFactoryPluginInterf
             'showCopyButtons' => $config->get('show_copy_buttons') ?? TRUE,
             'showSimpleTableArtifacts' => $config->get('show_simple_table_artifacts') ?? TRUE,
             'showAuxToolCalls' => $config->get('show_aux_tool_calls') ?? FALSE,
+            'showRestPlaygroundSidebar' => $config->get('show_rest_playground_sidebar') ?? FALSE,
             'showMethodSummary' => $config->get('show_method_summary') ?? TRUE,
             'userAuthenticated' => $this->currentUser->isAuthenticated(),
           ],

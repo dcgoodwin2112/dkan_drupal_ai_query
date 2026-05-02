@@ -67,6 +67,12 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
       'columns' => ['dataset_title', 'resource_id', 'column_name', 'column_type', 'matched_in'],
       'reshape' => NULL,
     ],
+    'search_datasets' => [
+      'rows_key' => 'results',
+      'count_key' => 'total',
+      'columns' => ['identifier', 'title', 'description', 'distributions'],
+      'reshape' => NULL,
+    ],
     'list_datasets' => [
       'rows_key' => 'datasets',
       'count_key' => 'total',
@@ -405,7 +411,7 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
     // small lets the UI still surface "what was queried" without dragging
     // in the query_datastore preview panels.
     $input = [];
-    foreach (['resource_id', 'column', 'query', 'keyword', 'limit', 'dataset_id'] as $contextName) {
+    foreach (['resource_id', 'column', 'query', 'keyword', 'limit', 'dataset_id', 'page', 'page_size'] as $contextName) {
       try {
         $value = $tool->getContextValue($contextName);
       }
