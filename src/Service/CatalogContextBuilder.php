@@ -26,6 +26,16 @@ class CatalogContextBuilder {
    */
   protected const MAX_LIST = 50;
 
+  /**
+   * Cap on per-build resource_id inlining lookups.
+   *
+   * Each single-distribution dataset costs one extra listDistributions() call
+   * on cache miss. Capping protects the build from pathological catalogs
+   * (e.g. 50 single-dist datasets = 50 extra calls every hour). Datasets
+   * past the cap still appear in the listing without their resource_id.
+   */
+  protected const MAX_RESOURCE_INLINE = 25;
+
   protected const CID = 'dkan_drupal_ai_query:catalog_context';
   protected const TTL_SECONDS = 3600;
 
@@ -55,14 +65,27 @@ class CatalogContextBuilder {
     $total = (int) ($result['total'] ?? count($datasets));
     $shown = array_slice($datasets, 0, self::MAX_LIST);
 
-    $lines = ['Available datasets in this catalog (use these titles in prose, these UUIDs in tool calls):'];
+    $lines = ['Available datasets in this catalog (use these titles in prose, the UUID for dataset-scoped tools, the resource_id (when shown) for datastore tools):'];
+    $inlined = 0;
     foreach ($shown as $d) {
       $title = $d['title'] ?? '(untitled)';
       $uuid = $d['identifier'] ?? '';
       if ($uuid === '') {
         continue;
       }
-      $lines[] = '- "' . $title . '" — ' . $uuid;
+      $distCount = (int) ($d['distributions'] ?? 0);
+      $suffix = '';
+      if ($distCount === 1 && $inlined < self::MAX_RESOURCE_INLINE) {
+        $resourceId = $this->lookupSingleResourceId($uuid);
+        if ($resourceId !== NULL) {
+          $suffix = ' (data: ' . $resourceId . ')';
+          $inlined++;
+        }
+      }
+      elseif ($distCount > 1) {
+        $suffix = ' (' . $distCount . ' data files)';
+      }
+      $lines[] = '- "' . $title . '" — ' . $uuid . $suffix;
     }
     if ($total > self::MAX_LIST) {
       $lines[] = '- (' . ($total - self::MAX_LIST) . ' more not shown — use search_datasets to find them)';
@@ -78,6 +101,28 @@ class CatalogContextBuilder {
    */
   public function invalidate(): void {
     $this->cache->delete(self::CID);
+  }
+
+  /**
+   * Fetch the resource_id of a dataset's lone distribution, or NULL on miss.
+   *
+   * Failures (no distributions array, no resource_id derivable, error response,
+   * exception) all collapse to NULL so the catalog line falls back to the
+   * plain `title — uuid` shape.
+   */
+  protected function lookupSingleResourceId(string $datasetUuid): ?string {
+    try {
+      $result = $this->metastore->listDistributions($datasetUuid);
+    }
+    catch (\Throwable) {
+      return NULL;
+    }
+    $distributions = $result['distributions'] ?? [];
+    if (!$distributions) {
+      return NULL;
+    }
+    $resourceId = $distributions[0]['resource_id'] ?? NULL;
+    return is_string($resourceId) && $resourceId !== '' ? $resourceId : NULL;
   }
 
 }

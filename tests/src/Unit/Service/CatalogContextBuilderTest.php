@@ -31,7 +31,7 @@ class CatalogContextBuilderTest extends TestCase {
     return $cache;
   }
 
-  protected function buildMetastore(array $datasets, ?int $totalOverride = NULL): MetastoreTools {
+  protected function buildMetastore(array $datasets, ?int $totalOverride = NULL, array $distributionsByUuid = []): MetastoreTools {
     $metastore = $this->createMock(MetastoreTools::class);
     $metastore->method('listDatasets')->willReturnCallback(function (int $offset, int $limit) use ($datasets, $totalOverride) {
       $page = array_slice($datasets, $offset, $limit);
@@ -41,6 +41,16 @@ class CatalogContextBuilderTest extends TestCase {
         'offset' => $offset,
         'limit' => $limit,
       ];
+    });
+    $metastore->method('listDistributions')->willReturnCallback(function (string $uuid) use ($distributionsByUuid) {
+      if (!array_key_exists($uuid, $distributionsByUuid)) {
+        return ['distributions' => []];
+      }
+      $val = $distributionsByUuid[$uuid];
+      if ($val instanceof \Throwable) {
+        throw $val;
+      }
+      return ['distributions' => $val];
     });
     return $metastore;
   }
@@ -124,6 +134,106 @@ class CatalogContextBuilderTest extends TestCase {
     $out = $builder->build();
     $this->assertStringNotContainsString('No UUID', $out);
     $this->assertStringContainsString('Has UUID', $out);
+  }
+
+  public function testInlinesResourceIdForSingleDistributionDatasets(): void {
+    $builder = new CatalogContextBuilder(
+      $this->buildMetastore(
+        [
+          ['identifier' => 'uuid-1', 'title' => 'Crime Data', 'distributions' => 1],
+        ],
+        NULL,
+        [
+          'uuid-1' => [
+            ['resource_id' => 'rid-abc__1', 'identifier' => 'dist-uuid-1'],
+          ],
+        ],
+      ),
+      $this->buildCache(),
+    );
+    $out = $builder->build();
+    $this->assertStringContainsString('"Crime Data" — uuid-1 (data: rid-abc__1)', $out);
+  }
+
+  public function testShowsDistributionCountForMultiDistDatasets(): void {
+    $builder = new CatalogContextBuilder(
+      $this->buildMetastore([
+        ['identifier' => 'uuid-2', 'title' => 'Multi Set', 'distributions' => 3],
+      ]),
+      $this->buildCache(),
+    );
+    $out = $builder->build();
+    $this->assertStringContainsString('"Multi Set" — uuid-2 (3 data files)', $out);
+    $this->assertStringNotContainsString('data: ', $out);
+  }
+
+  public function testFallsBackToPlainLineWhenLookupReturnsNoResourceId(): void {
+    $builder = new CatalogContextBuilder(
+      $this->buildMetastore(
+        [
+          ['identifier' => 'uuid-1', 'title' => 'Empty Dist', 'distributions' => 1],
+        ],
+        NULL,
+        // listDistributions returns an entry but resource_id is null.
+        ['uuid-1' => [['resource_id' => NULL]]],
+      ),
+      $this->buildCache(),
+    );
+    $out = $builder->build();
+    $this->assertStringContainsString('"Empty Dist" — uuid-1', $out);
+    $this->assertStringNotContainsString('(data:', $out);
+  }
+
+  public function testFallsBackToPlainLineWhenListDistributionsThrows(): void {
+    $builder = new CatalogContextBuilder(
+      $this->buildMetastore(
+        [
+          ['identifier' => 'uuid-1', 'title' => 'Boom', 'distributions' => 1],
+        ],
+        NULL,
+        ['uuid-1' => new \RuntimeException('storage down')],
+      ),
+      $this->buildCache(),
+    );
+    $out = $builder->build();
+    $this->assertStringContainsString('"Boom" — uuid-1', $out);
+    $this->assertStringNotContainsString('(data:', $out);
+  }
+
+  public function testCapsResourceIdInliningAtMaxResourceInline(): void {
+    // 30 single-dist datasets — only the first 25 should get a resource_id
+    // inlined; the rest appear as plain lines.
+    $datasets = [];
+    $dists = [];
+    for ($i = 1; $i <= 30; $i++) {
+      $datasets[] = ['identifier' => 'uuid-' . $i, 'title' => 'Title ' . $i, 'distributions' => 1];
+      $dists['uuid-' . $i] = [['resource_id' => 'rid-' . $i . '__1']];
+    }
+    $builder = new CatalogContextBuilder(
+      $this->buildMetastore($datasets, NULL, $dists),
+      $this->buildCache(),
+    );
+    $out = $builder->build();
+    // First 25 inlined.
+    $this->assertStringContainsString('"Title 1" — uuid-1 (data: rid-1__1)', $out);
+    $this->assertStringContainsString('"Title 25" — uuid-25 (data: rid-25__1)', $out);
+    // 26–30 still listed without the inline.
+    $this->assertStringContainsString('"Title 26" — uuid-26', $out);
+    $this->assertStringNotContainsString('(data: rid-26', $out);
+    $this->assertStringNotContainsString('(data: rid-30', $out);
+  }
+
+  public function testZeroDistributionDatasetGetsNoSuffix(): void {
+    $builder = new CatalogContextBuilder(
+      $this->buildMetastore([
+        ['identifier' => 'uuid-1', 'title' => 'Bare Dataset', 'distributions' => 0],
+      ]),
+      $this->buildCache(),
+    );
+    $out = $builder->build();
+    $this->assertStringContainsString('"Bare Dataset" — uuid-1', $out);
+    $this->assertStringNotContainsString('(data:', $out);
+    $this->assertStringNotContainsString('data files', $out);
   }
 
 }
