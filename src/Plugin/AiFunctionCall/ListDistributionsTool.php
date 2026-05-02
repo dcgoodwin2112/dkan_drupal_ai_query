@@ -19,13 +19,13 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   id: 'dkan_drupal_ai_query:list_distributions',
   function_name: 'list_distributions',
   name: 'List distributions',
-  description: 'Get distributions (data files) for a dataset by UUID. Returns resource_id needed for datastore tools.',
+  description: 'Get distributions (data files) for a dataset. Accepts a dataset UUID, resource_id (identifier__version), or dataset title for fuzzy lookup. Returns the resource_id needed for datastore tools.',
   group: 'dkan_drupal_ai_query',
   context_definitions: [
     'dataset_id' => new ContextDefinition(
       data_type: 'string',
-      label: new TranslatableMarkup('Dataset ID'),
-      description: new TranslatableMarkup('Dataset UUID.'),
+      label: new TranslatableMarkup('Dataset reference'),
+      description: new TranslatableMarkup('Dataset UUID, resource_id (identifier__version), or dataset title for fuzzy lookup.'),
       required: TRUE,
     ),
   ],
@@ -40,11 +40,19 @@ class ListDistributionsTool extends FunctionCallBase implements ExecutableFuncti
   protected MetastoreTools $metastoreTools;
 
   /**
+   * The resource id resolver.
+   *
+   * @var \Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver
+   */
+  protected ResourceIdResolver $resolver;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): FunctionCallInterface|static {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->metastoreTools = $container->get('dkan_query_tools.metastore');
+    $instance->resolver = $container->get('dkan_drupal_ai_query.resource_id_resolver');
     return $instance;
   }
 
@@ -52,9 +60,21 @@ class ListDistributionsTool extends FunctionCallBase implements ExecutableFuncti
    * {@inheritdoc}
    */
   public function execute() {
-    $result = $this->metastoreTools->listDistributions(
-      datasetId: ResourceIdResolver::normalize((string) $this->getContextValue('dataset_id')),
-    );
+    $input = ResourceIdResolver::normalize((string) $this->getContextValue('dataset_id'));
+    if ($input === '') {
+      $this->setOutput(json_encode([
+        'error' => 'dataset reference is required. Pass a dataset UUID, resource_id, or title.',
+      ], JSON_UNESCAPED_SLASHES));
+      return;
+    }
+    $datasetUuid = $this->resolver->resolveToDatasetUuid($input);
+    if ($datasetUuid === NULL) {
+      $this->setOutput(json_encode([
+        'error' => "Could not resolve dataset: {$input}",
+      ], JSON_UNESCAPED_SLASHES));
+      return;
+    }
+    $result = $this->metastoreTools->listDistributions($datasetUuid);
     $this->setOutput(json_encode($result, JSON_UNESCAPED_SLASHES));
   }
 
