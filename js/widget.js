@@ -2214,12 +2214,64 @@
     editorLabel.textContent = 'Request body (JSON)';
     const textareaId = 'dkan-aiq-playground-body-' + Math.random().toString(36).slice(2, 8);
     editorLabel.setAttribute('for', textareaId);
+    // Editor box wraps the textarea + a syntax-highlighted overlay <pre>.
+    // The textarea text is rendered transparent (caret stays visible), and
+    // the overlay sits behind it showing the colored tokens. They must
+    // share font / padding / line-height pixel-perfectly so the colors
+    // line up with the actual characters.
+    const editorBox = document.createElement('div');
+    editorBox.className = 'dkan-aiq-playground-editor-box';
+    const overlay = document.createElement('pre');
+    overlay.className = 'dkan-aiq-playground-overlay';
+    overlay.setAttribute('aria-hidden', 'true');
     const textarea = document.createElement('textarea');
     textarea.id = textareaId;
     textarea.className = 'dkan-aiq-playground-body';
     textarea.setAttribute('spellcheck', 'false');
     textarea.setAttribute('autocomplete', 'off');
-    textarea.addEventListener('input', () => { this.playground.dirty = true; });
+    editorBox.appendChild(overlay);
+    editorBox.appendChild(textarea);
+    // Validity indicator — debounced JSON.parse status, separate from the
+    // run-time errorEl below it which only fires on Run failures.
+    const validityEl = document.createElement('div');
+    validityEl.className = 'dkan-aiq-playground-validity';
+    validityEl.hidden = true;
+    let validityTimer = null;
+    const refreshHighlight = () => {
+      overlay.innerHTML = highlightJson(textarea.value);
+    };
+    const syncScroll = () => {
+      overlay.scrollTop = textarea.scrollTop;
+      overlay.scrollLeft = textarea.scrollLeft;
+    };
+    const refreshValidity = () => {
+      if (validityTimer) clearTimeout(validityTimer);
+      validityTimer = setTimeout(() => {
+        const v = validateJson(textarea.value);
+        if (v.status === 'empty') {
+          validityEl.hidden = true;
+          return;
+        }
+        validityEl.hidden = false;
+        if (v.ok) {
+          validityEl.textContent = '✓ Valid JSON';
+          validityEl.classList.remove('is-invalid');
+          validityEl.classList.add('is-valid');
+        }
+        else {
+          const where = (v.line >= 0) ? ('Line ' + v.line + ', col ' + v.col + ': ') : '';
+          validityEl.textContent = where + v.message;
+          validityEl.classList.remove('is-valid');
+          validityEl.classList.add('is-invalid');
+        }
+      }, 150);
+    };
+    textarea.addEventListener('input', () => {
+      this.playground.dirty = true;
+      refreshHighlight();
+      refreshValidity();
+    });
+    textarea.addEventListener('scroll', syncScroll);
     const actions = document.createElement('div');
     actions.className = 'dkan-aiq-playground-actions';
     const runBtn = document.createElement('button');
@@ -2234,7 +2286,7 @@
     resetBtn.addEventListener('click', () => {
       const cur = this.playground.current;
       if (!cur || cur.originalBodyJson == null) return;
-      textarea.value = cur.originalBodyJson;
+      this.setPlaygroundEditorValue(cur.originalBodyJson);
       this.playground.dirty = false;
       errorEl.hidden = true;
       this.playground.responseHost.hidden = true;
@@ -2257,7 +2309,8 @@
     errorEl.className = 'dkan-aiq-playground-error';
     errorEl.hidden = true;
     editorWrap.appendChild(editorLabel);
-    editorWrap.appendChild(textarea);
+    editorWrap.appendChild(editorBox);
+    editorWrap.appendChild(validityEl);
     editorWrap.appendChild(actions);
     editorWrap.appendChild(errorEl);
     aside.appendChild(editorWrap);
@@ -2285,6 +2338,10 @@
     this.root.appendChild(aside);
     this.playground.el = aside;
     this.playground.editor = textarea;
+    this.playground.overlay = overlay;
+    this.playground.validityEl = validityEl;
+    this.playground.refreshHighlight = refreshHighlight;
+    this.playground.refreshValidity = refreshValidity;
     this.playground.responseHost = responseHost;
     this.playground.runBtn = runBtn;
     this.playground.resetBtn = resetBtn;
@@ -2301,6 +2358,18 @@
     return aside;
   };
 
+  /**
+   * Single setter for the playground editor value. Keeps the textarea
+   * (source of truth), the syntax-highlighted overlay, and the validity
+   * indicator in sync. All callers that programmatically replace the body
+   * (openPlayground, Reset, restorePlaygroundRun) go through here.
+   */
+  Widget.prototype.setPlaygroundEditorValue = function (value) {
+    this.playground.editor.value = value;
+    if (this.playground.refreshHighlight) this.playground.refreshHighlight();
+    if (this.playground.refreshValidity) this.playground.refreshValidity();
+  };
+
   Widget.prototype.openPlayground = function (request) {
     this.ensurePlaygroundSidebar();
     if (this.playground.dirty && !window.confirm('Discard your unsaved edits in the API playground?')) {
@@ -2314,7 +2383,7 @@
       body: request.body,
       originalBodyJson: bodyJson,
     };
-    this.playground.editor.value = bodyJson;
+    this.setPlaygroundEditorValue(bodyJson);
     this.playground.dirty = false;
     this.playground.errorEl.hidden = true;
     this.playground.errorEl.textContent = '';
@@ -2499,6 +2568,130 @@
   }
 
   /**
+   * Tokenize a JSON-ish string. Tolerates malformed input — the playground
+   * editor highlights as you type, so partially-broken JSON is the common
+   * case. Unrecognized characters fall through as 'unknown' tokens so the
+   * overlay still covers the full source and stays aligned with the
+   * textarea below it.
+   */
+  function tokenizeJson(src) {
+    const tokens = [];
+    let i = 0;
+    const len = src.length;
+    while (i < len) {
+      const c = src[i];
+      if (c === ' ' || c === '\t' || c === '\n' || c === '\r') {
+        const start = i;
+        while (i < len && (src[i] === ' ' || src[i] === '\t' || src[i] === '\n' || src[i] === '\r')) i++;
+        tokens.push({ type: 'ws', text: src.slice(start, i) });
+        continue;
+      }
+      if (c === '"') {
+        const start = i;
+        i++;
+        while (i < len) {
+          if (src[i] === '\\' && i + 1 < len) { i += 2; continue; }
+          if (src[i] === '"') { i++; break; }
+          i++;
+        }
+        tokens.push({ type: 'string', text: src.slice(start, i) });
+        continue;
+      }
+      if (c === '-' || (c >= '0' && c <= '9')) {
+        const start = i;
+        if (src[i] === '-') i++;
+        while (i < len && src[i] >= '0' && src[i] <= '9') i++;
+        if (src[i] === '.') {
+          i++;
+          while (i < len && src[i] >= '0' && src[i] <= '9') i++;
+        }
+        if (src[i] === 'e' || src[i] === 'E') {
+          i++;
+          if (src[i] === '+' || src[i] === '-') i++;
+          while (i < len && src[i] >= '0' && src[i] <= '9') i++;
+        }
+        tokens.push({ type: 'number', text: src.slice(start, i) });
+        continue;
+      }
+      if (src.slice(i, i + 4) === 'true') { tokens.push({ type: 'bool', text: 'true' }); i += 4; continue; }
+      if (src.slice(i, i + 5) === 'false') { tokens.push({ type: 'bool', text: 'false' }); i += 5; continue; }
+      if (src.slice(i, i + 4) === 'null') { tokens.push({ type: 'null', text: 'null' }); i += 4; continue; }
+      if (c === '{' || c === '}' || c === '[' || c === ']' || c === ',' || c === ':') {
+        tokens.push({ type: 'punct', text: c });
+        i++;
+        continue;
+      }
+      tokens.push({ type: 'unknown', text: c });
+      i++;
+    }
+    // Second pass: a string immediately followed (modulo whitespace) by `:`
+    // is an object key. Coloring keys distinctly is the single biggest
+    // readability win for nested JSON.
+    for (let j = 0; j < tokens.length; j++) {
+      if (tokens[j].type !== 'string') continue;
+      let k = j + 1;
+      while (k < tokens.length && tokens[k].type === 'ws') k++;
+      if (k < tokens.length && tokens[k].type === 'punct' && tokens[k].text === ':') {
+        tokens[j].type = 'key';
+      }
+    }
+    return tokens;
+  }
+
+  function highlightJson(src) {
+    const tokens = tokenizeJson(src);
+    const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    let out = '';
+    for (const t of tokens) {
+      const safe = escape(t.text);
+      if (t.type === 'ws' || t.type === 'unknown') {
+        out += safe;
+      }
+      else {
+        out += '<span class="dkan-aiq-tok-' + t.type + '">' + safe + '</span>';
+      }
+    }
+    // Trailing space keeps the overlay's last line tall enough that the
+    // textarea's caret on a final blank line still has a row to align to.
+    return out + ' ';
+  }
+
+  /**
+   * Validate JSON and locate the parse error (line/col) when possible.
+   * `JSON.parse` error message text varies across browsers — modern V8
+   * includes "(at position N)", which we map to a 1-indexed line/col by
+   * walking the source. Older messages or different shapes fall back to
+   * just the message text. Empty source returns ok=true with status='empty'
+   * so the indicator can stay hidden.
+   */
+  function validateJson(src) {
+    if (src.trim() === '') return { ok: true, status: 'empty' };
+    try {
+      JSON.parse(src);
+      return { ok: true };
+    }
+    catch (e) {
+      const msg = (e && e.message) ? e.message : String(e);
+      const posMatch = msg.match(/position\s+(\d+)/);
+      let line = -1;
+      let col = -1;
+      if (posMatch) {
+        const pos = parseInt(posMatch[1], 10);
+        let l = 1;
+        let c = 1;
+        const stop = Math.min(pos, src.length);
+        for (let i = 0; i < stop; i++) {
+          if (src.charCodeAt(i) === 10) { l++; c = 1; }
+          else { c++; }
+        }
+        line = l;
+        col = c;
+      }
+      return { ok: false, message: msg, line: line, col: col };
+    }
+  }
+
+  /**
    * Record a completed playground run into the per-instance history. The
    * UI is refreshed so the dropdown reflects the new entry. LRU-trimmed
    * to PLAYGROUND_HISTORY_CAP.
@@ -2571,7 +2764,7 @@
       body: entry.request.body,
       originalBodyJson: bodyJson,
     };
-    this.playground.editor.value = bodyJson;
+    this.setPlaygroundEditorValue(bodyJson);
     this.playground.dirty = false;
     this.playground.errorEl.hidden = true;
     this.playground.methodEl.textContent = entry.request.method;

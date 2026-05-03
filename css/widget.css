@@ -1618,21 +1618,58 @@
   color: #475569;
 }
 
-.dkan-aiq-playground-body {
+/* Editor box: layers a syntax-highlighted overlay <pre> behind the
+ * textarea. Both children share padding/font/line-height so the colored
+ * tokens align pixel-perfectly with the (transparent) textarea text.
+ * Textarea remains the source of truth and the only focusable element. */
+.dkan-aiq-playground-editor-box {
+  position: relative;
   width: 100%;
   min-height: 220px;
-  padding: 8px 10px;
+}
+
+.dkan-aiq-playground-overlay,
+.dkan-aiq-playground-body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.45;
-  color: #0f172a;
-  background: #fff;
+  padding: 8px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   box-sizing: border-box;
-  resize: vertical;
   white-space: pre;
+  margin: 0;
+}
+
+.dkan-aiq-playground-overlay {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  color: #475569;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+  /* Wrap is `pre` (no wrap) — overlay scrolls programmatically to follow
+   * the textarea. Without this, hidden tokens past the right edge would
+   * cause a horizontal jump on long lines. */
+}
+
+.dkan-aiq-playground-body {
+  position: relative;
+  width: 100%;
+  min-height: 220px;
+  background: transparent;
+  color: transparent;
+  caret-color: #0f172a;
+  resize: vertical;
   overflow: auto;
+  z-index: 1;
+}
+
+.dkan-aiq-playground-body::selection {
+  /* Make selected text visible despite the transparent color. */
+  background: #bfdbfe;
+  color: #0f172a;
 }
 
 .dkan-aiq-playground-body:focus {
@@ -1640,6 +1677,28 @@
   outline-offset: 1px;
   border-color: #2563eb;
 }
+
+/* JSON token palette — subdued, distinguishable on white. Keys get the
+ * strongest distinct color since "find the key I want to edit" is the
+ * single most common scan task in nested JSON. */
+.dkan-aiq-tok-key { color: #4338ca; }
+.dkan-aiq-tok-string { color: #15803d; }
+.dkan-aiq-tok-number { color: #1d4ed8; }
+.dkan-aiq-tok-bool,
+.dkan-aiq-tok-null { color: #7c3aed; }
+.dkan-aiq-tok-punct { color: #64748b; }
+
+.dkan-aiq-playground-validity {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  padding: 2px 4px;
+  margin: -2px 0 0 0;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.dkan-aiq-playground-validity.is-valid { color: #15803d; }
+.dkan-aiq-playground-validity.is-invalid { color: #b91c1c; }
 
 .dkan-aiq-playground-actions {
   display: flex;
