@@ -43,54 +43,76 @@ decoder remains the only effective defense.
 **Status.** Cosmetic — no user-visible failure. Decoder is doing the
 work. Don't remove the decoder.
 
-## Stringified tool arguments on `<` queries
+## Empty `operator` field in conditions on `<` queries
 
-**Symptom.** Both models, on at least the simplest "less than"
-question, serialize structured tool arguments as JSON-encoded strings
-instead of their declared types. Observed shapes:
+**Symptom.** When asked a "less than" question, both Claude Haiku 4.5
+and OpenAI `gpt-5.4-mini` emit `"operator": ""` (empty string) in the
+conditions array — apparently dropping the literal `<` character on
+its way to the tool-call JSON. Decoded from saved conversation
+artifacts:
 
-```jsonc
+```json
 {
-  "resource_id": "…",
-  "columns": "city,population",                              // should be array
-  "conditions": "[{\"property\":\"population\",…}]",         // should be array
-  "limit": "500"                                             // should be number
+  "property": "population",
+  "value": "1000000",
+  "operator": ""
 }
 ```
 
-The FunctionCall input schema rejects all three with "JSON Schema
-validation failed" before any business logic runs. The agent retries
-the same shape several times, then exhausts its iteration budget.
+Same root cause as the operator HTML-encoding entry above (models
+mishandle the `<` / `>` character class in tool-call output), just a
+more degenerate failure mode for `<` — instead of producing `&lt;`
+that the decoder can fix, it produces nothing at all. The rest of the
+input is correctly shaped (`columns` and `conditions` are strings as
+the FunctionCall schema declares; `limit` is a proper integer).
 
-**Failure mode is model-dependent and worse than the operator bug:**
+DKAN's `RootedJsonData` rejects the empty operator with the cryptic
+`"JSON Schema validation failed."` (no field name, no enum hint), so
+the agent has no way to diagnose and self-correct.
+
+**Failure mode by model.** Both confirmed via the saved conversation
+artifacts (`dkan_aiq_messages.artifacts`, conversations 136 and 137):
 
 | Model | Retries before giving up | Final outcome |
 |---|---|---|
-| Claude Haiku 4.5 | 8 | **Hallucinated** answer from rows cached during prior queries — listed cities ≥1M as "<1M" without acknowledging the underlying queries failed |
-| OpenAI `gpt-5.4-mini` | 4 | Properly invoked `refuse(reason_category="other")` with an honest "filter syntax is not being accepted" message |
+| Claude Haiku 4.5 | 8 (all with same empty operator) | **Hallucinated** answer from rows cached during prior queries — listed cities >1M as "<1M" without acknowledging the underlying queries failed |
+| OpenAI `gpt-5.4-mini` | 4 (varied `value` from string to int and back, never the operator) | Properly invoked `refuse(reason_category="other")` with an honest "filter syntax is not being accepted" message |
 
-GPT's refuse path is acceptable; Haiku's hallucination is not.
+Haiku's hallucination is the user-visible harm. GPT's refuse path is
+acceptable but still a degraded experience.
 
-**Mitigation in place.** None. The schema rejection is intentional
-(it's catching real bugs); the agent's retry loop is bounded; nothing
-covers the gap.
+**Mitigation in place.** None yet — the schema rejection is intentional
+(the empty operator IS invalid), but the error message has no
+information the agent can act on.
 
-**Open ideas.**
-- Coerce common stringified shapes at the FunctionCall plugin layer:
-  if `conditions` arrives as a string, attempt `json_decode`; same for
-  `columns`. Cheap, defensive, and matches the operator-decoder
-  pattern.
-- Tighten the `query_datastore` system-prompt examples to show the
-  array shape directly inside a `<` example (the only existing example
-  uses `=`). The model may be conflating "string filter" with the JSON
-  shape when picking inequality operators.
-- Add a guard in the agent loop: when N consecutive identical
-  schema-validation failures hit the same tool call signature, force
-  a `refuse(other)` instead of letting Haiku-class models continue
-  into hallucination territory. Requires touching the `ai_agents`
-  framework or the controller's solve loop.
+**Recommended fix.** Add `validateOperators()` next to the existing
+`canonicalizeOperators()` in
+[`web/modules/custom/dkan_query_tools/src/Tool/DatastoreTools.php`](../../dkan_query_tools/src/Tool/DatastoreTools.php).
+Walks the same nested condition-group shape, runs **after**
+canonicalize so HTML-encoded operators get fixed first. Returns the
+first invalid operator encountered with a structured error:
 
-**Status.** Active concern. Reproducible on the simplest `<` query
-("cities with population less than 1000000"). Decide if this gets a
-prompt-only fix attempt or a server-side coercion before adding more
-issues to this file.
+> `Invalid condition for property "population": operator field is
+> empty. Operator must be one of: =, <>, <, <=, >, >=, like, contains,
+> starts with, in, not in, between.`
+
+This catches the empty-operator case AND any other invalid string a
+future model might emit (e.g., `equals`, `lt`, `>>>`). The agent gets
+a clear, actionable error and can either retry with a literal
+operator or refuse with a real reason instead of a black-box.
+
+**Other ideas considered, not chosen.**
+- Coerce empty operator to a default — unsafe, no way to guess intent
+  (`<`, `<=`, `=` give different answers).
+- Tighten the system prompt to include a `<` example — the v10
+  experiment showed prompt changes don't reliably move either model
+  on the `< / >` character class. A friendly server-side error is a
+  hard guarantee; a prompt instruction is best-effort.
+- Loop guard at the agent layer (force `refuse(other)` after N
+  identical failures) — would prevent Haiku's hallucination but
+  doesn't help the agent recover. Server-side error message is
+  strictly better.
+
+**Status.** Reproducible on demand: ask "cities with population less
+than 1000000" against the Crime Data resource. Fix is straightforward
+(~1 hour incl. unit tests).
