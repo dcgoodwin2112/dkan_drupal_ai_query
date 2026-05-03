@@ -70,49 +70,47 @@ DKAN's `RootedJsonData` rejects the empty operator with the cryptic
 `"JSON Schema validation failed."` (no field name, no enum hint), so
 the agent has no way to diagnose and self-correct.
 
-**Failure mode by model.** Both confirmed via the saved conversation
-artifacts (`dkan_aiq_messages.artifacts`, conversations 136 and 137):
+**Mitigation in place.**
+[`DatastoreTools::validateOperators()`](../../dkan_query_tools/src/Tool/DatastoreTools.php)
+runs after `canonicalizeOperators()` and rejects any condition whose
+operator is missing from DKAN's enum. Returns a structured error
+naming the property and listing the allowed operators:
 
-| Model | Retries before giving up | Final outcome |
+> `Invalid condition for property "population": operator is empty.
+> Operator must be one of: =, <>, <, <=, >, >=, like, between, in,
+> not in, contains, starts with, match.`
+
+The agent now gets actionable information instead of a black-box
+schema error, and as a side benefit the validator catches any other
+invalid operator a future model might emit (e.g. `equals`, `lt`,
+`>>>`).
+
+**Failure mode by model — before and after the validator.** Confirmed
+via the same conversation prompt against the Crime Data resource:
+
+| Model | Before (generic schema error) | After (friendly enum error) |
 |---|---|---|
-| Claude Haiku 4.5 | 8 (all with same empty operator) | **Hallucinated** answer from rows cached during prior queries — listed cities >1M as "<1M" without acknowledging the underlying queries failed |
-| OpenAI `gpt-5.4-mini` | 4 (varied `value` from string to int and back, never the operator) | Properly invoked `refuse(reason_category="other")` with an honest "filter syntax is not being accepted" message |
+| Claude Haiku 4.5 | 8 retries → **hallucinated** wrong cities (listed >1M cities as "<1M") | 8 retries → "task not solvable" — **no false data** |
+| OpenAI `gpt-5.4-mini` | 4 retries → vague "filter syntax not accepted" refusal | 2 retries → refuse with operator-specific framing ("supported comparison operators require a valid operator") |
 
-Haiku's hallucination is the user-visible harm. GPT's refuse path is
-acceptable but still a degraded experience.
+The validator does not stop the model from emitting empty operators in
+the first place — the upstream cause is shared with the operator
+HTML-encoding entry above (models mishandle the `< / >` character
+class). What it does is convert the worst outcome (hallucination)
+into a graceful failure, and shorten GPT's retry loop.
 
-**Mitigation in place.** None yet — the schema rejection is intentional
-(the empty operator IS invalid), but the error message has no
-information the agent can act on.
+**What's been tried.** A v10 prompt experiment that explicitly told
+the agent "operators must be literal characters in the JSON" did not
+move the needle on either model — see the operator HTML-encoding
+entry above for details. The server-side validator is the only
+intervention that produced a measurable behavior change.
 
-**Recommended fix.** Add `validateOperators()` next to the existing
-`canonicalizeOperators()` in
-[`web/modules/custom/dkan_query_tools/src/Tool/DatastoreTools.php`](../../dkan_query_tools/src/Tool/DatastoreTools.php).
-Walks the same nested condition-group shape, runs **after**
-canonicalize so HTML-encoded operators get fixed first. Returns the
-first invalid operator encountered with a structured error:
-
-> `Invalid condition for property "population": operator field is
-> empty. Operator must be one of: =, <>, <, <=, >, >=, like, contains,
-> starts with, in, not in, between.`
-
-This catches the empty-operator case AND any other invalid string a
-future model might emit (e.g., `equals`, `lt`, `>>>`). The agent gets
-a clear, actionable error and can either retry with a literal
-operator or refuse with a real reason instead of a black-box.
-
-**Other ideas considered, not chosen.**
-- Coerce empty operator to a default — unsafe, no way to guess intent
-  (`<`, `<=`, `=` give different answers).
-- Tighten the system prompt to include a `<` example — the v10
-  experiment showed prompt changes don't reliably move either model
-  on the `< / >` character class. A friendly server-side error is a
-  hard guarantee; a prompt instruction is best-effort.
-- Loop guard at the agent layer (force `refuse(other)` after N
-  identical failures) — would prevent Haiku's hallucination but
-  doesn't help the agent recover. Server-side error message is
-  strictly better.
-
-**Status.** Reproducible on demand: ask "cities with population less
-than 1000000" against the Crime Data resource. Fix is straightforward
-(~1 hour incl. unit tests).
+**Status.** Mitigated. Worst-case behavior (Haiku hallucination) is
+gone. Open follow-ups, all low-priority:
+- The `&lt;` HTML-encoded form would be the *better* failure mode
+  here (decoder fixes it silently). Whatever causes the model to
+  drop `<` entirely instead of escaping it is upstream; not worth
+  chasing further until a model-version bump changes behavior.
+- Haiku's "task not solvable" message is less informative than GPT's
+  structured refuse. That's an `ai_agents` framework UX thing — out
+  of scope for this module.
