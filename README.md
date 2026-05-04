@@ -129,7 +129,7 @@ Drupal's Request Path block-visibility condition does **literal** path matching.
 |---|---|---|
 | POST | `/api/dkan-ai-query/start` | Submit a question, blocking until `solve()` completes |
 | GET | `/api/dkan-ai-query/poll/{thread_id}` | Read status events + artifacts captured so far |
-| GET | `/api/dkan-ai-query/conversations` | List the current user's conversations |
+| GET | `/api/dkan-ai-query/conversations?offset=&limit=` | Paginated list of the current user's conversations. Defaults `offset=0`, `limit=25` (capped 1–100). Response: `{items, total, offset, limit}` |
 | GET | `/api/dkan-ai-query/conversations/{id}` | Load a conversation with messages and artifacts |
 | DELETE | `/api/dkan-ai-query/conversations/{id}` | Delete a conversation and its messages |
 | POST | `/api/dkan-ai-query/conversations/{id}/pin` | Toggle the pinned flag |

@@ -1,6 +1,29 @@
 <div class="dkan-aiq-widget" data-dataset-id="{{ dataset_id }}">
   <div class="dkan-aiq-sidebar" hidden>
-    <div class="dkan-aiq-sidebar-header">History</div>
+    <div class="dkan-aiq-sidebar-header">
+      <span class="dkan-aiq-sidebar-header-title">History</span>
+      <button type="button"
+              class="dkan-aiq-sidebar-toggle"
+              aria-label="Collapse history sidebar"
+              aria-expanded="true">
+        <svg class="dkan-aiq-sidebar-toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+    </div>
+    <button type="button"
+            class="dkan-aiq-sidebar-rail-summary"
+            data-count="0"
+            aria-label="Expand history sidebar">
+      <svg class="dkan-aiq-sidebar-rail-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span class="dkan-aiq-sidebar-rail-count">0</span>
+    </button>
     <div class="dkan-aiq-sidebar-search">
       <input type="text" class="dkan-aiq-sidebar-search-input" placeholder="Search conversations..." />
     </div>

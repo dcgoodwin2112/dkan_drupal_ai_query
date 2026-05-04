@@ -105,6 +105,7 @@ services:
     arguments:
       - '@dkan_drupal_ai_query.conversation_storage'
       - '@current_user'
+      - '@request_stack'
     tags:
       - { name: 'controller.service_arguments' }
 

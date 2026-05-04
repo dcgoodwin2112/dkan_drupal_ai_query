@@ -89,14 +89,14 @@ class ConversationStorage {
   /**
    * List conversations for a user, pinned first then most-recent.
    */
-  public function listForUser(int $uid, int $limit = 50): array {
+  public function listForUser(int $uid, int $limit = 50, int $offset = 0): array {
     $storage = $this->entityTypeManager->getStorage(self::CONVERSATION);
     $ids = $storage->getQuery()
       ->accessCheck(TRUE)
       ->condition('uid', $uid)
       ->sort('pinned', 'DESC')
       ->sort('changed', 'DESC')
-      ->range(0, $limit)
+      ->range($offset, $limit)
       ->execute();
     $out = [];
     foreach ($storage->loadMultiple($ids) as $entity) {
@@ -110,6 +110,19 @@ class ConversationStorage {
       ];
     }
     return $out;
+  }
+
+  /**
+   * Total conversation count for a user.
+   */
+  public function countForUser(int $uid): int {
+    return (int) $this->entityTypeManager
+      ->getStorage(self::CONVERSATION)
+      ->getQuery()
+      ->accessCheck(TRUE)
+      ->condition('uid', $uid)
+      ->count()
+      ->execute();
   }
 
   /**

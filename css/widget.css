@@ -27,6 +27,7 @@
   display: flex;
   flex-direction: column;
   max-height: 100%;
+  transition: width 0.15s ease;
 }
 
 .dkan-aiq-sidebar[hidden] {
@@ -39,6 +40,108 @@
   font-size: 14px;
   color: #1e293b;
   border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.dkan-aiq-sidebar-header-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dkan-aiq-sidebar-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.dkan-aiq-sidebar-toggle:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.dkan-aiq-sidebar-toggle-icon {
+  display: block;
+  transition: transform 0.15s ease;
+}
+
+/* Collapsed rail: hide search/list/footer/title; chevron flips to point right. */
+.dkan-aiq-sidebar--collapsed {
+  width: 32px;
+}
+
+.dkan-aiq-sidebar--collapsed .dkan-aiq-sidebar-header {
+  padding: 6px 0;
+  justify-content: center;
+  border-bottom: none;
+}
+
+.dkan-aiq-sidebar--collapsed .dkan-aiq-sidebar-header-title,
+.dkan-aiq-sidebar--collapsed .dkan-aiq-sidebar-search,
+.dkan-aiq-sidebar--collapsed .dkan-aiq-sidebar-list,
+.dkan-aiq-sidebar--collapsed .dkan-aiq-sidebar-footer {
+  display: none;
+}
+
+.dkan-aiq-sidebar--collapsed .dkan-aiq-sidebar-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* Rail summary: chat icon + conversation count, only shown when collapsed.
+   Acts as a second click target to expand the sidebar. */
+.dkan-aiq-sidebar-rail-summary {
+  display: none;
+}
+
+.dkan-aiq-sidebar--collapsed .dkan-aiq-sidebar-rail-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #475569;
+  width: 100%;
+}
+
+.dkan-aiq-sidebar--collapsed .dkan-aiq-sidebar-rail-summary:hover {
+  color: #1e293b;
+  background: #f1f5f9;
+}
+
+.dkan-aiq-sidebar-rail-icon {
+  display: block;
+}
+
+.dkan-aiq-sidebar-rail-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e293b;
+  background: #e2e8f0;
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.dkan-aiq-sidebar-rail-summary[data-count="0"] .dkan-aiq-sidebar-rail-count {
+  display: none;
 }
 
 .dkan-aiq-sidebar-search {
@@ -72,6 +175,29 @@
   font-size: 13px;
   color: #64748b;
   text-align: center;
+}
+
+.dkan-aiq-sidebar-load-more {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 8px 12px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: #1e293b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dkan-aiq-sidebar-load-more:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.dkan-aiq-sidebar-load-more:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
 }
 
 .dkan-aiq-sidebar-entry {
@@ -1548,6 +1674,14 @@
   grid-row: 1;
 }
 
+.dkan-aiq-playground-header-actions {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .dkan-aiq-playground-close {
   appearance: none;
   background: transparent;
@@ -1558,13 +1692,143 @@
   cursor: pointer;
   padding: 2px 8px;
   border-radius: 4px;
-  grid-column: 2;
-  grid-row: 1;
 }
 
 .dkan-aiq-playground-close:hover {
   background: #e2e8f0;
   color: #1e293b;
+}
+
+.dkan-aiq-playground-toggle {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: #475569;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.dkan-aiq-playground-toggle:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.dkan-aiq-playground-toggle-icon {
+  display: block;
+  transition: transform 0.15s ease;
+}
+
+/* Collapsed playground rail: ~36 px wide, only chevron and rail summary
+   visible. Mirror of the history sidebar collapse, polarity flipped because
+   this sidebar is right-anchored. */
+.dkan-aiq-playground-sidebar {
+  transition: flex-basis 0.15s ease, max-width 0.15s ease;
+}
+
+.dkan-aiq-widget--with-playground .dkan-aiq-playground-sidebar--collapsed {
+  flex: 0 0 36px;
+  max-width: 36px;
+  overflow: hidden;
+}
+
+.dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-title,
+.dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-close,
+.dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-endpoint,
+.dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-editor-wrap,
+.dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-history,
+.dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-response {
+  display: none;
+}
+
+.dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-header {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto;
+  padding: 6px 0;
+  justify-items: center;
+}
+
+.dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-header-actions {
+  grid-column: 1;
+}
+
+.dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.dkan-aiq-playground-rail-summary {
+  display: none;
+}
+
+.dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-rail-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #475569;
+  width: 100%;
+}
+
+.dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-rail-summary:hover {
+  color: #1e293b;
+  background: #e2e8f0;
+}
+
+.dkan-aiq-playground-rail-icon {
+  display: block;
+}
+
+.dkan-aiq-playground-rail-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e293b;
+  background: #e2e8f0;
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.dkan-aiq-playground-rail-summary[data-count="0"] .dkan-aiq-playground-rail-count {
+  display: none;
+}
+
+/* On small viewports the playground already overlays as a fixed drawer; a
+   36 px floating rail there is worse than the existing layout, so suppress
+   collapse. */
+@media (max-width: 1100px) {
+  .dkan-aiq-playground-toggle {
+    display: none;
+  }
+
+  .dkan-aiq-widget--with-playground .dkan-aiq-playground-sidebar--collapsed {
+    flex: 0 0 auto;
+    max-width: 420px;
+    overflow-y: auto;
+  }
+
+  .dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-title,
+  .dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-close,
+  .dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-endpoint,
+  .dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-editor-wrap,
+  .dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-history,
+  .dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-response {
+    display: revert;
+  }
+
+  .dkan-aiq-playground-sidebar--collapsed .dkan-aiq-playground-rail-summary {
+    display: none;
+  }
 }
 
 .dkan-aiq-playground-endpoint {
