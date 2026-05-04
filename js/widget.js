@@ -29,13 +29,22 @@
   ]);
 
   // Tools that can be replayed and edited in the right-side REST playground
-  // sidebar. Same boundary as today's "Show API call" panel — only the two
-  // datastore-query tools have a public REST endpoint that's worth tinkering
-  // with; everything else is internal LLM helper plumbing.
+  // sidebar. Each must have a `buildApiEquivalent()` branch that maps the
+  // tool's input to a real DKAN REST endpoint. Tools without a public REST
+  // analog (search_columns, compute_stats) or that are terminal/render-only
+  // (refuse, create_chart) stay out.
   const PLAYGROUND_ELIGIBLE_TOOLS = new Set([
     'query_datastore',
     'query_datastore_join',
+    'query_datastore_raw',
     'search_datasets',
+    'list_datasets',
+    'list_distributions',
+    'sample_rows',
+    'distinct_values',
+    'get_datastore_schema',
+    'get_datastore_stats',
+    'get_data_dictionary',
   ]);
 
   // Cap displayed response body so a large datastore response (10k rows) doesn't
@@ -92,6 +101,7 @@
   const TOOL_FRIENDLY_NAMES = {
     query_datastore: 'Datastore query',
     query_datastore_join: 'Datastore join query',
+    query_datastore_raw: 'Datastore query (raw)',
     sample_rows: 'Sample of rows',
     distinct_values: 'Distinct values',
     search_columns: 'Column search',
@@ -108,6 +118,7 @@
   const TOOL_DESCRIPTIONS = {
     query_datastore: 'Runs a structured query against one resource’s datastore table. Filters, sorts, and aggregations happen in the database; only matching rows come back.',
     query_datastore_join: 'Runs a structured query that joins two datastore tables on a shared column. The join happens in the database; only matching rows come back.',
+    query_datastore_raw: 'Submits a raw DKAN DatastoreQuery payload — the agent reaches for this when the flat query tools can\'t express the shape (nested OR groups, three-way joins, compound expressions). Response shape matches the REST endpoint verbatim.',
     sample_rows: 'Returns a small random sample of rows from the resource so you can eyeball the data.',
     distinct_values: 'Lists the unique values that appear in one column of the resource.',
     search_columns: 'Searches column names (and optionally descriptions) across all dataset resources to find columns matching your keyword.',
@@ -156,6 +167,7 @@
   const TOOL_PLURAL_NAMES = {
     query_datastore: ['datastore query', 'datastore queries'],
     query_datastore_join: ['datastore join', 'datastore joins'],
+    query_datastore_raw: ['raw datastore query', 'raw datastore queries'],
     sample_rows: ['row sample', 'row samples'],
     search_columns: ['column search', 'column searches'],
     list_datasets: ['dataset list', 'dataset lists'],
@@ -1054,14 +1066,20 @@
 
     const input = artifact.input || null;
 
-    // API and SQL preview only apply to the two datastore-query tools — the
-    // rest don't map to a public datastore endpoint and would render nonsense.
-    const apiPrimary = (!isSimpleTool && input) ? (input.distribution_uuid || input.resolved_resource_id || input.resource_id || '') : '';
-    const apiJoin = (!isSimpleTool && input) ? (input.join_distribution_uuid || input.resolved_join_resource_id || input.join_resource_id || '') : '';
+    // SQL preview and the inline "Show API call" panel only apply to the two
+    // datastore-query tools. The structured `apiCall` itself is built for
+    // every playground-eligible tool, so the playground sidebar can replay
+    // simple-table tools (sample_rows, list_datasets, etc.) too.
+    const apiPrimary = input ? (input.distribution_uuid || input.resolved_resource_id || input.resource_id || '') : '';
+    const apiJoin = input ? (input.join_distribution_uuid || input.resolved_join_resource_id || input.join_resource_id || '') : '';
     const sqlPrimary = (!isSimpleTool && input) ? (input.resolved_resource_id || input.resource_id || '') : '';
     const sqlJoin = (!isSimpleTool && input) ? (input.resolved_join_resource_id || input.join_resource_id || '') : '';
-    const apiCall = (!isSimpleTool && input) ? buildApiEquivalent(toolName, input, apiPrimary, apiJoin) : null;
-    const apiText = apiCall ? formatApiEquivalent(apiCall) : null;
+    const apiCall = (PLAYGROUND_ELIGIBLE_TOOLS.has(toolName) && input)
+      ? buildApiEquivalent(toolName, input, apiPrimary, apiJoin)
+      : null;
+    // Inline text-panel preview only renders for the two query tools — for
+    // other eligible tools the `apiCall` is consumed by the playground only.
+    const apiText = (!isSimpleTool && apiCall) ? formatApiEquivalent(apiCall) : null;
     const sqlText = (!isSimpleTool && input) ? buildSqlEquivalent(toolName, input, sqlPrimary, sqlJoin) : null;
 
     const container = document.createElement('div');
@@ -1166,6 +1184,7 @@
           method: apiCall.method,
           url: apiCall.url,
           body: apiCall.body,
+          note: apiCall.note || null,
         });
       });
       actions.appendChild(playgroundBtn);
@@ -1317,6 +1336,37 @@
    * text-panel UI; pass straight to fetch() for the playground.
    */
   function buildApiEquivalent(toolName, input, resolvedResourceId, resolvedJoinId) {
+    // query_datastore_raw — translate the agent's payload into a
+    // REST-faithful payload. Both the collection endpoint and the per-resource
+    // endpoint expect distribution UUIDs in resources[].id (not the internal
+    // {hash}__{version} form the agent uses). PHP captureData attaches
+    // input.distribution_uuid_map so we can rewrite each id at render time.
+    if (toolName === 'query_datastore_raw') {
+      let body = {};
+      const raw = (input && typeof input.payload === 'string') ? input.payload : '';
+      if (raw) {
+        try { body = JSON.parse(raw); }
+        catch (e) { body = { _parseError: e.message, _raw: raw }; }
+      }
+      const uuidMap = (input && input.distribution_uuid_map && typeof input.distribution_uuid_map === 'object') ? input.distribution_uuid_map : {};
+      if (body && Array.isArray(body.resources)) {
+        body.resources = body.resources.map((r) => {
+          if (!r || typeof r !== 'object') return r;
+          const id = r.id;
+          if (typeof id === 'string' && uuidMap[id]) {
+            return Object.assign({}, r, { id: uuidMap[id] });
+          }
+          return r;
+        });
+      }
+      // Always route to the multi-resource collection endpoint when the body
+      // carries a `resources` array; the per-resource endpoint rejects bodies
+      // that explicitly pass resources ("Joins are not available and resources
+      // should not be explicitly passed when using the resource query endpoint").
+      const url = '/api/1/datastore/query';
+      return { method: 'POST', url: url, body: body };
+    }
+
     // search_datasets maps to /api/1/search (GET with query string params),
     // not the datastore-query POST. Body is the params object; runPlayground
     // serializes it to a query string at fetch time.
@@ -1335,6 +1385,117 @@
         params['page-size'] = input.page_size;
       }
       return { method: 'GET', url: '/api/1/search', body: params };
+    }
+
+    // Metastore list/get tools — straightforward GET equivalents. Body is
+    // the query string params object; runPlayground serializes for GET.
+    if (toolName === 'list_datasets') {
+      const params = {};
+      if (input.offset) params.offset = input.offset;
+      if (input.limit) params.limit = input.limit;
+      return { method: 'GET', url: '/api/1/metastore/schemas/dataset/items', body: params };
+    }
+    if (toolName === 'list_distributions') {
+      // No direct REST endpoint; the tool walks distributions client-side
+      // after fetching the dataset. Show the dataset GET as the first hop.
+      const datasetId = input.dataset_id || '';
+      return {
+        method: 'GET',
+        url: '/api/1/metastore/schemas/dataset/items/' + datasetId,
+        body: { 'show-reference-ids': true },
+        note: 'First hop only. The tool walks the dataset’s distribution references client-side; this REST call returns the parent dataset.',
+      };
+    }
+    if (toolName === 'get_data_dictionary') {
+      // The tool resolves a data-dictionary identifier from a dataset or
+      // distribution. The playground call shows the metastore GET for the
+      // dictionary item — only valid when the tool already resolved one.
+      const dictId = (input && input.dictionary_identifier) || '';
+      return {
+        method: 'GET',
+        url: '/api/1/metastore/schemas/data-dictionary/items/' + dictId,
+        body: {},
+        note: 'First hop only. The tool resolves the dictionary identifier from the dataset/distribution refs; this REST call returns the resolved data-dictionary item.',
+      };
+    }
+
+    // Datastore-derived tools that map to /api/1/datastore/query/{id} with a
+    // narrow body. Each has its own translation; the JSON editor in the
+    // playground lets users tweak limits, columns, etc. before re-running.
+    if (toolName === 'sample_rows') {
+      const sampleId = resolvedResourceId || input.resource_id || '';
+      const n = Math.max(1, Math.min(parseInt(input.n, 10) || 5, 50));
+      return {
+        method: 'POST',
+        url: '/api/1/datastore/query/' + sampleId,
+        body: {
+          sorts: [{ property: 'record_number', order: 'asc' }],
+          limit: n,
+          results: true,
+          count: false,
+          keys: true,
+        },
+        note: 'Approximate. The tool also strips the synthetic record_number column from the response; this REST call returns it.',
+      };
+    }
+    if (toolName === 'distinct_values') {
+      const dvId = resolvedResourceId || input.resource_id || '';
+      const col = input.column || '';
+      const dvLimit = Math.max(1, Math.min(parseInt(input.limit, 10) || 50, 500));
+      return {
+        method: 'POST',
+        url: '/api/1/datastore/query/' + dvId,
+        body: {
+          properties: col ? [col] : [],
+          groupings: col ? [col] : [],
+          limit: dvLimit,
+          count: false,
+          keys: true,
+        },
+      };
+    }
+    if (toolName === 'get_datastore_schema') {
+      const schId = resolvedResourceId || input.resource_id || '';
+      return {
+        method: 'POST',
+        url: '/api/1/datastore/query/' + schId,
+        // DKAN's REST schema enforces limit ≥ 1, so even a schema-only
+        // payload needs limit=1 (results:false suppresses the row anyway).
+        body: {
+          schema: true,
+          keys: true,
+          limit: 1,
+          results: false,
+          count: false,
+        },
+        note: 'REST returns datastore column types only. The tool also merges per-column data-dictionary metadata (title, description, declared type) into its response.',
+      };
+    }
+    if (toolName === 'get_datastore_stats') {
+      const stId = resolvedResourceId || input.resource_id || '';
+      // Build one min/max/count expression per requested column. Total-row
+      // count comes from the top-level `count:true` flag — DKAN's REST DSL
+      // rejects `count(*)` ("Column not found") because operands must name
+      // a real column. Exact null/distinct-count parity with the full tool
+      // would require multiple round trips; that's the trade-off.
+      const cols = (input.columns || '').split(',').map(s => s.trim()).filter(Boolean);
+      const exprs = [];
+      cols.forEach((c) => {
+        exprs.push({ expression: { operator: 'min', operands: [c] }, alias: c + '_min' });
+        exprs.push({ expression: { operator: 'max', operands: [c] }, alias: c + '_max' });
+        exprs.push({ expression: { operator: 'count', operands: [c] }, alias: c + '_count' });
+      });
+      return {
+        method: 'POST',
+        url: '/api/1/datastore/query/' + stId,
+        body: {
+          properties: exprs,
+          limit: 1,
+          count: true,
+          keys: true,
+        },
+        note: 'Approximate. The full tool also computes null_count and distinct_count via direct DB queries; those don’t round-trip through the REST DSL.',
+      };
     }
 
     const resourceId = resolvedResourceId || input.resource_id || '';
@@ -1450,6 +1611,204 @@
   function formatApiEquivalent(api) {
     return api.method + ' ' + api.url + '\n' + JSON.stringify(api.body, null, 2);
   }
+
+  /**
+   * Lazy loader + matcher for DKAN's OpenAPI spec at /api/1.
+   *
+   * Used by the playground sidebar to render a "Parameter help" panel that
+   * surfaces operation summaries and per-property descriptions from the spec.
+   * Cached in localStorage with a 24-hour TTL and ETag-aware revalidation;
+   * degrades silently when fetch fails so the playground keeps working.
+   *
+   * Public:
+   *   OpenApiSpec.load() → Promise<spec | null>
+   *   OpenApiSpec.describe(spec, method, url) → { summary, description,
+   *     parameters: [{name,in,required,type,description}], bodyProperties: [
+   *     {name,required,type,description}] } | null
+   */
+  const OpenApiSpec = (function () {
+    const STORAGE_KEY = 'dkanAiqOpenApi:v1';
+    const TTL_MS = 24 * 60 * 60 * 1000;
+    const SPEC_URL = '/api/1';
+    let inFlight = null;
+    let memCache = null;
+
+    function readStorage() {
+      try {
+        const raw = window.localStorage && localStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.spec || !parsed.fetchedAt) return null;
+        return parsed;
+      }
+      catch (e) { return null; }
+    }
+
+    function writeStorage(payload) {
+      try {
+        if (window.localStorage) localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      }
+      catch (e) { /* quota exceeded / disabled — ignore */ }
+    }
+
+    function load() {
+      if (memCache && (Date.now() - memCache.fetchedAt) < TTL_MS) {
+        return Promise.resolve(memCache.spec);
+      }
+      if (inFlight) return inFlight;
+      const stored = readStorage();
+      const headers = stored && stored.etag ? { 'If-None-Match': stored.etag } : {};
+      inFlight = fetch(SPEC_URL, { headers: headers, credentials: 'same-origin' })
+        .then((res) => {
+          if (res.status === 304 && stored) {
+            memCache = { spec: stored.spec, etag: stored.etag, fetchedAt: Date.now() };
+            writeStorage(memCache);
+            return memCache.spec;
+          }
+          if (!res.ok) {
+            if (stored) { memCache = stored; return stored.spec; }
+            return null;
+          }
+          const etag = res.headers.get('ETag') || null;
+          return res.json().then((spec) => {
+            memCache = { spec: spec, etag: etag, fetchedAt: Date.now() };
+            writeStorage(memCache);
+            return spec;
+          });
+        })
+        .catch(() => {
+          if (stored) { memCache = stored; return stored.spec; }
+          return null;
+        })
+        .then((spec) => { inFlight = null; return spec; });
+      return inFlight;
+    }
+
+    function deref(spec, ref) {
+      if (!ref || typeof ref !== 'string' || ref.indexOf('#/') !== 0) return null;
+      const parts = ref.slice(2).split('/');
+      let node = spec;
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i].replace(/~1/g, '/').replace(/~0/g, '~');
+        if (node && typeof node === 'object' && p in node) node = node[p];
+        else return null;
+      }
+      return node;
+    }
+
+    function resolveSchema(spec, schema, depth) {
+      if (!schema) return null;
+      if ((depth || 0) > 8) return schema;
+      if (schema.$ref) {
+        const target = deref(spec, schema.$ref);
+        if (!target) return null;
+        return resolveSchema(spec, target, (depth || 0) + 1);
+      }
+      return schema;
+    }
+
+    function resolveParameter(spec, param, depth) {
+      if (!param) return null;
+      if ((depth || 0) > 4) return param;
+      if (param.$ref) {
+        const target = deref(spec, param.$ref);
+        if (!target) return null;
+        return resolveParameter(spec, target, (depth || 0) + 1);
+      }
+      return param;
+    }
+
+    // Match a literal URL against the spec's templated paths. Prefers the
+    // template with the most literal (non-{placeholder}) segments — so
+    // /api/1/metastore/schemas/dataset/items/{identifier} wins over the
+    // generic /api/1/metastore/schemas/{schema_id}/items/{identifier}.
+    // Only considers templates that actually declare the requested method,
+    // so a GET against /api/1/metastore/schemas/dataset/items falls through
+    // to the generic {schema_id}/items GET when the dataset-specific path
+    // only declares POST.
+    function matchPath(spec, method, url) {
+      if (!spec || !spec.paths) return null;
+      const m = (method || '').toLowerCase();
+      const cleanUrl = (url || '').split('?')[0];
+      const urlParts = cleanUrl.split('/').filter(Boolean);
+      let best = null;
+      let bestLiterals = -1;
+      for (const tmpl in spec.paths) {
+        if (!Object.prototype.hasOwnProperty.call(spec.paths, tmpl)) continue;
+        const ops = spec.paths[tmpl];
+        if (!ops || !ops[m]) continue;
+        const tmplParts = tmpl.split('/').filter(Boolean);
+        if (tmplParts.length !== urlParts.length) continue;
+        let ok = true;
+        let literals = 0;
+        for (let i = 0; i < tmplParts.length; i++) {
+          const t = tmplParts[i];
+          if (t.charAt(0) === '{' && t.charAt(t.length - 1) === '}') {
+            if (!urlParts[i]) { ok = false; break; }
+            continue;
+          }
+          if (t !== urlParts[i]) { ok = false; break; }
+          literals++;
+        }
+        if (ok && literals > bestLiterals) {
+          best = tmpl;
+          bestLiterals = literals;
+        }
+      }
+      return best;
+    }
+
+    function describe(spec, method, url) {
+      if (!spec) return null;
+      const m = (method || '').toLowerCase();
+      const tmpl = matchPath(spec, m, url);
+      if (!tmpl) return null;
+      const op = spec.paths[tmpl] && spec.paths[tmpl][m];
+      if (!op) return null;
+      const out = {
+        path: tmpl,
+        method: (method || '').toUpperCase(),
+        summary: op.summary || '',
+        description: op.description || '',
+        parameters: [],
+        bodyProperties: [],
+      };
+      (op.parameters || []).forEach((p) => {
+        const r = resolveParameter(spec, p);
+        if (!r || !r.name) return;
+        out.parameters.push({
+          name: r.name,
+          in: r.in || '',
+          required: !!r.required,
+          type: (r.schema && r.schema.type) || '',
+          description: r.description || '',
+        });
+      });
+      const body = op.requestBody;
+      if (body && body.content) {
+        const json = body.content['application/json'];
+        if (json && json.schema) {
+          const schema = resolveSchema(spec, json.schema);
+          if (schema && schema.properties) {
+            const required = new Set(schema.required || []);
+            for (const k in schema.properties) {
+              if (!Object.prototype.hasOwnProperty.call(schema.properties, k)) continue;
+              const prop = schema.properties[k] || {};
+              out.bodyProperties.push({
+                name: k,
+                required: required.has(k),
+                type: prop.type || (prop.$ref ? 'object' : ''),
+                description: prop.description || '',
+              });
+            }
+          }
+        }
+      }
+      return out;
+    }
+
+    return { load: load, describe: describe };
+  }());
 
   function buildSqlEquivalent(toolName, input, resolvedResourceId, resolvedJoinId) {
     // SQL preview only applies to the two datastore-query tools. Anything
@@ -1914,7 +2273,20 @@
       list = outer.querySelector('.dkan-aiq-aux-list');
     }
 
-    const entry = buildAuxEntry(artifact);
+    // Build the per-tool apiCall when this aux tool has a REST analog and
+    // the playground sidebar is enabled. We pass it down to buildAuxEntry
+    // so the disclosure can render an "API playground" button alongside
+    // the raw-output details.
+    const s = this.settings || {};
+    const playgroundCb = (
+      s.showRestPlaygroundSidebar !== false
+      && PLAYGROUND_ELIGIBLE_TOOLS.has(artifact.tool)
+      && artifact.input
+    )
+      ? this.buildAuxPlaygroundCallback(artifact)
+      : null;
+
+    const entry = buildAuxEntry(artifact, playgroundCb);
     list.appendChild(entry);
 
     // Reflect the running count in the outer summary so the analyst sees
@@ -1927,11 +2299,57 @@
   };
 
   /**
+   * Compute the playground request for an aux_tool artifact.
+   *
+   * Pulls input from the artifact (captured PHP-side at tool finish) and
+   * for get_data_dictionary supplements it with the resolved dictionary
+   * identifier read off the response. Returns a () => {} click handler
+   * that the buildAuxEntry helper attaches to a "Try in API playground"
+   * button. NULL when no apiCall could be built.
+   */
+  Widget.prototype.buildAuxPlaygroundCallback = function (artifact) {
+    const inp = Object.assign({}, artifact.input || {});
+    if (artifact.tool === 'get_data_dictionary' && artifact.raw && artifact.raw.dictionaries) {
+      // The tool resolves a data-dictionary identifier from the dataset/
+      // distribution refs. Pluck the first one off the response so the
+      // playground GETs the actual item rather than a placeholder URL.
+      const dicts = artifact.raw.dictionaries;
+      const firstKey = Object.keys(dicts)[0];
+      if (firstKey && dicts[firstKey] && dicts[firstKey].identifier) {
+        inp.dictionary_identifier = dicts[firstKey].identifier;
+      }
+    }
+    // Prefer the distribution UUID — the public datastore-query endpoint
+    // expects it, not the internal {hash}__{version} resource id.
+    const apiCall = buildApiEquivalent(
+      artifact.tool,
+      inp,
+      inp.distribution_uuid || inp.resolved_resource_id || inp.resource_id || '',
+      ''
+    );
+    if (!apiCall) {
+      return null;
+    }
+    return () => {
+      this.openPlayground({
+        tool: artifact.tool,
+        method: apiCall.method,
+        url: apiCall.url,
+        body: apiCall.body,
+        note: apiCall.note || null,
+      });
+    };
+  };
+
+  /**
    * Build a single per-tool entry: collapsed details whose summary shows
    * the friendly tool name + one-line headline; body shows the tool-
    * specific content + a Raw output disclosure.
+   *
+   * `onPlayground` is an optional click handler. When provided, an
+   * "API playground" button is appended to the entry's footer.
    */
-  function buildAuxEntry(artifact) {
+  function buildAuxEntry(artifact, onPlayground) {
     const entry = document.createElement('details');
     entry.className = 'dkan-aiq-aux-entry';
 
@@ -1980,6 +2398,18 @@
       pre.textContent = JSON.stringify(artifact.raw, null, 2);
       raw.appendChild(pre);
       entry.appendChild(raw);
+    }
+
+    if (typeof onPlayground === 'function') {
+      const actions = document.createElement('div');
+      actions.className = 'dkan-aiq-aux-actions';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dkan-aiq-playground-btn';
+      btn.textContent = 'API playground';
+      btn.addEventListener('click', onPlayground);
+      actions.appendChild(btn);
+      entry.appendChild(actions);
     }
 
     return entry;
@@ -2209,6 +2639,30 @@
     // Editor — JSON textarea + Run/Reset + inline error slot.
     const editorWrap = document.createElement('div');
     editorWrap.className = 'dkan-aiq-playground-editor-wrap';
+    // Optional note rendered above the editor — used by composite tools
+    // (list_distributions, get_data_dictionary, ...) to flag that the
+    // shown REST call is only the first hop, or by approximating tools
+    // (sample_rows, get_datastore_stats, get_datastore_schema) to flag
+    // that the tool computes additional things client-side.
+    const noteEl = document.createElement('div');
+    noteEl.className = 'dkan-aiq-playground-note';
+    noteEl.hidden = true;
+    editorWrap.appendChild(noteEl);
+    // Collapsible "Parameter help" panel populated from DKAN's OpenAPI spec
+    // at /api/1 (cached in localStorage). Hidden until openPlayground()
+    // resolves a matching operation; if the spec fetch fails, this stays
+    // hidden and the playground continues to work.
+    const helpEl = document.createElement('details');
+    helpEl.className = 'dkan-aiq-playground-help';
+    helpEl.hidden = true;
+    const helpSummary = document.createElement('summary');
+    helpSummary.className = 'dkan-aiq-playground-help-summary';
+    helpSummary.textContent = 'Parameter help';
+    helpEl.appendChild(helpSummary);
+    const helpBody = document.createElement('div');
+    helpBody.className = 'dkan-aiq-playground-help-body';
+    helpEl.appendChild(helpBody);
+    editorWrap.appendChild(helpEl);
     const editorLabel = document.createElement('label');
     editorLabel.className = 'dkan-aiq-playground-editor-label';
     editorLabel.textContent = 'Request body (JSON)';
@@ -2352,6 +2806,9 @@
     this.playground.historyEl = historyWrap;
     this.playground.historyListEl = historyList;
     this.playground.historySummaryEl = historySummary;
+    this.playground.noteEl = noteEl;
+    this.playground.helpEl = helpEl;
+    this.playground.helpBodyEl = helpBody;
     // History UI may already be populated from a previous open in the same
     // widget instance — render it now so re-opening preserves the dropdown.
     this.refreshPlaygroundHistoryUI();
@@ -2381,6 +2838,7 @@
       method: request.method,
       url: request.url,
       body: request.body,
+      note: request.note || null,
       originalBodyJson: bodyJson,
     };
     this.setPlaygroundEditorValue(bodyJson);
@@ -2393,6 +2851,17 @@
     this.playground.methodEl.className = 'dkan-aiq-playground-method is-' + request.method.toLowerCase();
     this.playground.urlEl.textContent = request.url;
     this.playground.openTabBtn.hidden = (request.method !== 'GET');
+    if (this.playground.noteEl) {
+      if (request.note) {
+        this.playground.noteEl.textContent = request.note;
+        this.playground.noteEl.hidden = false;
+      }
+      else {
+        this.playground.noteEl.hidden = true;
+        this.playground.noteEl.textContent = '';
+      }
+    }
+    this.refreshPlaygroundHelp(request.method, request.url);
     this.root.classList.add('dkan-aiq-widget--with-playground');
     this.playground.el.setAttribute('aria-hidden', 'false');
     this.playground.open = true;
@@ -2406,6 +2875,107 @@
     this.playground.el.setAttribute('aria-hidden', 'true');
     this.playground.open = false;
   };
+
+  /**
+   * Populate the playground "Parameter help" panel from the OpenAPI spec.
+   *
+   * Fires asynchronously (the spec fetch may not yet be resolved). The current
+   * (method, url) is stashed on `this.playground.current` before this is
+   * called; when the spec resolves we re-check current still matches before
+   * rendering, so a quick second openPlayground call doesn't overwrite the
+   * newer help with stale content.
+   */
+  Widget.prototype.refreshPlaygroundHelp = function (method, url) {
+    const helpEl = this.playground.helpEl;
+    const bodyEl = this.playground.helpBodyEl;
+    if (!helpEl || !bodyEl) return;
+    helpEl.hidden = true;
+    bodyEl.innerHTML = '';
+    const widget = this;
+    OpenApiSpec.load().then((spec) => {
+      const cur = widget.playground.current;
+      if (!cur || cur.method !== method || cur.url !== url) {
+        // A newer openPlayground call superseded this one before the spec
+        // resolved — bail out so we don't overwrite the newer help.
+        return;
+      }
+      const help = OpenApiSpec.describe(spec, method, url);
+      if (!help) return;
+      renderPlaygroundHelp(bodyEl, help);
+      helpEl.hidden = false;
+    }).catch(() => { /* graceful degradation */ });
+  };
+
+  /**
+   * Render an OpenApiSpec.describe() result into the help panel body.
+   * Builds DOM nodes (no innerHTML/templating) so descriptions are safely
+   * escaped even though they come from a same-origin source.
+   */
+  function renderPlaygroundHelp(bodyEl, help) {
+    bodyEl.innerHTML = '';
+    if (help.summary) {
+      const sum = document.createElement('div');
+      sum.className = 'dkan-aiq-playground-help-summary-text';
+      sum.textContent = help.summary;
+      bodyEl.appendChild(sum);
+    }
+    if (help.description) {
+      const desc = document.createElement('div');
+      desc.className = 'dkan-aiq-playground-help-description';
+      desc.textContent = help.description;
+      bodyEl.appendChild(desc);
+    }
+    const sections = [];
+    if (help.parameters && help.parameters.length) {
+      sections.push({ title: 'URL parameters', items: help.parameters, showLocation: true });
+    }
+    if (help.bodyProperties && help.bodyProperties.length) {
+      sections.push({ title: 'Body properties', items: help.bodyProperties, showLocation: false });
+    }
+    sections.forEach((section) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'dkan-aiq-playground-help-section';
+      const title = document.createElement('div');
+      title.className = 'dkan-aiq-playground-help-section-title';
+      title.textContent = section.title;
+      wrap.appendChild(title);
+      const list = document.createElement('dl');
+      list.className = 'dkan-aiq-playground-help-list';
+      section.items.forEach((item) => {
+        const dt = document.createElement('dt');
+        dt.className = 'dkan-aiq-playground-help-term';
+        const name = document.createElement('code');
+        name.className = 'dkan-aiq-playground-help-name';
+        name.textContent = item.name;
+        dt.appendChild(name);
+        if (item.type) {
+          const type = document.createElement('span');
+          type.className = 'dkan-aiq-playground-help-type';
+          type.textContent = item.type;
+          dt.appendChild(type);
+        }
+        if (section.showLocation && item.in) {
+          const loc = document.createElement('span');
+          loc.className = 'dkan-aiq-playground-help-location';
+          loc.textContent = item.in;
+          dt.appendChild(loc);
+        }
+        if (item.required) {
+          const req = document.createElement('span');
+          req.className = 'dkan-aiq-playground-help-required';
+          req.textContent = 'required';
+          dt.appendChild(req);
+        }
+        list.appendChild(dt);
+        const dd = document.createElement('dd');
+        dd.className = 'dkan-aiq-playground-help-desc';
+        dd.textContent = item.description || '—';
+        list.appendChild(dd);
+      });
+      wrap.appendChild(list);
+      bodyEl.appendChild(wrap);
+    });
+  }
 
   Widget.prototype.runPlayground = function () {
     const cur = this.playground.current;
@@ -2867,6 +3437,14 @@
       statusRow.appendChild(hint);
     }
     host.appendChild(statusRow);
+
+    // Disclaimer: the playground response is the raw REST shape. The agent
+    // tool may transform this further (sanity flags, dictionary enrichment,
+    // case-corrected columns, etc.) before the LLM sees it.
+    const disclaimer = document.createElement('div');
+    disclaimer.className = 'dkan-aiq-playground-disclaimer';
+    disclaimer.textContent = 'REST response — the agent tool may transform this further before passing it to the LLM.';
+    host.appendChild(disclaimer);
 
     // Tab strip.
     const tabs = document.createElement('div');
@@ -3849,7 +4427,7 @@
     if (parsed.error) {
       return '→ Error: ' + String(parsed.error);
     }
-    if ((name === 'query_datastore' || name === 'query_datastore_join') && Array.isArray(parsed.results)) {
+    if ((name === 'query_datastore' || name === 'query_datastore_join' || name === 'query_datastore_raw') && Array.isArray(parsed.results)) {
       const got = parsed.results.length;
       const total = parsed.total_rows != null
         ? parsed.total_rows
