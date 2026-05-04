@@ -1766,6 +1766,158 @@
   padding: 6px 10px;
 }
 
+.dkan-aiq-playground-note {
+  font-size: 12px;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.dkan-aiq-playground-help {
+  font-size: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #f8fafc;
+  margin-bottom: 8px;
+}
+
+.dkan-aiq-playground-help[hidden] {
+  display: none;
+}
+
+.dkan-aiq-playground-help-summary {
+  cursor: pointer;
+  padding: 6px 10px;
+  font-weight: 600;
+  color: #334155;
+  list-style: none;
+}
+
+.dkan-aiq-playground-help-summary::-webkit-details-marker {
+  display: none;
+}
+
+.dkan-aiq-playground-help-summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+
+.dkan-aiq-playground-help[open] .dkan-aiq-playground-help-summary::before {
+  transform: rotate(90deg);
+}
+
+.dkan-aiq-playground-help-summary:hover {
+  background: #f1f5f9;
+}
+
+.dkan-aiq-playground-help-body {
+  padding: 8px 12px 10px;
+  border-top: 1px solid #e2e8f0;
+  color: #1e293b;
+  line-height: 1.45;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.dkan-aiq-playground-help-summary-text {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.dkan-aiq-playground-help-description {
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+.dkan-aiq-playground-help-section {
+  margin-top: 8px;
+}
+
+.dkan-aiq-playground-help-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.dkan-aiq-playground-help-list {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(140px, max-content) 1fr;
+  gap: 4px 12px;
+}
+
+.dkan-aiq-playground-help-term {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  align-self: start;
+}
+
+.dkan-aiq-playground-help-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #0f172a;
+  background: #e2e8f0;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.dkan-aiq-playground-help-type {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.dkan-aiq-playground-help-location {
+  font-size: 10px;
+  color: #475569;
+  background: #f1f5f9;
+  border-radius: 3px;
+  padding: 1px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dkan-aiq-playground-help-required {
+  font-size: 10px;
+  color: #b91c1c;
+  background: #fee2e2;
+  border-radius: 3px;
+  padding: 1px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dkan-aiq-playground-help-desc {
+  margin: 0;
+  color: #334155;
+  align-self: start;
+}
+
+.dkan-aiq-playground-disclaimer {
+  font-size: 11px;
+  color: #64748b;
+  font-style: italic;
+}
+
+.dkan-aiq-aux-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
 .dkan-aiq-playground-response {
   border-top: 1px solid #e2e8f0;
   padding: 12px 14px;

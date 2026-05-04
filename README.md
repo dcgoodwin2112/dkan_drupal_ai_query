@@ -21,7 +21,8 @@ ai.provider plugin (anthropic / openai)
 FunctionCall tools: query_datastore, query_datastore_join,
   get_datastore_schema, get_data_dictionary, get_datastore_stats,
   search_columns, search_datasets, list_datasets, list_distributions,
-  find_dataset_resources, create_chart
+  find_dataset_resources, sample_rows, distinct_values, compute_stats,
+  create_chart, refuse, [query_datastore_raw — opt-in]
   │
   ▼
 dkan_query_tools service methods (DatastoreTools, MetastoreTools, SearchTools)
@@ -96,6 +97,7 @@ The module's admin pages are grouped under `/admin/dkan/ai-query` (alongside the
 3. **Default provider.** Visit `/admin/config/ai/settings`. Select Anthropic or OpenAI as the default provider for the `chat` operation type. (drupal-ai 1.2 does not register `chat_with_tools` as a separate operation type; revisit when upgrading to a version that does.)
 4. **Provider key wiring.** Visit `/admin/config/ai/providers/anthropic` (and/or `openai`). Set the `api_key` field to the Key entity (`dkan_anthropic` / `dkan_openai`).
 5. **Widget toggles.** Back at `/admin/dkan/ai-query/settings`, walk the grouped sections (Widget interface, Result actions, Conversation history, Agent runtime, Logging) to decide which features users see and tune runtime/retention/debug knobs.
+6. **Raw query escape hatch (optional).** Under **Agent runtime**, the **Enable raw passthrough query tool** checkbox registers `query_datastore_raw` on the agent. This lets the agent submit a verbatim DKAN DatastoreQuery payload (nested OR groups, three-way joins, compound expressions) when the flat `query_datastore` tools cannot express the shape. The flat tools remain the default per the system prompt — raw is documented as the escape hatch. Off by default; turn on after telemetry confirms behavior.
 
 ## Placing the widget
 

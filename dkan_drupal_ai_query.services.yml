@@ -37,6 +37,7 @@ services:
       - '@dkan.datastore.service'
       - '@dkan_drupal_ai_query.refusal_collector'
       - '@config.factory'
+      - '@dkan_drupal_ai_query.system_prompt_loader'
     tags:
       - { name: event_subscriber }
 
@@ -73,6 +74,12 @@ services:
     arguments:
       - '@ai.provider'
       - '@logger.channel.dkan_drupal_ai_query'
+
+  dkan_drupal_ai_query.raw_query_runner:
+    class: Drupal\dkan_drupal_ai_query\Service\DatastoreRawQueryRunner
+    arguments:
+      - '@dkan.datastore.query'
+      - '@dkan_drupal_ai_query.resource_id_resolver'
 
   dkan_drupal_ai_query.controller:
     class: Drupal\dkan_drupal_ai_query\Controller\NlQueryController

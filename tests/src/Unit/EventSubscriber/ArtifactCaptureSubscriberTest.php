@@ -3,6 +3,7 @@
 namespace Drupal\Tests\dkan_drupal_ai_query\Unit\EventSubscriber;
 
 use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
+use Drupal\ai_agents\Event\AgentToolPreExecuteEvent;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\ImmutableConfig;
 use Drupal\datastore\DatastoreService;
@@ -10,6 +11,7 @@ use Drupal\dkan_drupal_ai_query\EventSubscriber\ArtifactCaptureSubscriber;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
 use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
 use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
+use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -35,12 +37,17 @@ class ArtifactCaptureSubscriberTest extends TestCase {
     ArtifactStorage $artifacts,
     ?ResourceIdResolver $resolver = NULL,
     ?RefusalCollector $refusals = NULL,
+    ?SystemPromptLoader $promptLoader = NULL,
   ): ArtifactCaptureSubscriber {
     $resolver = $resolver ?? $this->createMock(ResourceIdResolver::class);
     $config = $this->createMock(ImmutableConfig::class);
     $config->method('get')->willReturn(NULL);
     $configFactory = $this->createMock(ConfigFactoryInterface::class);
     $configFactory->method('get')->willReturn($config);
+    if ($promptLoader === NULL) {
+      $promptLoader = $this->createMock(SystemPromptLoader::class);
+      $promptLoader->method('activeVersion')->willReturn('v9');
+    }
     return new ArtifactCaptureSubscriber(
       $artifacts,
       $this->createMock(LoggerInterface::class),
@@ -48,6 +55,7 @@ class ArtifactCaptureSubscriberTest extends TestCase {
       $this->createMock(DatastoreService::class),
       $refusals ?? new RefusalCollector(),
       $configFactory,
+      $promptLoader,
     );
   }
 
@@ -640,6 +648,126 @@ class ArtifactCaptureSubscriberTest extends TestCase {
     $types = array_column($appended, 'type');
     $this->assertNotContains('aux_tool', $types, 'Error output must not produce an aux_tool artifact');
     $this->assertContains('tool_call', $types, 'Tool-call debug snapshot is captured even on error');
+  }
+
+  /**
+   * Capture the first appended tool_call artifact.
+   */
+  protected function bindCaptureToolCall(ArtifactStorage $artifacts, &$out): void {
+    $artifacts->method('append')
+      ->willReturnCallback(function (string $tid, array $entry) use (&$out) {
+        if ($entry['type'] === 'tool_call' && $out === NULL) {
+          $out = $entry;
+        }
+      });
+  }
+
+  /**
+   * Telemetry block carries prompt version, sizes, and error_present=false.
+   */
+  public function testToolCallSnapshotIncludesTelemetry(): void {
+    $artifacts = $this->createMock(ArtifactStorage::class);
+    $captured = NULL;
+    $this->bindCaptureToolCall($artifacts, $captured);
+
+    $promptLoader = $this->createMock(SystemPromptLoader::class);
+    $promptLoader->method('activeVersion')->willReturn('v10');
+
+    $subscriber = $this->buildSubscriber($artifacts, NULL, NULL, $promptLoader);
+
+    $output = json_encode(['results' => [['x' => 1]], 'total_rows' => 1]);
+    $tool = new \FunctionCallStub(
+      'sample_rows',
+      $output,
+      ['resource_id' => 'rid__1', 'n' => 5],
+    );
+
+    $subscriber->onToolFinished(new AgentToolFinishedExecutionEvent('thread-x', $tool));
+
+    $this->assertNotNull($captured, 'Tool-call artifact must be appended.');
+    $this->assertArrayHasKey('telemetry', $captured);
+    $tel = $captured['telemetry'];
+    $this->assertSame('v10', $tel['prompt_version']);
+    $this->assertSame(strlen($captured['tool_input']), $tel['tool_input_size']);
+    $this->assertSame(strlen($output), $tel['tool_output_size']);
+    $this->assertFalse($tel['error_present']);
+    // No pre-execute fired, so timing is null — not zero.
+    $this->assertNull($tel['execution_time_ms']);
+  }
+
+  /**
+   * Pre-execute event sets a start timestamp consumed by the matching finish.
+   */
+  public function testToolCallSnapshotComputesExecutionTime(): void {
+    $artifacts = $this->createMock(ArtifactStorage::class);
+    $captured = NULL;
+    $this->bindCaptureToolCall($artifacts, $captured);
+
+    $subscriber = $this->buildSubscriber($artifacts);
+
+    $tool = new \FunctionCallStub(
+      'query_datastore',
+      json_encode(['results' => [], 'total_rows' => 0]),
+      ['resource_id' => 'rid__1'],
+    );
+
+    // Bracket the finish event with a pre and a small sleep so elapsed > 0.
+    $subscriber->onToolPreExecute(new AgentToolPreExecuteEvent('thread-x', $tool));
+    usleep(2000);
+    $subscriber->onToolFinished(new AgentToolFinishedExecutionEvent('thread-x', $tool));
+
+    $this->assertNotNull($captured);
+    $this->assertIsInt($captured['telemetry']['execution_time_ms']);
+    $this->assertGreaterThanOrEqual(1, $captured['telemetry']['execution_time_ms']);
+  }
+
+  /**
+   * error_present is true when the tool's JSON output has a top-level error.
+   */
+  public function testToolCallSnapshotFlagsErrorOutput(): void {
+    $artifacts = $this->createMock(ArtifactStorage::class);
+    $captured = NULL;
+    $this->bindCaptureToolCall($artifacts, $captured);
+
+    $tool = new \FunctionCallStub(
+      'query_datastore',
+      json_encode(['error' => 'unknown_column', 'available_columns' => ['city']]),
+      ['resource_id' => 'rid__1'],
+    );
+
+    $subscriber = $this->buildSubscriber($artifacts);
+    $subscriber->onToolFinished(new AgentToolFinishedExecutionEvent('thread-x', $tool));
+
+    $this->assertTrue($captured['telemetry']['error_present']);
+  }
+
+  /**
+   * The pre-execute slot is consumed exactly once per finish.
+   *
+   * If a second finish fires without a fresh pre, its elapsed must be NULL —
+   * otherwise stale timestamps would attribute one tool's runtime to another.
+   */
+  public function testPreExecuteSlotIsClearedAfterFinish(): void {
+    $artifacts = $this->createMock(ArtifactStorage::class);
+    $appended = [];
+    $artifacts->method('append')
+      ->willReturnCallback(function (string $tid, array $entry) use (&$appended) {
+        if ($entry['type'] === 'tool_call') {
+          $appended[] = $entry;
+        }
+      });
+
+    $subscriber = $this->buildSubscriber($artifacts);
+    $tool = new \FunctionCallStub('list_datasets', json_encode(['datasets' => [], 'total' => 0]), []);
+
+    $subscriber->onToolPreExecute(new AgentToolPreExecuteEvent('thread-x', $tool));
+    $subscriber->onToolFinished(new AgentToolFinishedExecutionEvent('thread-x', $tool));
+    // Second finish without a fresh pre.
+    $subscriber->onToolFinished(new AgentToolFinishedExecutionEvent('thread-x', $tool));
+
+    $this->assertCount(2, $appended);
+    $this->assertIsInt($appended[0]['telemetry']['execution_time_ms']);
+    $this->assertNull($appended[1]['telemetry']['execution_time_ms']);
   }
 
 }

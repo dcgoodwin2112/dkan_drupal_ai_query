@@ -3,12 +3,14 @@
 namespace Drupal\dkan_drupal_ai_query\EventSubscriber;
 
 use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
+use Drupal\ai_agents\Event\AgentToolPreExecuteEvent;
 use Drupal\common\DataResource;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\datastore\DatastoreService;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
 use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
 use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
+use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -94,6 +96,17 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
    */
   protected array $tableNameCache = [];
 
+  /**
+   * Pre-execute timestamps keyed by thread id, captured for tool-call timing.
+   *
+   * Pre/finished events bracket each tool synchronously within a thread, so
+   * a single slot per thread is enough — overwritten on each pre, consumed
+   * (and cleared) on the matching finish.
+   *
+   * @var array<string, float>
+   */
+  protected array $pendingStarts = [];
+
   public function __construct(
     protected ArtifactStorage $artifacts,
     protected LoggerInterface $logger,
@@ -101,6 +114,7 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
     protected DatastoreService $datastoreService,
     protected RefusalCollector $refusals,
     protected ConfigFactoryInterface $configFactory,
+    protected ?SystemPromptLoader $systemPromptLoader = NULL,
   ) {}
 
   /**
@@ -108,8 +122,20 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
    */
   public static function getSubscribedEvents(): array {
     return [
+      AgentToolPreExecuteEvent::EVENT_NAME => ['onToolPreExecute', 0],
       AgentToolFinishedExecutionEvent::EVENT_NAME => ['onToolFinished', 0],
     ];
+  }
+
+  /**
+   * Record the start time so the matching finish can compute elapsed ms.
+   */
+  public function onToolPreExecute(AgentToolPreExecuteEvent $event): void {
+    $threadId = $event->getThreadId() ?: $event->getAgentRunnerId();
+    if (!$threadId) {
+      return;
+    }
+    $this->pendingStarts[$threadId] = microtime(TRUE);
   }
 
   /**
@@ -149,7 +175,7 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
       ]);
     }
 
-    if ($name === 'query_datastore' || $name === 'query_datastore_join') {
+    if ($name === 'query_datastore' || $name === 'query_datastore_join' || $name === 'query_datastore_raw') {
       $this->captureData($threadId, $tool, $name);
     }
     elseif (isset(self::SIMPLE_TABLE_TOOLS[$name])) {
@@ -198,15 +224,50 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
     catch (\Throwable) {
       $readable = '';
     }
+    $toolInput = $args ? json_encode($args, JSON_UNESCAPED_SLASHES) : '';
     $this->artifacts->append($threadId, [
       'type' => 'tool_call',
       'tool_name' => $name,
-      'tool_input' => $args ? json_encode($args, JSON_UNESCAPED_SLASHES) : '',
+      'tool_input' => $toolInput,
       // Cap the persisted result so a large query doesn't bloat the message
       // entity. The summary line in the debug panel only needs the head
       // anyway; the full table is available via the `data` artifact.
       'tool_results' => $readable !== '' ? mb_substr($readable, 0, 4000) : '',
+      'telemetry' => $this->buildToolCallTelemetry($threadId, $toolInput, $readable),
     ]);
+  }
+
+  /**
+   * Build the per-tool-call telemetry block.
+   *
+   * Adds enough metadata for offline analysis (timing, prompt-version
+   * correlation, raw input/output size, error rate) without bloating the
+   * persisted artifact with the full output. Read by ad-hoc SQL queries
+   * over `dkan_aiq_message.artifacts`.
+   */
+  protected function buildToolCallTelemetry(string $threadId, string $toolInput, string $readable): array {
+    $elapsedMs = NULL;
+    if (isset($this->pendingStarts[$threadId])) {
+      $elapsedMs = (int) round((microtime(TRUE) - $this->pendingStarts[$threadId]) * 1000);
+      unset($this->pendingStarts[$threadId]);
+    }
+    // Detect a top-level `error` key in the JSON output. Non-JSON output
+    // (or output that doesn't decode to an array) is treated as not-an-error;
+    // structured tools we care about always emit JSON.
+    $errorPresent = FALSE;
+    if ($readable !== '') {
+      $decoded = json_decode($readable, TRUE);
+      if (is_array($decoded) && array_key_exists('error', $decoded)) {
+        $errorPresent = TRUE;
+      }
+    }
+    return [
+      'execution_time_ms' => $elapsedMs,
+      'prompt_version' => $this->systemPromptLoader?->activeVersion(),
+      'tool_input_size' => strlen($toolInput),
+      'tool_output_size' => strlen($readable),
+      'error_present' => $errorPresent,
+    ];
   }
 
   /**
@@ -262,6 +323,12 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
       $inputNames[] = 'join_resource_id';
       $inputNames[] = 'join_on';
     }
+    if ($toolName === 'query_datastore_raw') {
+      // Raw tool's only context is `payload` (the verbatim DSL JSON). The
+      // playground branch reads it via `input.payload`; everything else in
+      // the loop above is irrelevant for raw and harmlessly absent.
+      $inputNames = ['payload'];
+    }
     $input = [];
     foreach ($inputNames as $name) {
       try {
@@ -311,6 +378,51 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
       }
     }
 
+    // For the raw tool, walk every resource in the payload and build a
+    // {hash}__{version} → distribution_uuid map. The playground needs UUIDs
+    // because both /api/1/datastore/query (collection) and the per-resource
+    // form expect distribution UUIDs in resources[].id, while the agent's
+    // payload uses the internal {hash}__{version} form (the runner resolves
+    // titles to that form before validation).
+    if ($toolName === 'query_datastore_raw' && !empty($input['payload'])) {
+      $payloadDecoded = is_string($input['payload']) ? json_decode($input['payload'], TRUE) : NULL;
+      $resources = $payloadDecoded['resources'] ?? NULL;
+      if (is_array($resources)) {
+        $uuidMap = [];
+        foreach ($resources as $resource) {
+          $id = $resource['id'] ?? NULL;
+          if (!is_string($id) || $id === '') {
+            continue;
+          }
+          $resolved = $this->resolver->resolve(ResourceIdResolver::normalize($id));
+          if ($resolved === NULL) {
+            continue;
+          }
+          $uuid = $this->resolver->resolveDistributionUuid($resolved);
+          if ($uuid !== NULL) {
+            $uuidMap[$resolved] = $uuid;
+            // Index by the agent's original id too, in case the agent
+            // emitted a fuzzy title that resolved to a different string.
+            if ($id !== $resolved) {
+              $uuidMap[$id] = $uuid;
+            }
+          }
+        }
+        if ($uuidMap !== []) {
+          $input['distribution_uuid_map'] = $uuidMap;
+        }
+        if (!empty($resources[0]['id'])) {
+          $primary = $this->resolver->resolve(ResourceIdResolver::normalize((string) $resources[0]['id']));
+          if ($primary !== NULL) {
+            $input['resolved_resource_id'] = $primary;
+            if (isset($uuidMap[$primary])) {
+              $input['distribution_uuid'] = $uuidMap[$primary];
+            }
+          }
+        }
+      }
+    }
+
     $rows = $decoded['results'] ?? [];
     $totalRows = $decoded['total_rows']
       ?? $decoded['count']
@@ -353,6 +465,18 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
    * data rather than re-parsing strings.
    */
   protected function buildQuerySummary(string $toolName, array $input): array {
+    if ($toolName === 'query_datastore_raw') {
+      $payload = $input['payload'] ?? '';
+      $decoded = is_string($payload) ? json_decode($payload, TRUE) : NULL;
+      $primaryId = NULL;
+      if (is_array($decoded) && !empty($decoded['resources'][0]['id'])) {
+        $primaryId = (string) $decoded['resources'][0]['id'];
+      }
+      return [
+        'resource_id' => $primaryId,
+        'payload' => is_array($decoded) ? $decoded : NULL,
+      ];
+    }
     $summary = [
       'resource_id' => $input['resolved_resource_id'] ?? $input['resource_id'] ?? NULL,
     ];
@@ -424,6 +548,11 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
       $input[$contextName] = $value;
     }
 
+    // Resolve resource_id → distribution_uuid so the playground hits the
+    // public datastore-query endpoint (which takes the distribution UUID,
+    // not the internal {hash}__{version} resource id).
+    $this->annotateResourceId($input);
+
     $totalRows = $cfg['count_key'] !== NULL && isset($decoded[$cfg['count_key']])
       ? (int) $decoded[$cfg['count_key']]
       : count($rows);
@@ -438,6 +567,29 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
       'input' => $input ?: NULL,
       'provenance' => $this->buildSimpleProvenance($toolName, $decoded, count($rows), $totalRows),
     ]);
+  }
+
+  /**
+   * Resolve resource_id in the input array to its distribution UUID.
+   *
+   * Mutates $input to add resolved_resource_id and distribution_uuid when a
+   * lookup succeeds. Shared by captureSimpleData and captureAuxTool so any
+   * tool whose playground rebuild hits /api/1/datastore/query/{distributionId}
+   * can find the right id at render time.
+   */
+  protected function annotateResourceId(array &$input): void {
+    if (empty($input['resource_id'])) {
+      return;
+    }
+    $resolved = $this->resolver->resolve(ResourceIdResolver::normalize((string) $input['resource_id']));
+    if ($resolved === NULL) {
+      return;
+    }
+    $input['resolved_resource_id'] = $resolved;
+    $distributionUuid = $this->resolver->resolveDistributionUuid($resolved);
+    if ($distributionUuid !== NULL) {
+      $input['distribution_uuid'] = $distributionUuid;
+    }
   }
 
   /**
@@ -507,12 +659,31 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
       return;
     }
 
+    // Capture the tool's accepted inputs so the playground sidebar can
+    // rebuild the equivalent REST call. Mirrors captureSimpleData()'s
+    // capture set.
+    $input = [];
+    foreach (['resource_id', 'column', 'columns', 'dataset_id', 'limit'] as $contextName) {
+      try {
+        $value = $tool->getContextValue($contextName);
+      }
+      catch (\Throwable) {
+        continue;
+      }
+      if ($value === NULL || $value === '') {
+        continue;
+      }
+      $input[$contextName] = $value;
+    }
+    $this->annotateResourceId($input);
+
     $this->artifacts->append($threadId, [
       'type' => 'aux_tool',
       'tool' => $toolName,
       'executed_at' => gmdate('c'),
       'structured' => $structured,
       'raw' => $decoded,
+      'input' => $input ?: NULL,
     ]);
   }
 

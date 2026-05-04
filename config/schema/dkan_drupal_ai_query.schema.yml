@@ -56,6 +56,9 @@ dkan_drupal_ai_query.settings:
     show_method_summary:
       type: boolean
       label: 'Show method summary'
+    enable_raw_query_tool:
+      type: boolean
+      label: 'Enable query_datastore_raw passthrough tool'
     max_iterations:
       type: integer
       label: 'Max agent iterations'

@@ -9,6 +9,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\dkan_drupal_ai_query\Service\AgentPromptSync;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -34,6 +35,13 @@ class SettingsForm extends ConfigFormBase {
   protected EntityTypeManagerInterface $entityTypeManager;
 
   /**
+   * The agent prompt sync service.
+   *
+   * @var \Drupal\dkan_drupal_ai_query\Service\AgentPromptSync
+   */
+  protected AgentPromptSync $agentPromptSync;
+
+  /**
    * {@inheritdoc}
    */
   public function __construct(
@@ -41,10 +49,12 @@ class SettingsForm extends ConfigFormBase {
     TypedConfigManagerInterface $typed_config_manager,
     AiProviderPluginManager $provider_manager,
     EntityTypeManagerInterface $entity_type_manager,
+    AgentPromptSync $agent_prompt_sync,
   ) {
     parent::__construct($config_factory, $typed_config_manager);
     $this->providerManager = $provider_manager;
     $this->entityTypeManager = $entity_type_manager;
+    $this->agentPromptSync = $agent_prompt_sync;
   }
 
   /**
@@ -56,6 +66,7 @@ class SettingsForm extends ConfigFormBase {
       $container->get('config.typed'),
       $container->get('ai.provider'),
       $container->get('entity_type.manager'),
+      $container->get('dkan_drupal_ai_query.agent_prompt_sync'),
     );
   }
 
@@ -279,6 +290,13 @@ class SettingsForm extends ConfigFormBase {
       '#tree' => FALSE,
     ];
 
+    $form['runtime']['enable_raw_query_tool'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Enable raw passthrough query tool'),
+      '#default_value' => (bool) ($config->get('enable_raw_query_tool') ?? FALSE),
+      '#description' => $this->t('Registers <code>query_datastore_raw</code> on the agent. Lets the agent submit a verbatim DKAN DatastoreQuery payload (nested OR groups, three-way joins, compound expressions) when the flat <code>query_datastore</code> tools cannot express the shape. The flat tools remain the default per the system prompt — raw is the escape hatch. Off by default; enable after telemetry confirms behavior.'),
+    ];
+
     $form['runtime']['max_iterations'] = [
       '#type' => 'number',
       '#title' => $this->t('Max agent iterations'),
@@ -319,6 +337,7 @@ class SettingsForm extends ConfigFormBase {
     if (!in_array($debugLevel, ['off', 'info', 'debug'], TRUE)) {
       $debugLevel = 'off';
     }
+    $enableRawQueryTool = (bool) $form_state->getValue('enable_raw_query_tool');
 
     $this->config('dkan_drupal_ai_query.settings')
       ->set('default_model', $form_state->getValue('default_model'))
@@ -338,6 +357,7 @@ class SettingsForm extends ConfigFormBase {
       ->set('show_aux_tool_calls', (bool) $form_state->getValue('show_aux_tool_calls'))
       ->set('show_rest_playground_sidebar', (bool) $form_state->getValue('show_rest_playground_sidebar'))
       ->set('show_method_summary', (bool) $form_state->getValue('show_method_summary'))
+      ->set('enable_raw_query_tool', $enableRawQueryTool)
       ->set('max_iterations', $maxIterations)
       ->set('conversation_retention_days', max(0, (int) $form_state->getValue('conversation_retention_days')))
       ->set('debug_log_level', $debugLevel)
@@ -352,6 +372,8 @@ class SettingsForm extends ConfigFormBase {
           $agent->set('max_loops', $maxIterations)->save();
         }
       }
+      // Mirror the raw-tool flag onto the agent's tools list. Idempotent.
+      $this->agentPromptSync->syncTools($enableRawQueryTool);
     }
 
     parent::submitForm($form, $form_state);
