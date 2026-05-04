@@ -1,0 +1,51 @@
+id: create_chart_flow
+description: |
+  Pull Yellowstone's recreation-visit history (2018-2024) and emit a Vega-Lite
+  line chart so the chart artifact path renders in the widget.
+match:
+  question_contains:
+    - yellowstone
+    - trend
+turns:
+  - type: tool_calls
+    calls:
+      - name: query_datastore
+        args:
+          resource_id: '${FIXTURE_RESOURCE_ID}'
+          columns: 'year,recreation_visits'
+          conditions: '[{"property":"park_name","value":"Yellowstone","operator":"="}]'
+          sort_field: year
+          sort_direction: asc
+
+  - type: tool_calls
+    calls:
+      - name: create_chart
+        args:
+          spec: |
+            {
+              "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+              "title": "Yellowstone Recreation Visits, 2018-2024",
+              "data": {
+                "values": [
+                  {"year": 2018, "recreation_visits": 4115000},
+                  {"year": 2019, "recreation_visits": 4020288},
+                  {"year": 2020, "recreation_visits": 3806305},
+                  {"year": 2021, "recreation_visits": 4860537},
+                  {"year": 2022, "recreation_visits": 3290242},
+                  {"year": 2023, "recreation_visits": 4501382},
+                  {"year": 2024, "recreation_visits": 4744353}
+                ]
+              },
+              "mark": {"type": "line", "point": true},
+              "encoding": {
+                "x": {"field": "year", "type": "ordinal", "title": "Year"},
+                "y": {"field": "recreation_visits", "type": "quantitative", "title": "Recreation visits"}
+              }
+            }
+
+  - type: final_answer
+    content: |
+      Yellowstone's annual recreation visits over 2018-2024 climbed to a record
+      4.86 million in 2021, then dropped sharply in 2022 due to the historic
+      summer flooding that closed the northern half of the park, before
+      rebounding past 4.7 million in 2024.

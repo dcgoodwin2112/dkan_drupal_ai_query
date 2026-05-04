@@ -1,0 +1,7 @@
+services:
+  dkan_drupal_ai_query_mock.fixture_commands:
+    class: Drupal\dkan_drupal_ai_query_mock\Commands\FixtureCommands
+    arguments:
+      - '@dkan_drupal_ai_query_mock.fixture_loader'
+    tags:
+      - { name: drush.command }

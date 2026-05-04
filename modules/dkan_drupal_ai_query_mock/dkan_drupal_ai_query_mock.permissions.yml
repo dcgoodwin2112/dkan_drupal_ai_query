@@ -1,0 +1,4 @@
+administer dkan ai query mock:
+  title: 'Administer DKAN AI Query mock provider'
+  description: 'Pick which mock scenario the dkan_aiq_mock provider replays.'
+  restrict access: true

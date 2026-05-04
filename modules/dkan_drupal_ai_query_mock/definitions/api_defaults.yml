@@ -1,0 +1,17 @@
+scripted:
+  max_tokens:
+    label: 'Max tokens'
+    description: 'Ignored by the mock provider; present so the model-config form renders.'
+    default: 1024
+    type: number
+    constraints:
+      min: 1
+      max: 1024
+  temperature:
+    label: 'Temperature'
+    description: 'Ignored by the mock provider.'
+    default: 0
+    type: number
+    constraints:
+      min: 0
+      max: 1

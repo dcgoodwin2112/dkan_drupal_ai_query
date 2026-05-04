@@ -9,6 +9,5 @@ dependencies:
   - drupal:user
   - ai:ai
   - ai_agents:ai_agents
-  - ai_provider_anthropic:ai_provider_anthropic
   - key:key
   - dkan_query_tools:dkan_query_tools

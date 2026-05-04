@@ -1,0 +1,29 @@
+id: refusal_no_dataset
+description: |
+  User asks about a topic with no matching dataset; the agent searches once
+  and then refuses via the structured refuse tool. Exercises the refusal
+  artifact path in the widget.
+match:
+  question_contains:
+    - mars
+    - rainfall
+turns:
+  - type: tool_calls
+    calls:
+      - name: search_datasets
+        args:
+          keyword: mars rainfall
+
+  - type: tool_calls
+    calls:
+      - name: refuse
+        args:
+          reason_category: no_matching_dataset
+          explanation: 'No dataset in this catalog covers rainfall on Mars. The fixture catalog ships a single dataset on U.S. National Park visitation.'
+          datasets_searched: 'National Parks Visitation'
+
+  - type: final_answer
+    content: |
+      I could not find a dataset that covers rainfall on Mars. The fixture
+      catalog focuses on U.S. National Park visitation; there is no
+      planetary-science data here.

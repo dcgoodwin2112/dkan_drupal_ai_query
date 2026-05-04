@@ -1,0 +1,41 @@
+id: multi_turn_followup
+description: |
+  Designed to be matched on a follow-up question after the user has already
+  asked about the busiest region in this conversation. Demonstrates chat-history
+  rehydration: ScenarioMatcher reads the most recent user message (the
+  follow-up). Aggregates 2023 visits by region and answers the "least visited"
+  side of the comparison. The 'list_datasets_then_query' scenario is the
+  natural priming first turn.
+match:
+  question_contains:
+    - region
+    - least
+turns:
+  - type: tool_calls
+    calls:
+      - name: query_datastore
+        args:
+          resource_id: '${FIXTURE_RESOURCE_ID}'
+          columns: 'region'
+          conditions: '[{"property":"year","value":"2023","operator":"="}]'
+          expressions: '[{"operator":"sum","operands":["recreation_visits"],"alias":"total_visits"}]'
+          groupings: 'region'
+          sort_field: total_visits
+          sort_direction: asc
+
+  - type: final_answer
+    content: |
+      Aggregating 2023 recreation visits by region:
+
+      | Region | Total visits (2023) |
+      | --- | ---: |
+      | Eastern | 22,966,508 |
+      | Mountain West | 22,050,973 |
+      | West Coast | 13,385,358 |
+      | Southwest | 7,956,649 |
+      | Alaska & Pacific | 4,042,026 |
+
+      **Alaska & Pacific** is the least-visited region, with 4.04 million
+      total recreation visits across its six parks — roughly one-fifth of the
+      Eastern total, even though Wrangell-St. Elias alone is the largest park
+      in the dataset by area.
