@@ -16,6 +16,20 @@
 
   const POLL_INTERVAL_MS = 500;
 
+  // History sidebar pagination — server returns N at a time and a "Load more"
+  // button at the foot of the list fetches the next page. Matches the
+  // controller's default/cap (1..100) in ConversationController::list().
+  const SIDEBAR_PAGE_SIZE = 25;
+
+  // localStorage key for the collapsed/expanded state of the history sidebar.
+  // Per-browser only — not synced server-side.
+  const SIDEBAR_COLLAPSED_KEY = 'dkanAiQuery.sidebarCollapsed';
+
+  // localStorage key for the collapsed/expanded state of the API playground
+  // sidebar. Per-browser only — not synced server-side. Independent of the
+  // playground "open" state (× still tears the playground down entirely).
+  const PLAYGROUND_COLLAPSED_KEY = 'dkanAiQuery.playgroundCollapsed';
+
   // Tool names whose data artifact should render as a plain table+CSV with
   // simplified provenance — no API call / SQL / preview panels (those only
   // make sense for the two datastore-query tools).
@@ -240,6 +254,9 @@
     this.activeRun = null;
     this.datasetMap = {};
     this.cachedConversations = [];
+    this.sidebarOffset = 0;
+    this.sidebarTotal = 0;
+    this.sidebarHasMore = false;
     this.followUpPlaceholder = 'Ask a follow-up...';
 
     // Right-side REST API playground sidebar. Lazily created on first
@@ -281,6 +298,9 @@
       sidebarList: root.querySelector('.dkan-aiq-sidebar-list'),
       sidebarSearch: root.querySelector('.dkan-aiq-sidebar-search-input'),
       sidebarFooter: root.querySelector('.dkan-aiq-sidebar-footer'),
+      sidebarToggle: root.querySelector('.dkan-aiq-sidebar-toggle'),
+      sidebarRailSummary: root.querySelector('.dkan-aiq-sidebar-rail-summary'),
+      sidebarRailCount: root.querySelector('.dkan-aiq-sidebar-rail-count'),
       threadHeader: root.querySelector('.dkan-aiq-thread-header'),
       newBtn: root.querySelector('.dkan-aiq-new-conversation'),
       thread: root.querySelector('.dkan-aiq-thread'),
@@ -319,6 +339,8 @@
       this.root.classList.add('dkan-aiq-widget--with-sidebar');
       this.dom.sidebar.hidden = false;
       this.bindSidebar();
+      this.bindSidebarToggle();
+      this.applySidebarCollapsedState();
       this.refreshSidebar();
     }
     this.updateThreadHeader();
@@ -340,7 +362,9 @@
           }
         });
         if (this.cachedConversations.length) {
-          this.renderSidebar(this.cachedConversations);
+          // Re-render with already-loaded conversations + current pagination
+          // total so the dataset labels (now in datasetMap) appear.
+          this.renderSidebar({ items: this.cachedConversations.slice(), total: this.sidebarTotal }, false);
         }
       });
   };
@@ -420,7 +444,9 @@
           this.dom.datasetSelect.appendChild(opt);
         });
         if (this.cachedConversations.length) {
-          this.renderSidebar(this.cachedConversations);
+          // Re-render with already-loaded conversations + current pagination
+          // total so the dataset labels (now in datasetMap) appear.
+          this.renderSidebar({ items: this.cachedConversations.slice(), total: this.sidebarTotal }, false);
         }
       });
   };
@@ -549,6 +575,9 @@
     if (!this.dom.sidebarSearch) {
       return;
     }
+    // Filter operates only over conversations already loaded into the DOM.
+    // Pages fetched after a search begins are appended unfiltered; users can
+    // re-type to re-apply. Server-side search is intentionally out of scope.
     this.dom.sidebarSearch.addEventListener('input', () => {
       const term = this.dom.sidebarSearch.value.toLowerCase();
       this.dom.sidebarList.querySelectorAll('.dkan-aiq-sidebar-entry').forEach((item) => {
@@ -558,22 +587,107 @@
     });
   };
 
+  Widget.prototype.bindSidebarToggle = function () {
+    if (!this.dom.sidebarToggle) {
+      return;
+    }
+    const toggle = () => {
+      const collapsed = !this.dom.sidebar.classList.contains('dkan-aiq-sidebar--collapsed');
+      this.setSidebarCollapsed(collapsed);
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+      }
+      catch (e) {
+        // Safari private mode can throw QuotaExceededError; collapse still works
+        // for the current session, just not persisted.
+      }
+    };
+    this.dom.sidebarToggle.addEventListener('click', toggle);
+    // Rail summary (icon + count badge) is only visible when collapsed and
+    // shares the same toggle behavior so the whole rail acts as one expand
+    // target.
+    if (this.dom.sidebarRailSummary) {
+      this.dom.sidebarRailSummary.addEventListener('click', toggle);
+    }
+  };
+
+  Widget.prototype.applySidebarCollapsedState = function () {
+    let collapsed = false;
+    try {
+      collapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+    }
+    catch (e) {
+      // localStorage may be unavailable; default to expanded.
+    }
+    this.setSidebarCollapsed(collapsed);
+  };
+
+  Widget.prototype.setSidebarCollapsed = function (collapsed) {
+    if (!this.dom.sidebar) {
+      return;
+    }
+    this.dom.sidebar.classList.toggle('dkan-aiq-sidebar--collapsed', collapsed);
+    if (this.dom.sidebarToggle) {
+      this.dom.sidebarToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      this.dom.sidebarToggle.setAttribute(
+        'aria-label',
+        collapsed ? 'Expand history sidebar' : 'Collapse history sidebar'
+      );
+    }
+  };
+
   Widget.prototype.refreshSidebar = function () {
     if (!this.historyEnabled) {
       return;
     }
-    fetch('/api/dkan-ai-query/conversations', {
+    this.sidebarOffset = 0;
+    fetch('/api/dkan-ai-query/conversations?offset=0&limit=' + SIDEBAR_PAGE_SIZE, {
       headers: { 'Accept': 'application/json' },
       credentials: 'same-origin',
     })
       .then(function (r) { return r.json(); })
-      .then((list) => { this.renderSidebar(list); })
+      .then((payload) => { this.renderSidebar(payload, false); })
       .catch(() => {});
   };
 
-  Widget.prototype.renderSidebar = function (list) {
-    this.cachedConversations = list || [];
-    this.dom.sidebarList.innerHTML = '';
+  Widget.prototype.loadMoreSidebar = function () {
+    if (!this.historyEnabled || !this.sidebarHasMore) {
+      return;
+    }
+    const nextOffset = this.sidebarOffset + SIDEBAR_PAGE_SIZE;
+    fetch('/api/dkan-ai-query/conversations?offset=' + nextOffset + '&limit=' + SIDEBAR_PAGE_SIZE, {
+      headers: { 'Accept': 'application/json' },
+      credentials: 'same-origin',
+    })
+      .then(function (r) { return r.json(); })
+      .then((payload) => {
+        this.sidebarOffset = nextOffset;
+        this.renderSidebar(payload, true);
+      })
+      .catch(() => {});
+  };
+
+  Widget.prototype.renderSidebar = function (payload, append) {
+    const items = (payload && Array.isArray(payload.items)) ? payload.items : [];
+    this.sidebarTotal = (payload && typeof payload.total === 'number') ? payload.total : items.length;
+
+    const oldLoadMore = this.dom.sidebarList.querySelector('.dkan-aiq-sidebar-load-more');
+    if (oldLoadMore) {
+      oldLoadMore.remove();
+    }
+
+    if (!append) {
+      this.cachedConversations = items.slice();
+      this.dom.sidebarList.innerHTML = '';
+    }
+    else {
+      const empty = this.dom.sidebarList.querySelector('.dkan-aiq-sidebar-empty');
+      if (empty) {
+        empty.remove();
+      }
+      this.cachedConversations = this.cachedConversations.concat(items);
+    }
+
     if (!this.cachedConversations.length) {
       const empty = document.createElement('div');
       empty.className = 'dkan-aiq-sidebar-empty';
@@ -581,13 +695,53 @@
       this.dom.sidebarList.appendChild(empty);
     }
     else {
-      this.cachedConversations.forEach((conv) => {
+      items.forEach((conv) => {
         this.dom.sidebarList.appendChild(this.buildSidebarEntry(conv));
       });
     }
-    if (this.dom.sidebarFooter) {
-      const n = this.cachedConversations.length;
-      this.dom.sidebarFooter.textContent = n + ' conversation' + (n !== 1 ? 's' : '');
+
+    this.sidebarHasMore = this.cachedConversations.length < this.sidebarTotal;
+    if (this.sidebarHasMore) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dkan-aiq-sidebar-load-more';
+      btn.textContent = 'Load more';
+      btn.addEventListener('click', () => { this.loadMoreSidebar(); });
+      this.dom.sidebarList.appendChild(btn);
+    }
+
+    this.updateSidebarFooter();
+  };
+
+  Widget.prototype.updateSidebarFooter = function () {
+    const loaded = this.cachedConversations.length;
+    const total = this.sidebarTotal;
+
+    if (this.dom.sidebarRailCount) {
+      this.dom.sidebarRailCount.textContent = String(total);
+    }
+    if (this.dom.sidebarRailSummary) {
+      this.dom.sidebarRailSummary.setAttribute('data-count', String(total));
+      this.dom.sidebarRailSummary.setAttribute(
+        'aria-label',
+        total
+          ? 'Expand history sidebar (' + total + ' conversation' + (total !== 1 ? 's' : '') + ')'
+          : 'Expand history sidebar'
+      );
+    }
+
+    if (!this.dom.sidebarFooter) {
+      return;
+    }
+    if (!total) {
+      this.dom.sidebarFooter.textContent = '';
+      return;
+    }
+    if (loaded >= total) {
+      this.dom.sidebarFooter.textContent = total + ' conversation' + (total !== 1 ? 's' : '');
+    }
+    else {
+      this.dom.sidebarFooter.textContent = loaded + ' of ' + total + ' conversations';
     }
   };
 
@@ -672,10 +826,17 @@
           this.dom.thread.innerHTML = '';
           this.dom.input.placeholder = this.defaultPlaceholder;
         }
-        if (this.dom.sidebarFooter) {
-          const n = this.cachedConversations.length;
-          this.dom.sidebarFooter.textContent = n + ' conversation' + (n !== 1 ? 's' : '');
+        if (this.sidebarTotal > 0) {
+          this.sidebarTotal -= 1;
         }
+        this.sidebarHasMore = this.cachedConversations.length < this.sidebarTotal;
+        if (!this.sidebarHasMore) {
+          const btn = this.dom.sidebarList.querySelector('.dkan-aiq-sidebar-load-more');
+          if (btn) {
+            btn.remove();
+          }
+        }
+        this.updateSidebarFooter();
       });
     });
     actions.appendChild(delBtn);
@@ -1537,7 +1698,16 @@
 
     if (input.expressions) {
       try {
-        JSON.parse(input.expressions).forEach((expr) => { properties.push(expr); });
+        // The tool's `expressions` param is the flat shape
+        // {operator, operands, alias}; the REST schema requires the wrapped
+        // {expression: {operator, operands}, alias} shape, so wrap here to
+        // match what DatastoreTools::validateAndBuildExpressions does in PHP.
+        JSON.parse(input.expressions).forEach((expr) => {
+          properties.push({
+            expression: { operator: expr.operator, operands: expr.operands },
+            alias: expr.alias,
+          });
+        });
       }
       catch (e) { /* ignore */ }
     }
@@ -2625,16 +2795,46 @@
     urlEl.className = 'dkan-aiq-playground-url';
     endpoint.appendChild(methodEl);
     endpoint.appendChild(urlEl);
+    // Header actions: collapse-to-rail (chevron) + full close (×). The chevron
+    // is additive — × still tears the playground all the way down.
+    const headerActions = document.createElement('div');
+    headerActions.className = 'dkan-aiq-playground-header-actions';
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'dkan-aiq-playground-toggle';
+    toggleBtn.setAttribute('aria-label', 'Collapse playground');
+    toggleBtn.setAttribute('aria-expanded', 'true');
+    toggleBtn.innerHTML =
+      '<svg class="dkan-aiq-playground-toggle-icon" width="14" height="14" viewBox="0 0 24 24"' +
+      ' fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"' +
+      ' stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>';
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
     closeBtn.className = 'dkan-aiq-playground-close';
     closeBtn.setAttribute('aria-label', 'Close playground');
     closeBtn.innerHTML = '&times;';
     closeBtn.addEventListener('click', () => { this.closePlayground(); });
+    headerActions.appendChild(toggleBtn);
+    headerActions.appendChild(closeBtn);
     header.appendChild(title);
-    header.appendChild(closeBtn);
+    header.appendChild(headerActions);
     header.appendChild(endpoint);
     aside.appendChild(header);
+
+    // Rail summary: code-brackets icon + recent-runs count, only visible when
+    // the sidebar is collapsed. Acts as a second click target to expand.
+    const railSummary = document.createElement('button');
+    railSummary.type = 'button';
+    railSummary.className = 'dkan-aiq-playground-rail-summary';
+    railSummary.setAttribute('data-count', '0');
+    railSummary.setAttribute('aria-label', 'Expand API playground');
+    railSummary.innerHTML =
+      '<svg class="dkan-aiq-playground-rail-icon" width="20" height="20" viewBox="0 0 24 24"' +
+      ' fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"' +
+      ' stroke-linejoin="round" aria-hidden="true">' +
+      '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>' +
+      '<span class="dkan-aiq-playground-rail-count">0</span>';
+    aside.appendChild(railSummary);
 
     // Editor — JSON textarea + Run/Reset + inline error slot.
     const editorWrap = document.createElement('div');
@@ -2809,6 +3009,11 @@
     this.playground.noteEl = noteEl;
     this.playground.helpEl = helpEl;
     this.playground.helpBodyEl = helpBody;
+    this.playground.toggleBtn = toggleBtn;
+    this.playground.railSummary = railSummary;
+    this.playground.railCount = railSummary.querySelector('.dkan-aiq-playground-rail-count');
+    this.bindPlaygroundToggle();
+    this.applyPlaygroundCollapsedState();
     // History UI may already be populated from a previous open in the same
     // widget instance — render it now so re-opening preserves the dropdown.
     this.refreshPlaygroundHistoryUI();
@@ -2865,6 +3070,12 @@
     this.root.classList.add('dkan-aiq-widget--with-playground');
     this.playground.el.setAttribute('aria-hidden', 'false');
     this.playground.open = true;
+    // A new bubble click implies the user wants to see the new request, so
+    // override any persisted collapsed state. Don't rewrite localStorage —
+    // the user's last explicit chevron click is still their preference.
+    if (this.playground.el.classList.contains('dkan-aiq-playground-sidebar--collapsed')) {
+      this.setPlaygroundCollapsed(false);
+    }
     // Defer focus so the slide-in transition doesn't fight it.
     setTimeout(() => { this.playground.editor.focus(); }, 50);
   };
@@ -2874,6 +3085,75 @@
     this.root.classList.remove('dkan-aiq-widget--with-playground');
     this.playground.el.setAttribute('aria-hidden', 'true');
     this.playground.open = false;
+  };
+
+  Widget.prototype.bindPlaygroundToggle = function () {
+    if (!this.playground.toggleBtn || !this.playground.el) {
+      return;
+    }
+    const toggle = () => {
+      const collapsed = !this.playground.el.classList.contains('dkan-aiq-playground-sidebar--collapsed');
+      this.setPlaygroundCollapsed(collapsed);
+      try {
+        localStorage.setItem(PLAYGROUND_COLLAPSED_KEY, collapsed ? '1' : '0');
+      }
+      catch (e) {
+        // localStorage unavailable (Safari private mode); collapse still works
+        // for the current session.
+      }
+    };
+    this.playground.toggleBtn.addEventListener('click', toggle);
+    if (this.playground.railSummary) {
+      this.playground.railSummary.addEventListener('click', () => {
+        // Rail summary is only visible when collapsed → only ever expands.
+        this.setPlaygroundCollapsed(false);
+        try {
+          localStorage.setItem(PLAYGROUND_COLLAPSED_KEY, '0');
+        }
+        catch (e) {}
+      });
+    }
+  };
+
+  Widget.prototype.applyPlaygroundCollapsedState = function () {
+    let collapsed = false;
+    try {
+      collapsed = localStorage.getItem(PLAYGROUND_COLLAPSED_KEY) === '1';
+    }
+    catch (e) {
+      // Default to expanded.
+    }
+    this.setPlaygroundCollapsed(collapsed);
+  };
+
+  Widget.prototype.setPlaygroundCollapsed = function (collapsed) {
+    if (!this.playground.el) {
+      return;
+    }
+    this.playground.el.classList.toggle('dkan-aiq-playground-sidebar--collapsed', collapsed);
+    if (this.playground.toggleBtn) {
+      this.playground.toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      this.playground.toggleBtn.setAttribute(
+        'aria-label',
+        collapsed ? 'Expand playground' : 'Collapse playground'
+      );
+    }
+  };
+
+  Widget.prototype.updatePlaygroundRailCount = function () {
+    const count = this.playgroundHistory.length;
+    if (this.playground.railCount) {
+      this.playground.railCount.textContent = String(count);
+    }
+    if (this.playground.railSummary) {
+      this.playground.railSummary.setAttribute('data-count', String(count));
+      this.playground.railSummary.setAttribute(
+        'aria-label',
+        count
+          ? 'Expand API playground (' + count + ' recent run' + (count !== 1 ? 's' : '') + ')'
+          : 'Expand API playground'
+      );
+    }
   };
 
   /**
@@ -3284,6 +3564,7 @@
    * <details> when empty so the sidebar doesn't show an inert affordance.
    */
   Widget.prototype.refreshPlaygroundHistoryUI = function () {
+    this.updatePlaygroundRailCount();
     if (!this.playground.historyEl) return;
     const list = this.playground.historyListEl;
     list.innerHTML = '';

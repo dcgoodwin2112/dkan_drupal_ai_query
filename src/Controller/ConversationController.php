@@ -5,6 +5,7 @@ namespace Drupal\dkan_drupal_ai_query\Controller;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\dkan_drupal_ai_query\Service\ConversationStorage;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Conversation list / load / delete / pin endpoints.
@@ -14,15 +15,24 @@ class ConversationController {
   public function __construct(
     protected ConversationStorage $storage,
     protected AccountProxyInterface $currentUser,
+    protected RequestStack $requestStack,
   ) {}
 
   /**
    * List the current user's conversations.
    */
   public function list(): JsonResponse {
-    return new JsonResponse(
-      $this->storage->listForUser((int) $this->currentUser->id())
-    );
+    $request = $this->requestStack->getCurrentRequest();
+    $offset = max(0, (int) $request->query->get('offset', 0));
+    $limit = (int) $request->query->get('limit', 25);
+    $limit = max(1, min(100, $limit));
+    $uid = (int) $this->currentUser->id();
+    return new JsonResponse([
+      'items' => $this->storage->listForUser($uid, $limit, $offset),
+      'total' => $this->storage->countForUser($uid),
+      'offset' => $offset,
+      'limit' => $limit,
+    ]);
   }
 
   /**
