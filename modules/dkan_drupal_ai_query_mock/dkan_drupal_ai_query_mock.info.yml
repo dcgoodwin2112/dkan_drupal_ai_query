@@ -1,0 +1,11 @@
+name: 'DKAN Drupal AI Query Mock'
+type: module
+description: 'Scenario-driven mock AI provider for browser-driven testing of dkan_drupal_ai_query without hitting a live LLM.'
+core_version_requirement: ^10.5 || ^11
+package: DKAN
+dependencies:
+  - drupal:system
+  - ai:ai
+  - dkan:harvest
+  - dkan:metastore
+  - dkan_drupal_ai_query:dkan_drupal_ai_query

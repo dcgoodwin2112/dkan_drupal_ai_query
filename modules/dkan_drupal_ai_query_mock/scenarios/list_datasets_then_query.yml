@@ -1,0 +1,49 @@
+id: list_datasets_then_query
+description: |
+  Find the National Parks visitation dataset, inspect its schema, query for the
+  busiest parks in 2023, and answer with the top five.
+match:
+  question_contains:
+    - parks
+    - 2023
+turns:
+  - type: tool_calls
+    calls:
+      - name: search_datasets
+        args:
+          keyword: parks
+
+  - type: tool_calls
+    calls:
+      - name: find_dataset_resources
+        args:
+          title: 'National Parks Visitation'
+
+  - type: tool_calls
+    calls:
+      - name: get_datastore_schema
+        args:
+          resource_id: '${FIXTURE_RESOURCE_ID}'
+
+  - type: tool_calls
+    calls:
+      - name: query_datastore
+        args:
+          resource_id: '${FIXTURE_RESOURCE_ID}'
+          columns: 'park_name,state,recreation_visits'
+          conditions: '[{"property":"year","value":"2023","operator":"="}]'
+          sort_field: recreation_visits
+          sort_direction: desc
+          limit: 5
+
+  - type: final_answer
+    content: |
+      The five most-visited U.S. National Parks in 2023 were:
+
+      1. **Great Smoky Mountains** (TN) — 13,297,647 recreation visits
+      2. **Grand Canyon** (AZ) — 4,733,705
+      3. **Zion** (UT) — 4,623,238
+      4. **Yellowstone** (WY) — 4,501,382
+      5. **Rocky Mountain** (CO) — 4,115,837
+
+      Great Smoky Mountains has held the top spot every year in this dataset.

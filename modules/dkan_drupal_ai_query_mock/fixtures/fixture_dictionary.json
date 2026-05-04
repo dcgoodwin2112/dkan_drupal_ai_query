@@ -1,0 +1,44 @@
+{
+  "identifier": "a1b2c3d4-e5f6-4789-a0b1-c2d3e4f50002",
+  "data": {
+    "title": "National Parks Visitation Data Dictionary",
+    "fields": [
+      {
+        "name": "park_name",
+        "type": "string",
+        "title": "Park Name",
+        "description": "Park common name; the 'National Park' suffix is omitted."
+      },
+      {
+        "name": "state",
+        "type": "string",
+        "title": "State",
+        "description": "Two-letter U.S. state postal code. For parks spanning multiple states, the headquarters state is listed."
+      },
+      {
+        "name": "region",
+        "type": "string",
+        "title": "Region",
+        "description": "Coarse U.S. region. One of: Eastern, Mountain West, West Coast, Southwest, Alaska & Pacific."
+      },
+      {
+        "name": "year",
+        "type": "integer",
+        "title": "Year",
+        "description": "Calendar year of the recorded visitation count (2018-2024)."
+      },
+      {
+        "name": "recreation_visits",
+        "type": "integer",
+        "title": "Recreation Visits",
+        "description": "NPS-defined annual recreation visits."
+      },
+      {
+        "name": "area_acres",
+        "type": "integer",
+        "title": "Area (Acres)",
+        "description": "Park area in acres. Stable across years."
+      }
+    ]
+  }
+}

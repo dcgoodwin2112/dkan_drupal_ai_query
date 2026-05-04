@@ -1,0 +1,11 @@
+{
+  "identifier": "dkan_aiq_mock_fixture",
+  "extract": {
+    "type": "\\Drupal\\harvest\\ETL\\Extract\\DataJson",
+    "uri": "/fixture.json"
+  },
+  "transforms": ["\\Drupal\\harvest\\Transform\\ResourceImporter"],
+  "load": {
+    "type": "\\Drupal\\harvest\\Load\\Dataset"
+  }
+}

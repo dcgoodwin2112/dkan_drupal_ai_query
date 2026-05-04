@@ -1,0 +1,211 @@
+park_name,state,region,year,recreation_visits,area_acres
+Great Smoky Mountains,TN,Eastern,2018,11421200,522427
+Great Smoky Mountains,TN,Eastern,2019,12547743,522427
+Great Smoky Mountains,TN,Eastern,2020,12095720,522427
+Great Smoky Mountains,TN,Eastern,2021,14161548,522427
+Great Smoky Mountains,TN,Eastern,2022,12937633,522427
+Great Smoky Mountains,TN,Eastern,2023,13297647,522427
+Great Smoky Mountains,TN,Eastern,2024,12191834,522427
+Acadia,ME,Eastern,2018,3537575,49071
+Acadia,ME,Eastern,2019,3437286,49071
+Acadia,ME,Eastern,2020,2669034,49071
+Acadia,ME,Eastern,2021,4069098,49071
+Acadia,ME,Eastern,2022,3970260,49071
+Acadia,ME,Eastern,2023,3879890,49071
+Acadia,ME,Eastern,2024,3961661,49071
+Shenandoah,VA,Eastern,2018,1264880,199224
+Shenandoah,VA,Eastern,2019,1425507,199224
+Shenandoah,VA,Eastern,2020,1313652,199224
+Shenandoah,VA,Eastern,2021,1592312,199224
+Shenandoah,VA,Eastern,2022,1592899,199224
+Shenandoah,VA,Eastern,2023,1490177,199224
+Shenandoah,VA,Eastern,2024,1535000,199224
+Everglades,FL,Eastern,2018,597124,1508938
+Everglades,FL,Eastern,2019,1089893,1508938
+Everglades,FL,Eastern,2020,702319,1508938
+Everglades,FL,Eastern,2021,942130,1508938
+Everglades,FL,Eastern,2022,817253,1508938
+Everglades,FL,Eastern,2023,805663,1508938
+Everglades,FL,Eastern,2024,832400,1508938
+Mammoth Cave,KY,Eastern,2018,533206,54016
+Mammoth Cave,KY,Eastern,2019,551437,54016
+Mammoth Cave,KY,Eastern,2020,415083,54016
+Mammoth Cave,KY,Eastern,2021,515774,54016
+Mammoth Cave,KY,Eastern,2022,515488,54016
+Mammoth Cave,KY,Eastern,2023,633072,54016
+Mammoth Cave,KY,Eastern,2024,642800,54016
+Cuyahoga Valley,OH,Eastern,2018,2096053,32572
+Cuyahoga Valley,OH,Eastern,2019,2237213,32572
+Cuyahoga Valley,OH,Eastern,2020,2755365,32572
+Cuyahoga Valley,OH,Eastern,2021,2575275,32572
+Cuyahoga Valley,OH,Eastern,2022,2913312,32572
+Cuyahoga Valley,OH,Eastern,2023,2860059,32572
+Cuyahoga Valley,OH,Eastern,2024,2872295,32572
+Yellowstone,WY,Mountain West,2018,4115000,2219791
+Yellowstone,WY,Mountain West,2019,4020288,2219791
+Yellowstone,WY,Mountain West,2020,3806305,2219791
+Yellowstone,WY,Mountain West,2021,4860537,2219791
+Yellowstone,WY,Mountain West,2022,3290242,2219791
+Yellowstone,WY,Mountain West,2023,4501382,2219791
+Yellowstone,WY,Mountain West,2024,4744353,2219791
+Grand Teton,WY,Mountain West,2018,3491151,310044
+Grand Teton,WY,Mountain West,2019,3405614,310044
+Grand Teton,WY,Mountain West,2020,3289638,310044
+Grand Teton,WY,Mountain West,2021,3885230,310044
+Grand Teton,WY,Mountain West,2022,2806223,310044
+Grand Teton,WY,Mountain West,2023,3417106,310044
+Grand Teton,WY,Mountain West,2024,3628222,310044
+Glacier,MT,Mountain West,2018,2965309,1012837
+Glacier,MT,Mountain West,2019,3049839,1012837
+Glacier,MT,Mountain West,2020,1698864,1012837
+Glacier,MT,Mountain West,2021,3081656,1012837
+Glacier,MT,Mountain West,2022,2908458,1012837
+Glacier,MT,Mountain West,2023,2932141,1012837
+Glacier,MT,Mountain West,2024,3206209,1012837
+Rocky Mountain,CO,Mountain West,2018,4590493,265795
+Rocky Mountain,CO,Mountain West,2019,4670053,265795
+Rocky Mountain,CO,Mountain West,2020,3305199,265795
+Rocky Mountain,CO,Mountain West,2021,4434848,265795
+Rocky Mountain,CO,Mountain West,2022,4300424,265795
+Rocky Mountain,CO,Mountain West,2023,4115837,265795
+Rocky Mountain,CO,Mountain West,2024,4154349,265795
+Zion,UT,Mountain West,2018,4320033,146597
+Zion,UT,Mountain West,2019,4488268,146597
+Zion,UT,Mountain West,2020,3591254,146597
+Zion,UT,Mountain West,2021,5039835,146597
+Zion,UT,Mountain West,2022,4692417,146597
+Zion,UT,Mountain West,2023,4623238,146597
+Zion,UT,Mountain West,2024,4946592,146597
+Bryce Canyon,UT,Mountain West,2018,2679478,35835
+Bryce Canyon,UT,Mountain West,2019,2594904,35835
+Bryce Canyon,UT,Mountain West,2020,1464655,35835
+Bryce Canyon,UT,Mountain West,2021,2104600,35835
+Bryce Canyon,UT,Mountain West,2022,2354660,35835
+Bryce Canyon,UT,Mountain West,2023,2461269,35835
+Bryce Canyon,UT,Mountain West,2024,2503000,35835
+Yosemite,CA,West Coast,2018,4009436,759620
+Yosemite,CA,West Coast,2019,4422861,759620
+Yosemite,CA,West Coast,2020,2268313,759620
+Yosemite,CA,West Coast,2021,3287595,759620
+Yosemite,CA,West Coast,2022,3667550,759620
+Yosemite,CA,West Coast,2023,3897070,759620
+Yosemite,CA,West Coast,2024,4121807,759620
+Sequoia,CA,West Coast,2018,1229594,404063
+Sequoia,CA,West Coast,2019,1246053,404063
+Sequoia,CA,West Coast,2020,796086,404063
+Sequoia,CA,West Coast,2021,1059548,404063
+Sequoia,CA,West Coast,2022,902594,404063
+Sequoia,CA,West Coast,2023,1084000,404063
+Sequoia,CA,West Coast,2024,1202000,404063
+Joshua Tree,CA,West Coast,2018,2942382,795156
+Joshua Tree,CA,West Coast,2019,2988547,795156
+Joshua Tree,CA,West Coast,2020,2400066,795156
+Joshua Tree,CA,West Coast,2021,3064400,795156
+Joshua Tree,CA,West Coast,2022,3058294,795156
+Joshua Tree,CA,West Coast,2023,3270404,795156
+Joshua Tree,CA,West Coast,2024,3348141,795156
+Olympic,WA,West Coast,2018,3104455,922650
+Olympic,WA,West Coast,2019,3245806,922650
+Olympic,WA,West Coast,2020,2499177,922650
+Olympic,WA,West Coast,2021,2718925,922650
+Olympic,WA,West Coast,2022,2432075,922650
+Olympic,WA,West Coast,2023,2947503,922650
+Olympic,WA,West Coast,2024,3717267,922650
+Mount Rainier,WA,West Coast,2018,1518491,236381
+Mount Rainier,WA,West Coast,2019,1501621,236381
+Mount Rainier,WA,West Coast,2020,1160754,236381
+Mount Rainier,WA,West Coast,2021,1670063,236381
+Mount Rainier,WA,West Coast,2022,1541635,236381
+Mount Rainier,WA,West Coast,2023,1632604,236381
+Mount Rainier,WA,West Coast,2024,1734016,236381
+Crater Lake,OR,West Coast,2018,720659,183224
+Crater Lake,OR,West Coast,2019,704512,183224
+Crater Lake,OR,West Coast,2020,670500,183224
+Crater Lake,OR,West Coast,2021,647751,183224
+Crater Lake,OR,West Coast,2022,538907,183224
+Crater Lake,OR,West Coast,2023,553777,183224
+Crater Lake,OR,West Coast,2024,568400,183224
+Grand Canyon,AZ,Southwest,2018,6380495,1201647
+Grand Canyon,AZ,Southwest,2019,5974411,1201647
+Grand Canyon,AZ,Southwest,2020,2897098,1201647
+Grand Canyon,AZ,Southwest,2021,4532677,1201647
+Grand Canyon,AZ,Southwest,2022,4732101,1201647
+Grand Canyon,AZ,Southwest,2023,4733705,1201647
+Grand Canyon,AZ,Southwest,2024,4919163,1201647
+Saguaro,AZ,Southwest,2018,957405,91442
+Saguaro,AZ,Southwest,2019,1020226,91442
+Saguaro,AZ,Southwest,2020,1041571,91442
+Saguaro,AZ,Southwest,2021,1079789,91442
+Saguaro,AZ,Southwest,2022,1007855,91442
+Saguaro,AZ,Southwest,2023,989243,91442
+Saguaro,AZ,Southwest,2024,1038275,91442
+Carlsbad Caverns,NM,Southwest,2018,465912,46766
+Carlsbad Caverns,NM,Southwest,2019,440003,46766
+Carlsbad Caverns,NM,Southwest,2020,183835,46766
+Carlsbad Caverns,NM,Southwest,2021,349244,46766
+Carlsbad Caverns,NM,Southwest,2022,394167,46766
+Carlsbad Caverns,NM,Southwest,2023,394121,46766
+Carlsbad Caverns,NM,Southwest,2024,414560,46766
+White Sands,NM,Southwest,2018,603008,146344
+White Sands,NM,Southwest,2019,608785,146344
+White Sands,NM,Southwest,2020,415383,146344
+White Sands,NM,Southwest,2021,782469,146344
+White Sands,NM,Southwest,2022,706000,146344
+White Sands,NM,Southwest,2023,715000,146344
+White Sands,NM,Southwest,2024,728000,146344
+Big Bend,TX,Southwest,2018,440091,801163
+Big Bend,TX,Southwest,2019,463832,801163
+Big Bend,TX,Southwest,2020,393907,801163
+Big Bend,TX,Southwest,2021,581220,801163
+Big Bend,TX,Southwest,2022,517335,801163
+Big Bend,TX,Southwest,2023,509237,801163
+Big Bend,TX,Southwest,2024,548000,801163
+Petrified Forest,AZ,Southwest,2018,644922,221390
+Petrified Forest,AZ,Southwest,2019,643475,221390
+Petrified Forest,AZ,Southwest,2020,489565,221390
+Petrified Forest,AZ,Southwest,2021,590334,221390
+Petrified Forest,AZ,Southwest,2022,590330,221390
+Petrified Forest,AZ,Southwest,2023,615343,221390
+Petrified Forest,AZ,Southwest,2024,631800,221390
+Denali,AK,Alaska & Pacific,2018,594660,6045153
+Denali,AK,Alaska & Pacific,2019,601152,6045153
+Denali,AK,Alaska & Pacific,2020,54850,6045153
+Denali,AK,Alaska & Pacific,2021,229521,6045153
+Denali,AK,Alaska & Pacific,2022,427562,6045153
+Denali,AK,Alaska & Pacific,2023,499164,6045153
+Denali,AK,Alaska & Pacific,2024,580000,6045153
+Glacier Bay,AK,Alaska & Pacific,2018,597915,3283168
+Glacier Bay,AK,Alaska & Pacific,2019,672087,3283168
+Glacier Bay,AK,Alaska & Pacific,2020,4769,3283168
+Glacier Bay,AK,Alaska & Pacific,2021,89768,3283168
+Glacier Bay,AK,Alaska & Pacific,2022,552000,3283168
+Glacier Bay,AK,Alaska & Pacific,2023,657000,3283168
+Glacier Bay,AK,Alaska & Pacific,2024,712000,3283168
+Kenai Fjords,AK,Alaska & Pacific,2018,321596,669983
+Kenai Fjords,AK,Alaska & Pacific,2019,356601,669983
+Kenai Fjords,AK,Alaska & Pacific,2020,11592,669983
+Kenai Fjords,AK,Alaska & Pacific,2021,411782,669983
+Kenai Fjords,AK,Alaska & Pacific,2022,386031,669983
+Kenai Fjords,AK,Alaska & Pacific,2023,414089,669983
+Kenai Fjords,AK,Alaska & Pacific,2024,442000,669983
+Wrangell-St. Elias,AK,Alaska & Pacific,2018,79450,13175799
+Wrangell-St. Elias,AK,Alaska & Pacific,2019,74518,13175799
+Wrangell-St. Elias,AK,Alaska & Pacific,2020,16655,13175799
+Wrangell-St. Elias,AK,Alaska & Pacific,2021,50189,13175799
+Wrangell-St. Elias,AK,Alaska & Pacific,2022,65236,13175799
+Wrangell-St. Elias,AK,Alaska & Pacific,2023,65236,13175799
+Wrangell-St. Elias,AK,Alaska & Pacific,2024,70000,13175799
+Hawaii Volcanoes,HI,Alaska & Pacific,2018,1116891,325605
+Hawaii Volcanoes,HI,Alaska & Pacific,2019,1368376,325605
+Hawaii Volcanoes,HI,Alaska & Pacific,2020,589397,325605
+Hawaii Volcanoes,HI,Alaska & Pacific,2021,1008463,325605
+Hawaii Volcanoes,HI,Alaska & Pacific,2022,1265754,325605
+Hawaii Volcanoes,HI,Alaska & Pacific,2023,1372479,325605
+Hawaii Volcanoes,HI,Alaska & Pacific,2024,1400000,325605
+Haleakala,HI,Alaska & Pacific,2018,1044084,33265
+Haleakala,HI,Alaska & Pacific,2019,994394,33265
+Haleakala,HI,Alaska & Pacific,2020,411431,33265
+Haleakala,HI,Alaska & Pacific,2021,853181,33265
+Haleakala,HI,Alaska & Pacific,2022,853181,33265
+Haleakala,HI,Alaska & Pacific,2023,1034058,33265
+Haleakala,HI,Alaska & Pacific,2024,1096000,33265

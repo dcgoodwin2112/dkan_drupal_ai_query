@@ -5,8 +5,42 @@
  * Install, update, and uninstall hooks for dkan_drupal_ai_query.
  */
 
+use Drupal\Core\Url;
+use Drupal\ai\Enum\AiModelCapability;
 use Drupal\dkan_drupal_ai_query\Entity\Conversation;
 use Drupal\dkan_drupal_ai_query\Entity\Message;
+
+/**
+ * Implements hook_requirements().
+ *
+ * Verifies a chat-with-tools provider is usable. The module no longer hard-
+ * depends on ai_provider_anthropic, so a CI/dev install needs either a real
+ * provider configured or the dkan_drupal_ai_query_mock submodule enabled.
+ */
+function dkan_drupal_ai_query_requirements(string $phase): array {
+  if ($phase !== 'runtime') {
+    return [];
+  }
+  $manager = \Drupal::service('ai.provider');
+  $providers = $manager->getProvidersForOperationType('chat', TRUE, [AiModelCapability::ChatTools]);
+  if (!empty($providers)) {
+    return [];
+  }
+  return [
+    'dkan_drupal_ai_query_chat_provider' => [
+      'title' => t('DKAN AI Query: chat-with-tools provider'),
+      'value' => t('No chat-with-tools provider is configured.'),
+      'severity' => REQUIREMENT_WARNING,
+      'description' => t(
+        'Configure a provider at <a href=":providers">/admin/config/ai/providers</a>, set a default at <a href=":settings">/admin/config/ai/settings</a>, or enable the <code>dkan_drupal_ai_query_mock</code> submodule for fixture-driven local development.',
+        [
+          ':providers' => Url::fromUri('base:/admin/config/ai/providers')->toString(),
+          ':settings' => Url::fromUri('base:/admin/config/ai/settings')->toString(),
+        ],
+      ),
+    ],
+  ];
+}
 
 /**
  * Implements hook_install().

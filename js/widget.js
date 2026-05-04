@@ -1021,6 +1021,20 @@
         clearInterval(pollHandle);
         this.activeRun = null;
         if (resp.ok) {
+          // Safety net: if the assistant bubble was detached mid-request (race
+          // with sidebar / new-conversation reset, or a layout reflow), the
+          // user would otherwise see no answer despite the start succeeding.
+          // Force a reload of the saved conversation so the result is visible.
+          if (!bubble.isConnected && resp.body.conversation_id) {
+            this.currentConversationId = resp.body.conversation_id;
+            this.refreshSidebar();
+            this.loadConversation(resp.body.conversation_id);
+            this.debugFooter();
+            this.setStatus('');
+            this.dom.submit.disabled = false;
+            this.dom.input.focus();
+            return;
+          }
           // Refusal artifacts already render their own card via polling, so
           // don't show "(no answer)" on top of one.
           const hasRefusal = !!bubble.querySelector('.dkan-aiq-refusal');
