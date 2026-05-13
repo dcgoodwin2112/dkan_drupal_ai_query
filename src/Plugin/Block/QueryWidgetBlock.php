@@ -149,6 +149,7 @@ class QueryWidgetBlock extends BlockBase implements ContainerFactoryPluginInterf
             'showAuxToolCalls' => $config->get('show_aux_tool_calls') ?? FALSE,
             'showRestPlaygroundSidebar' => $config->get('show_rest_playground_sidebar') ?? FALSE,
             'showMethodSummary' => $config->get('show_method_summary') ?? TRUE,
+            'showSchemaBrowser' => $config->get('show_schema_browser') ?? TRUE,
             'userAuthenticated' => $this->currentUser->isAuthenticated(),
           ],
         ],

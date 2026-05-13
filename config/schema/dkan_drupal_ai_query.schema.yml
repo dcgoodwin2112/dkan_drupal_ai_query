@@ -56,6 +56,9 @@ dkan_drupal_ai_query.settings:
     show_method_summary:
       type: boolean
       label: 'Show method summary'
+    show_schema_browser:
+      type: boolean
+      label: 'Show "Browse catalog" tab'
     enable_raw_query_tool:
       type: boolean
       label: 'Enable query_datastore_raw passthrough tool'

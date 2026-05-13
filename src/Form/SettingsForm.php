@@ -174,6 +174,13 @@ class SettingsForm extends ConfigFormBase {
       '#description' => $this->t('After each answer, generate three short follow-up question chips via a lightweight LLM call.'),
     ];
 
+    $form['chrome']['show_schema_browser'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Show "Browse catalog" tab'),
+      '#default_value' => $config->get('show_schema_browser') ?? TRUE,
+      '#description' => $this->t('Adds a second tab to the widget for browsing the catalog (datasets, distributions, columns, sample rows) without composing a question. Powered by read-only endpoints under <code>/api/dkan-ai-query/browse/*</code>.'),
+    ];
+
     $form['chrome']['show_debug_panel'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Show "Agent diagnostics" panel'),
@@ -357,6 +364,7 @@ class SettingsForm extends ConfigFormBase {
       ->set('show_aux_tool_calls', (bool) $form_state->getValue('show_aux_tool_calls'))
       ->set('show_rest_playground_sidebar', (bool) $form_state->getValue('show_rest_playground_sidebar'))
       ->set('show_method_summary', (bool) $form_state->getValue('show_method_summary'))
+      ->set('show_schema_browser', (bool) $form_state->getValue('show_schema_browser'))
       ->set('enable_raw_query_tool', $enableRawQueryTool)
       ->set('max_iterations', $maxIterations)
       ->set('conversation_retention_days', max(0, (int) $form_state->getValue('conversation_retention_days')))

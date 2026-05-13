@@ -69,6 +69,23 @@ services:
       - '@dkan_query_tools.metastore'
       - '@cache.default'
 
+  dkan_drupal_ai_query.schema_browser:
+    class: Drupal\dkan_drupal_ai_query\Service\SchemaBrowserService
+    arguments:
+      - '@dkan_query_tools.metastore'
+      - '@dkan_query_tools.datastore'
+      - '@dkan_query_tools.search'
+      - '@dkan_drupal_ai_query.dataset_caveat_registry'
+      - '@logger.channel.dkan_drupal_ai_query'
+
+  dkan_drupal_ai_query.browse_controller:
+    class: Drupal\dkan_drupal_ai_query\Controller\BrowseController
+    arguments:
+      - '@dkan_drupal_ai_query.schema_browser'
+      - '@logger.channel.dkan_drupal_ai_query'
+    tags:
+      - { name: 'controller.service_arguments' }
+
   dkan_drupal_ai_query.suggestion_generator:
     class: Drupal\dkan_drupal_ai_query\Service\SuggestionGenerator
     arguments:

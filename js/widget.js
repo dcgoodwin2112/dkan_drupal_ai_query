@@ -318,11 +318,17 @@
       modelSelect: root.querySelector('.dkan-aiq-model-select'),
       debugPanel: root.querySelector('.dkan-aiq-debug'),
       debugLog: root.querySelector('.dkan-aiq-debug-log'),
+      tabsNav: root.querySelector('.dkan-aiq-tabs'),
+      tabs: root.querySelectorAll('.dkan-aiq-tab'),
+      modeChat: root.querySelector('.dkan-aiq-mode-chat'),
+      modeBrowse: root.querySelector('.dkan-aiq-mode-browse'),
+      browseHost: root.querySelector('.dkan-aiq-browse'),
     };
   }
 
   Widget.prototype.init = function () {
     this.applyVisibilityToggles();
+    this.setupModeTabs();
     this.defaultPlaceholder = this.dom.input ? (this.dom.input.placeholder || '') : '';
     this.defaultExamplesHtml = this.dom.examplesContainer
       ? this.dom.examplesContainer.innerHTML
@@ -382,6 +388,90 @@
     }
     if (!s.showDebugPanel && this.dom.debugPanel) {
       this.dom.debugPanel.hidden = true;
+    }
+  };
+
+  /**
+   * Reveal the Ask / Browse-catalog tab nav and wire mode-switching.
+   *
+   * Off when showSchemaBrowser is false: nav stays hidden, browse panel
+   * stays hidden, chat behaves identically to the pre-tab layout. Browse
+   * content is populated lazily on first activation (added in step 4).
+   */
+  Widget.prototype.setupModeTabs = function () {
+    if (!this.settings.showSchemaBrowser) {
+      return;
+    }
+    if (!this.dom.tabsNav || !this.dom.tabs.length) {
+      return;
+    }
+    this.dom.tabsNav.hidden = false;
+    this.activeMode = 'chat';
+    this.browseInitialized = false;
+    const self = this;
+    this.dom.tabs.forEach((btn) => {
+      btn.addEventListener('click', function () {
+        const mode = btn.getAttribute('data-mode');
+        if (!mode || mode === self.activeMode) {
+          return;
+        }
+        self.switchMode(mode);
+      });
+    });
+  };
+
+  /**
+   * Cross-mode handoff: switch to chat, pre-fill the input with `text`,
+   * dispatch an input event so any auto-grow / validation reacts, and
+   * focus the textarea. The submit step is intentionally left to the
+   * user — the BrowseTab is read-only by contract.
+   */
+  Widget.prototype.openChatWith = function (text) {
+    if (typeof text !== 'string') {
+      return;
+    }
+    this.switchMode('chat');
+    if (!this.dom.input) {
+      return;
+    }
+    this.dom.input.value = text;
+    this.dom.input.dispatchEvent(new Event('input', { bubbles: true }));
+    this.dom.input.focus();
+    // Move caret to end so the user can extend the prompt naturally.
+    const len = this.dom.input.value.length;
+    try {
+      this.dom.input.setSelectionRange(len, len);
+    }
+    catch (e) {
+      // Some input types disallow setSelectionRange; ignore.
+    }
+  };
+
+  /**
+   * Activate the named mode panel. Called by the tab click handler and by
+   * cross-mode handoffs (e.g. "Ask about this column" from browse → chat).
+   */
+  Widget.prototype.switchMode = function (mode) {
+    if (mode !== 'chat' && mode !== 'browse') {
+      return;
+    }
+    this.activeMode = mode;
+    this.dom.tabs.forEach((btn) => {
+      const isActive = btn.getAttribute('data-mode') === mode;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    if (this.dom.modeChat) {
+      this.dom.modeChat.hidden = (mode !== 'chat');
+    }
+    if (this.dom.modeBrowse) {
+      this.dom.modeBrowse.hidden = (mode !== 'browse');
+    }
+    // Browse-mode content is wired in a later step; for now the panel
+    // simply becomes visible. Lazy init seam:
+    if (mode === 'browse' && !this.browseInitialized && typeof this.initBrowseTab === 'function') {
+      this.browseInitialized = true;
+      this.initBrowseTab();
     }
   };
 
@@ -4843,4 +4933,1176 @@
   Widget.prototype.scrollToBottom = function () {
     this.dom.thread.scrollTop = this.dom.thread.scrollHeight;
   };
+
+  // ---------------------------------------------------------------------------
+  // BrowseTab — catalog browser pane (Schema browser tab).
+  // ---------------------------------------------------------------------------
+  //
+  // Lazily wired on the first activation of the Browse tab. Talks to
+  // /api/dkan-ai-query/browse/* (read-only, GET). Fetches and renders are
+  // independent of the chat agent — usable offline against the mock provider.
+  //
+  // Step 4 scope: catalog list only. Detail view, lazy stats/sample/distinct,
+  // and cross-mode handoff land in steps 5–7.
+  // ---------------------------------------------------------------------------
+
+  const BROWSE_BASE = '/api/dkan-ai-query/browse';
+  const BROWSE_PAGE_SIZE = 25;
+  const BROWSE_SEARCH_DEBOUNCE_MS = 250;
+  // Per-widget cache TTL — schemas / catalog lists rarely change between
+  // page interactions, and rebuilding the DOM dominates the network call.
+  const BROWSE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+  Widget.prototype.initBrowseTab = function () {
+    if (!this.dom.browseHost) {
+      return;
+    }
+    this.browseTab = new BrowseTab(this);
+    this.browseTab.init();
+  };
+
+  /**
+   * One BrowseTab per Widget. State is local to the instance so the tab can
+   * be torn down (eventually) without leaking handlers.
+   */
+  function BrowseTab(widget) {
+    this.widget = widget;
+    this.host = widget.dom.browseHost;
+    this.cache = new Map();
+    this.searchTimer = null;
+    this.requestSeq = 0;
+    this.detailSeq = 0;
+    this.scopedDatasetId = widget.datasetId || '';
+    this.state = {
+      view: 'catalog',
+      datasetUuid: '',
+      dataset: null,
+      detailLoading: false,
+      detailError: null,
+      offset: 0,
+      limit: BROWSE_PAGE_SIZE,
+      q: '',
+      total: 0,
+      datasets: [],
+      loading: false,
+      error: null,
+    };
+  }
+
+  BrowseTab.prototype.init = function () {
+    this.bindHistory();
+    const fromHash = this.parseHash();
+    if (fromHash) {
+      this.openDataset(fromHash, { replace: true });
+      return;
+    }
+    if (this.scopedDatasetId) {
+      this.openDataset(this.scopedDatasetId, { replace: true });
+      return;
+    }
+    this.showCatalog({ pushHistory: false });
+  };
+
+  /**
+   * Recognize `#browse/datasets/<uuid>` so deep-links restore the detail
+   * view. Other hashes are ignored to avoid stomping host-page state.
+   */
+  BrowseTab.prototype.parseHash = function () {
+    const hash = window.location.hash || '';
+    const m = /^#browse\/datasets\/([a-zA-Z0-9_-]+)$/.exec(hash);
+    return m ? m[1] : '';
+  };
+
+  BrowseTab.prototype.bindHistory = function () {
+    const self = this;
+    window.addEventListener('popstate', function (e) {
+      const s = e.state || {};
+      if (s.mode !== 'browse') {
+        const restored = self.parseHash();
+        if (restored) {
+          self.openDataset(restored, { pushHistory: false });
+        }
+        else {
+          self.showCatalog({ pushHistory: false });
+        }
+        return;
+      }
+      if (s.view === 'dataset' && s.uuid) {
+        self.openDataset(s.uuid, { pushHistory: false });
+      }
+      else {
+        self.showCatalog({ pushHistory: false });
+      }
+    });
+  };
+
+  /**
+   * Switch to the catalog list view. Cheap to call repeatedly — the cache
+   * makes paging back instant.
+   */
+  BrowseTab.prototype.showCatalog = function (opts) {
+    opts = opts || {};
+    this.state.view = 'catalog';
+    this.state.datasetUuid = '';
+    this.state.dataset = null;
+    if (opts.pushHistory !== false) {
+      window.history.pushState({ mode: 'browse', view: 'catalog' }, '', '#browse');
+    }
+    this.renderCatalogShell();
+    this.load();
+  };
+
+  /**
+   * Switch to the dataset detail view and trigger a payload fetch.
+   *
+   * @param {string} uuid
+   *   Dataset UUID.
+   * @param {{replace?: boolean, pushHistory?: boolean}} [opts]
+   *   `replace`: use replaceState instead of pushState (deep-link bootstrap).
+   *   `pushHistory: false`: skip history mutation entirely (popstate handler).
+   */
+  BrowseTab.prototype.openDataset = function (uuid, opts) {
+    opts = opts || {};
+    this.state.view = 'dataset';
+    this.state.datasetUuid = uuid;
+    this.state.dataset = null;
+    this.state.detailLoading = true;
+    this.state.detailError = null;
+    if (opts.pushHistory !== false) {
+      const stateObj = { mode: 'browse', view: 'dataset', uuid: uuid };
+      const target = '#browse/datasets/' + uuid;
+      if (opts.replace) {
+        window.history.replaceState(stateObj, '', target);
+      }
+      else {
+        window.history.pushState(stateObj, '', target);
+      }
+    }
+    this.renderDatasetShell();
+    this.loadDataset(uuid);
+  };
+
+  /**
+   * Build the static parts of the catalog list view: search input +
+   * results host + pagination footer.
+   */
+  BrowseTab.prototype.renderCatalogShell = function () {
+    this.host.innerHTML = '';
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'dkan-aiq-browse-toolbar';
+
+    const searchWrap = document.createElement('label');
+    searchWrap.className = 'dkan-aiq-browse-search-wrap';
+    const searchLabel = document.createElement('span');
+    searchLabel.className = 'visually-hidden';
+    searchLabel.textContent = 'Search the catalog';
+    searchWrap.appendChild(searchLabel);
+
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'dkan-aiq-browse-search';
+    search.placeholder = 'Search the catalog…';
+    search.autocomplete = 'off';
+    search.spellcheck = false;
+    searchWrap.appendChild(search);
+
+    toolbar.appendChild(searchWrap);
+    this.host.appendChild(toolbar);
+
+    const results = document.createElement('div');
+    results.className = 'dkan-aiq-browse-results';
+    this.host.appendChild(results);
+
+    const pagination = document.createElement('div');
+    pagination.className = 'dkan-aiq-browse-pagination';
+    pagination.hidden = true;
+    this.host.appendChild(pagination);
+
+    this.dom = {
+      search: search,
+      results: results,
+      pagination: pagination,
+    };
+
+    const self = this;
+    search.addEventListener('input', function () {
+      const value = search.value;
+      if (self.searchTimer) {
+        clearTimeout(self.searchTimer);
+      }
+      self.searchTimer = setTimeout(function () {
+        if (value === self.state.q) {
+          return;
+        }
+        self.state.q = value;
+        self.state.offset = 0;
+        self.load();
+      }, BROWSE_SEARCH_DEBOUNCE_MS);
+    });
+  };
+
+  /**
+   * Fetch the current page and render. Honors a 5-minute in-memory cache
+   * so paging back to a prior page is instant.
+   */
+  BrowseTab.prototype.load = function () {
+    const url = this.buildUrl();
+    const cached = this.cacheGet(url);
+    if (cached) {
+      this.state.loading = false;
+      this.state.error = null;
+      this.state.datasets = cached.datasets || [];
+      this.state.total = cached.total || 0;
+      this.renderResults();
+      this.renderPagination();
+      return;
+    }
+
+    this.state.loading = true;
+    this.state.error = null;
+    this.renderResults();
+
+    const seq = ++this.requestSeq;
+    const self = this;
+    fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.text().then(function (txt) {
+            throw new Error(txt || ('HTTP ' + res.status));
+          });
+        }
+        return res.json();
+      })
+      .then(function (payload) {
+        // Drop responses that arrived after a newer fetch was issued.
+        if (seq !== self.requestSeq) {
+          return;
+        }
+        self.cacheSet(url, payload);
+        self.state.loading = false;
+        self.state.datasets = payload.datasets || [];
+        self.state.total = payload.total || 0;
+        self.renderResults();
+        self.renderPagination();
+      })
+      .catch(function (err) {
+        if (seq !== self.requestSeq) {
+          return;
+        }
+        self.state.loading = false;
+        self.state.error = err.message || String(err);
+        self.renderResults();
+        self.renderPagination();
+      });
+  };
+
+  BrowseTab.prototype.buildUrl = function () {
+    const params = new URLSearchParams();
+    params.set('offset', String(this.state.offset));
+    params.set('limit', String(this.state.limit));
+    if (this.state.q) {
+      params.set('q', this.state.q);
+    }
+    return BROWSE_BASE + '/datasets?' + params.toString();
+  };
+
+  BrowseTab.prototype.cacheGet = function (key) {
+    const hit = this.cache.get(key);
+    if (!hit) {
+      return null;
+    }
+    if (Date.now() - hit.at > BROWSE_CACHE_TTL_MS) {
+      this.cache.delete(key);
+      return null;
+    }
+    return hit.data;
+  };
+
+  BrowseTab.prototype.cacheSet = function (key, data) {
+    this.cache.set(key, { at: Date.now(), data: data });
+  };
+
+  BrowseTab.prototype.renderResults = function () {
+    const root = this.dom.results;
+    root.innerHTML = '';
+
+    if (this.state.loading) {
+      const loading = document.createElement('div');
+      loading.className = 'dkan-aiq-browse-loading';
+      loading.textContent = 'Loading…';
+      root.appendChild(loading);
+      return;
+    }
+
+    if (this.state.error) {
+      const err = document.createElement('div');
+      err.className = 'dkan-aiq-browse-error';
+      err.textContent = 'Could not load catalog: ' + this.state.error;
+      root.appendChild(err);
+      return;
+    }
+
+    if (!this.state.datasets.length) {
+      const empty = document.createElement('div');
+      empty.className = 'dkan-aiq-browse-empty';
+      empty.textContent = this.state.q
+        ? 'No datasets match "' + this.state.q + '".'
+        : 'Catalog is empty.';
+      root.appendChild(empty);
+      return;
+    }
+
+    const list = document.createElement('div');
+    list.className = 'dkan-aiq-browse-list';
+    const self = this;
+    this.state.datasets.forEach(function (ds) {
+      list.appendChild(self.buildCard(ds));
+    });
+    root.appendChild(list);
+  };
+
+  /**
+   * Build one dataset card. Click → detail view (wired in step 5).
+   */
+  BrowseTab.prototype.buildCard = function (ds) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'dkan-aiq-browse-card';
+    card.setAttribute('data-uuid', ds.identifier || '');
+
+    const title = document.createElement('div');
+    title.className = 'dkan-aiq-browse-card-title';
+    title.textContent = ds.title || ds.identifier || '(untitled)';
+    card.appendChild(title);
+
+    if (ds.description) {
+      const desc = document.createElement('div');
+      desc.className = 'dkan-aiq-browse-card-desc';
+      desc.textContent = ds.description;
+      card.appendChild(desc);
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'dkan-aiq-browse-card-meta';
+
+    const distCount = Number(ds.distributions || 0);
+    const distBadge = document.createElement('span');
+    distBadge.className = 'dkan-aiq-browse-badge';
+    distBadge.textContent = distCount + (distCount === 1 ? ' distribution' : ' distributions');
+    meta.appendChild(distBadge);
+
+    if (ds.has_caveats) {
+      const caveatBadge = document.createElement('span');
+      caveatBadge.className = 'dkan-aiq-browse-badge dkan-aiq-browse-badge--caveats';
+      caveatBadge.textContent = 'Curator notes';
+      caveatBadge.title = 'This dataset has curator-authored caveats.';
+      meta.appendChild(caveatBadge);
+    }
+
+    card.appendChild(meta);
+
+    const self = this;
+    card.addEventListener('click', function () {
+      if (ds.identifier) {
+        self.openDataset(ds.identifier);
+      }
+    });
+    return card;
+  };
+
+  BrowseTab.prototype.renderPagination = function () {
+    const root = this.dom.pagination;
+    root.innerHTML = '';
+
+    const total = this.state.total;
+    const pageSize = this.state.limit;
+    if (this.state.error || this.state.loading || total <= pageSize) {
+      root.hidden = true;
+      return;
+    }
+    root.hidden = false;
+
+    const start = this.state.offset + 1;
+    const end = Math.min(this.state.offset + this.state.datasets.length, total);
+
+    const prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.className = 'dkan-aiq-browse-page-btn';
+    prevBtn.textContent = '‹ Prev';
+    prevBtn.disabled = this.state.offset === 0;
+    const self = this;
+    prevBtn.addEventListener('click', function () {
+      self.state.offset = Math.max(0, self.state.offset - pageSize);
+      self.load();
+    });
+
+    const label = document.createElement('span');
+    label.className = 'dkan-aiq-browse-page-label';
+    label.textContent = 'Showing ' + start + '–' + end + ' of ' + total;
+
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.className = 'dkan-aiq-browse-page-btn';
+    nextBtn.textContent = 'Next ›';
+    nextBtn.disabled = end >= total;
+    nextBtn.addEventListener('click', function () {
+      self.state.offset += pageSize;
+      self.load();
+    });
+
+    root.appendChild(prevBtn);
+    root.appendChild(label);
+    root.appendChild(nextBtn);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Dataset detail view.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Build the static frame for the dataset detail view: back button +
+   * header host + distributions host. Filled in by renderDataset() once
+   * the payload arrives.
+   */
+  BrowseTab.prototype.renderDatasetShell = function () {
+    this.host.innerHTML = '';
+
+    // Hide the "← All datasets" affordance when the widget is hard-scoped
+    // to a single dataset by the block; in that case the catalog list is
+    // not the user's expected destination.
+    if (!this.scopedDatasetId) {
+      const back = document.createElement('button');
+      back.type = 'button';
+      back.className = 'dkan-aiq-browse-back';
+      back.textContent = '← All datasets';
+      const self = this;
+      back.addEventListener('click', function () {
+        self.showCatalog();
+      });
+      this.host.appendChild(back);
+    }
+
+    const header = document.createElement('div');
+    header.className = 'dkan-aiq-browse-detail-header';
+    this.host.appendChild(header);
+
+    const dists = document.createElement('div');
+    dists.className = 'dkan-aiq-browse-distributions';
+    this.host.appendChild(dists);
+
+    this.dom = this.dom || {};
+    this.dom.detailHeader = header;
+    this.dom.detailDistributions = dists;
+
+    // Initial loading paint while loadDataset() is in flight.
+    this.renderDetail();
+  };
+
+  /**
+   * Fetch the dataset payload (metadata + distributions + caveats) and,
+   * for each distribution, fan out to its schema endpoint in parallel.
+   */
+  BrowseTab.prototype.loadDataset = function (uuid) {
+    const url = BROWSE_BASE + '/datasets/' + encodeURIComponent(uuid);
+    const cached = this.cacheGet(url);
+    if (cached) {
+      this.state.detailLoading = false;
+      this.state.dataset = cached;
+      this.renderDetail();
+      this.loadDistributionSchemas(cached);
+      return;
+    }
+
+    const seq = ++this.detailSeq;
+    const self = this;
+    fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.text().then(function (txt) {
+            throw new Error(txt || ('HTTP ' + res.status));
+          });
+        }
+        return res.json();
+      })
+      .then(function (payload) {
+        if (seq !== self.detailSeq || self.state.datasetUuid !== uuid) {
+          return;
+        }
+        self.cacheSet(url, payload);
+        self.state.detailLoading = false;
+        self.state.dataset = payload;
+        self.renderDetail();
+        self.loadDistributionSchemas(payload);
+      })
+      .catch(function (err) {
+        if (seq !== self.detailSeq || self.state.datasetUuid !== uuid) {
+          return;
+        }
+        self.state.detailLoading = false;
+        self.state.detailError = err.message || String(err);
+        self.renderDetail();
+      });
+  };
+
+  /**
+   * For each distribution with a resource_id, fetch the schema and replace
+   * its column-table placeholder. Errors are rendered inline so a single
+   * bad distribution doesn't blank the whole detail view.
+   */
+  BrowseTab.prototype.loadDistributionSchemas = function (dataset) {
+    const dists = (dataset && dataset.distributions) || [];
+    const self = this;
+    dists.forEach(function (dist) {
+      const rid = dist.resource_id;
+      if (!rid) {
+        return;
+      }
+      const placeholder = self.dom.detailDistributions.querySelector(
+        '.dkan-aiq-browse-columns[data-rid="' + cssEscape(rid) + '"]'
+      );
+      if (!placeholder) {
+        return;
+      }
+      const url = BROWSE_BASE + '/resources/' + encodeURIComponent(rid) + '/schema';
+      const cached = self.cacheGet(url);
+      if (cached) {
+        self.renderColumns(placeholder, cached, dataset);
+        return;
+      }
+      fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (res) {
+          if (!res.ok) {
+            return res.text().then(function (txt) {
+              throw new Error(txt || ('HTTP ' + res.status));
+            });
+          }
+          return res.json();
+        })
+        .then(function (schema) {
+          self.cacheSet(url, schema);
+          // Distribution view may have moved on to a different dataset
+          // while the request was in flight — bail if the placeholder is
+          // no longer in the DOM.
+          if (!placeholder.isConnected) {
+            return;
+          }
+          self.renderColumns(placeholder, schema, dataset);
+        })
+        .catch(function (err) {
+          if (!placeholder.isConnected) {
+            return;
+          }
+          placeholder.innerHTML = '';
+          const errEl = document.createElement('div');
+          errEl.className = 'dkan-aiq-browse-error';
+          errEl.textContent = 'Could not load columns: ' + (err.message || err);
+          placeholder.appendChild(errEl);
+        });
+    });
+  };
+
+  /**
+   * Repaint the detail panel based on current state. Called whenever the
+   * loading flag flips, the payload arrives, or an error is captured.
+   */
+  BrowseTab.prototype.renderDetail = function () {
+    if (!this.dom || !this.dom.detailHeader) {
+      return;
+    }
+    const header = this.dom.detailHeader;
+    const dists = this.dom.detailDistributions;
+    header.innerHTML = '';
+    dists.innerHTML = '';
+
+    if (this.state.detailLoading) {
+      const loading = document.createElement('div');
+      loading.className = 'dkan-aiq-browse-loading';
+      loading.textContent = 'Loading dataset…';
+      header.appendChild(loading);
+      return;
+    }
+
+    if (this.state.detailError) {
+      const err = document.createElement('div');
+      err.className = 'dkan-aiq-browse-error';
+      err.textContent = 'Could not load dataset: ' + this.state.detailError;
+      header.appendChild(err);
+      return;
+    }
+
+    const ds = this.state.dataset;
+    if (!ds) {
+      return;
+    }
+
+    const title = document.createElement('h3');
+    title.className = 'dkan-aiq-browse-detail-title';
+    title.textContent = ds.title || ds.identifier || '(untitled)';
+    header.appendChild(title);
+
+    if (ds.description) {
+      const desc = document.createElement('p');
+      desc.className = 'dkan-aiq-browse-detail-desc';
+      desc.textContent = ds.description;
+      header.appendChild(desc);
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'dkan-aiq-browse-detail-meta';
+    if (ds.modified) {
+      const m = document.createElement('span');
+      m.className = 'dkan-aiq-browse-badge';
+      m.textContent = 'Updated ' + ds.modified;
+      meta.appendChild(m);
+    }
+    if (Array.isArray(ds.theme)) {
+      ds.theme.forEach(function (t) {
+        const b = document.createElement('span');
+        b.className = 'dkan-aiq-browse-badge';
+        b.textContent = String(t);
+        meta.appendChild(b);
+      });
+    }
+    if (ds.caveats) {
+      const c = document.createElement('span');
+      c.className = 'dkan-aiq-browse-badge dkan-aiq-browse-badge--caveats';
+      c.textContent = 'Curator notes';
+      c.title = 'This dataset has curator-authored caveats.';
+      meta.appendChild(c);
+    }
+    if (meta.children.length) {
+      header.appendChild(meta);
+    }
+
+    if (ds.caveats && ds.caveats.suppression) {
+      const supp = document.createElement('div');
+      supp.className = 'dkan-aiq-browse-caveat';
+      const lbl = document.createElement('strong');
+      lbl.textContent = 'Caveat: ';
+      supp.appendChild(lbl);
+      supp.appendChild(document.createTextNode(ds.caveats.suppression));
+      header.appendChild(supp);
+    }
+
+    const list = (ds.distributions || []);
+    if (!list.length) {
+      const empty = document.createElement('div');
+      empty.className = 'dkan-aiq-browse-empty';
+      empty.textContent = 'No distributions on this dataset.';
+      dists.appendChild(empty);
+      return;
+    }
+    const self = this;
+    list.forEach(function (dist) {
+      dists.appendChild(self.buildDistributionSection(dist));
+    });
+  };
+
+  /**
+   * Render one distribution: header (title/mediaType/download) + a
+   * placeholder for its columns table (filled by loadDistributionSchemas).
+   */
+  BrowseTab.prototype.buildDistributionSection = function (dist) {
+    const sec = document.createElement('section');
+    sec.className = 'dkan-aiq-browse-dist';
+
+    const head = document.createElement('header');
+    head.className = 'dkan-aiq-browse-dist-header';
+
+    const title = document.createElement('h4');
+    title.className = 'dkan-aiq-browse-dist-title';
+    title.textContent = dist.title || dist.mediaType || dist.identifier || '(untitled distribution)';
+    head.appendChild(title);
+
+    const metaLine = document.createElement('div');
+    metaLine.className = 'dkan-aiq-browse-dist-meta';
+    if (dist.mediaType) {
+      const t = document.createElement('span');
+      t.className = 'dkan-aiq-browse-badge';
+      t.textContent = dist.mediaType;
+      metaLine.appendChild(t);
+    }
+    if (dist.resource_id) {
+      const r = document.createElement('code');
+      r.className = 'dkan-aiq-browse-dist-rid';
+      r.textContent = dist.resource_id;
+      metaLine.appendChild(r);
+    }
+    if (dist.has_dictionary) {
+      const d = document.createElement('span');
+      d.className = 'dkan-aiq-browse-badge';
+      d.textContent = 'Data dictionary';
+      metaLine.appendChild(d);
+    }
+    head.appendChild(metaLine);
+
+    if (dist.downloadURL) {
+      const dl = document.createElement('a');
+      dl.className = 'dkan-aiq-browse-dist-download';
+      dl.href = dist.downloadURL;
+      dl.target = '_blank';
+      dl.rel = 'noopener noreferrer';
+      dl.textContent = 'Download';
+      head.appendChild(dl);
+    }
+    sec.appendChild(head);
+
+    const cols = document.createElement('div');
+    cols.className = 'dkan-aiq-browse-columns';
+    cols.setAttribute('data-rid', dist.resource_id || '');
+    if (dist.resource_id) {
+      const loading = document.createElement('div');
+      loading.className = 'dkan-aiq-browse-loading';
+      loading.textContent = 'Loading columns…';
+      cols.appendChild(loading);
+    }
+    else {
+      const note = document.createElement('div');
+      note.className = 'dkan-aiq-browse-empty';
+      note.textContent = 'No datastore for this distribution.';
+      cols.appendChild(note);
+    }
+    sec.appendChild(cols);
+    return sec;
+  };
+
+  /**
+   * Render the columns table for one distribution plus its lazy-action
+   * toolbar (Load stats / Load sample rows). Distinct-values buttons
+   * live on each column row. The schema payload is already enriched with
+   * dictionary fields by the backend.
+   */
+  BrowseTab.prototype.renderColumns = function (host, schema, dataset) {
+    host.innerHTML = '';
+    const cols = (schema && schema.columns) || [];
+    if (!cols.length) {
+      const empty = document.createElement('div');
+      empty.className = 'dkan-aiq-browse-empty';
+      empty.textContent = 'No columns for this resource.';
+      host.appendChild(empty);
+      return;
+    }
+    const rid = (schema && schema.resource_id) || host.getAttribute('data-rid') || '';
+    const colCaveats = (dataset && dataset.caveats && dataset.caveats.column_caveats) || {};
+
+    const actions = this.buildResourceActions(rid, host);
+    host.appendChild(actions);
+
+    const table = document.createElement('table');
+    table.className = 'dkan-aiq-browse-cols';
+
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    ['Column', 'Type', 'Description', ''].forEach(function (label) {
+      const th = document.createElement('th');
+      th.textContent = label;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    const self = this;
+    cols.forEach(function (col) {
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-col-name', col.name || '');
+
+      const nameCell = document.createElement('td');
+      nameCell.className = 'dkan-aiq-browse-col-name';
+      nameCell.textContent = col.name || '';
+      tr.appendChild(nameCell);
+
+      const typeCell = document.createElement('td');
+      typeCell.className = 'dkan-aiq-browse-col-type';
+      typeCell.setAttribute('data-label', 'Type');
+      typeCell.textContent = col.dictionary_type || col.type || '';
+      tr.appendChild(typeCell);
+
+      const descCell = document.createElement('td');
+      descCell.className = 'dkan-aiq-browse-col-desc';
+      const baseDesc = col.dictionary_description || col.description || '';
+      if (baseDesc) {
+        descCell.textContent = baseDesc;
+      }
+      const cv = col.name && colCaveats[col.name];
+      if (cv) {
+        const note = document.createElement('div');
+        note.className = 'dkan-aiq-browse-col-caveat';
+        note.textContent = cv;
+        descCell.appendChild(note);
+      }
+      tr.appendChild(descCell);
+
+      const actionCell = document.createElement('td');
+      actionCell.className = 'dkan-aiq-browse-col-actions';
+      if (col.name) {
+        const askBtn = document.createElement('button');
+        askBtn.type = 'button';
+        askBtn.className = 'dkan-aiq-browse-col-action';
+        askBtn.textContent = 'Ask';
+        askBtn.title = 'Pre-fill the chat input with a question about this column.';
+        askBtn.addEventListener('click', function () {
+          self.askAboutColumn(col.name, dataset);
+        });
+        actionCell.appendChild(askBtn);
+      }
+      if (rid && col.name) {
+        const distinctBtn = document.createElement('button');
+        distinctBtn.type = 'button';
+        distinctBtn.className = 'dkan-aiq-browse-col-action';
+        distinctBtn.textContent = 'Distinct';
+        distinctBtn.title = 'Show up to 50 distinct values for this column.';
+        distinctBtn.addEventListener('click', function () {
+          self.handleDistinctLoad(rid, col.name, tr, distinctBtn);
+        });
+        actionCell.appendChild(distinctBtn);
+      }
+      tr.appendChild(actionCell);
+
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    host.appendChild(table);
+
+    const sample = document.createElement('div');
+    sample.className = 'dkan-aiq-browse-sample';
+    sample.hidden = true;
+    sample.setAttribute('data-rid', rid);
+    host.appendChild(sample);
+  };
+
+  /**
+   * Toolbar of resource-level lazy loaders. `Load column stats` augments
+   * each row in-place; `Load sample rows` renders a second table below.
+   */
+  BrowseTab.prototype.buildResourceActions = function (rid, host) {
+    const bar = document.createElement('div');
+    bar.className = 'dkan-aiq-browse-resource-actions';
+    if (!rid) {
+      return bar;
+    }
+    const self = this;
+
+    const statsBtn = document.createElement('button');
+    statsBtn.type = 'button';
+    statsBtn.className = 'dkan-aiq-browse-action';
+    statsBtn.textContent = 'Load column stats';
+    statsBtn.title = 'Compute null counts, distinct counts, and min/max per column. May take a few seconds on large tables.';
+    statsBtn.addEventListener('click', function () {
+      self.handleStatsLoad(rid, host, statsBtn);
+    });
+    bar.appendChild(statsBtn);
+
+    const sampleBtn = document.createElement('button');
+    sampleBtn.type = 'button';
+    sampleBtn.className = 'dkan-aiq-browse-action';
+    sampleBtn.textContent = 'Load sample rows';
+    sampleBtn.title = 'Show the first 5 rows from this resource.';
+    sampleBtn.addEventListener('click', function () {
+      self.handleSampleLoad(rid, host, sampleBtn);
+    });
+    bar.appendChild(sampleBtn);
+
+    return bar;
+  };
+
+  /**
+   * Fetch /stats and append null/distinct/min/max cells to each row.
+   *
+   * Idempotent: re-clicking after a successful load short-circuits via
+   * the data-stats-loaded flag on the table. On error the button stays
+   * enabled so the user can retry.
+   */
+  BrowseTab.prototype.handleStatsLoad = function (rid, host, button) {
+    const table = host.querySelector('.dkan-aiq-browse-cols');
+    if (!table || table.getAttribute('data-stats-loaded') === 'true') {
+      return;
+    }
+    button.disabled = true;
+    const original = button.textContent;
+    button.textContent = 'Loading stats…';
+
+    const url = BROWSE_BASE + '/resources/' + encodeURIComponent(rid) + '/stats';
+    const cached = this.cacheGet(url);
+    const apply = (payload) => {
+      this.applyStats(table, payload);
+      button.textContent = 'Column stats loaded';
+    };
+    if (cached) {
+      apply(cached);
+      return;
+    }
+    fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then((res) => res.ok ? res.json() : res.text().then((t) => { throw new Error(t || 'HTTP ' + res.status); }))
+      .then((payload) => {
+        this.cacheSet(url, payload);
+        apply(payload);
+      })
+      .catch((err) => {
+        button.disabled = false;
+        button.textContent = original;
+        // eslint-disable-next-line no-alert
+        alert('Could not load column stats: ' + (err.message || err));
+      });
+  };
+
+  /**
+   * Inject Null / Distinct / Min / Max columns into the columns table
+   * once stats arrive. Splices three new <th> nodes into the header and
+   * matching <td> nodes into each existing row, keyed by data-col-name.
+   */
+  BrowseTab.prototype.applyStats = function (table, payload) {
+    const headRow = table.querySelector('thead tr');
+    const actionsTh = headRow.lastElementChild;
+    const newHeaders = ['Null', 'Distinct', 'Min', 'Max'];
+    newHeaders.forEach(function (label) {
+      const th = document.createElement('th');
+      th.textContent = label;
+      th.className = 'dkan-aiq-browse-col-stat-h';
+      headRow.insertBefore(th, actionsTh);
+    });
+
+    const total = Number(payload.total_rows || 0);
+    const cols = (payload.columns || []);
+    const byName = {};
+    cols.forEach(function (c) {
+      if (c && c.name) {
+        byName[c.name] = c;
+      }
+    });
+
+    table.querySelectorAll('tbody tr').forEach(function (row) {
+      const name = row.getAttribute('data-col-name');
+      const stat = byName[name] || {};
+      const actionTd = row.lastElementChild;
+
+      const nullCell = document.createElement('td');
+      nullCell.className = 'dkan-aiq-browse-col-stat';
+      nullCell.setAttribute('data-label', 'Null');
+      const nullCount = Number(stat.null_count || 0);
+      if (total > 0) {
+        const pct = (nullCount / total) * 100;
+        nullCell.textContent = pct === 0 ? '0' : pct < 1 ? '<1%' : pct.toFixed(0) + '%';
+        nullCell.title = nullCount + ' of ' + total + ' rows null';
+      }
+      else {
+        nullCell.textContent = String(nullCount);
+      }
+      row.insertBefore(nullCell, actionTd);
+
+      const distinctCell = document.createElement('td');
+      distinctCell.className = 'dkan-aiq-browse-col-stat';
+      distinctCell.setAttribute('data-label', 'Distinct');
+      distinctCell.textContent = stat.distinct_count != null ? String(stat.distinct_count) : '—';
+      row.insertBefore(distinctCell, actionTd);
+
+      const minCell = document.createElement('td');
+      minCell.className = 'dkan-aiq-browse-col-stat';
+      minCell.setAttribute('data-label', 'Min');
+      minCell.textContent = stat.min != null ? String(stat.min) : '—';
+      row.insertBefore(minCell, actionTd);
+
+      const maxCell = document.createElement('td');
+      maxCell.className = 'dkan-aiq-browse-col-stat';
+      maxCell.setAttribute('data-label', 'Max');
+      maxCell.textContent = stat.max != null ? String(stat.max) : '—';
+      row.insertBefore(maxCell, actionTd);
+    });
+
+    table.setAttribute('data-stats-loaded', 'true');
+  };
+
+  /**
+   * Fetch /sample and render a small read-only table beneath the columns
+   * table. Re-click toggles visibility without re-fetching.
+   */
+  BrowseTab.prototype.handleSampleLoad = function (rid, host, button) {
+    const sampleHost = host.querySelector('.dkan-aiq-browse-sample[data-rid="' + cssEscape(rid) + '"]');
+    if (!sampleHost) {
+      return;
+    }
+    if (sampleHost.getAttribute('data-loaded') === 'true') {
+      // Toggle existing render.
+      sampleHost.hidden = !sampleHost.hidden;
+      button.textContent = sampleHost.hidden ? 'Show sample rows' : 'Hide sample rows';
+      return;
+    }
+    button.disabled = true;
+    const original = button.textContent;
+    button.textContent = 'Loading sample…';
+    const url = BROWSE_BASE + '/resources/' + encodeURIComponent(rid) + '/sample?n=5';
+    const apply = (payload) => {
+      this.renderSample(sampleHost, payload);
+      sampleHost.setAttribute('data-loaded', 'true');
+      sampleHost.hidden = false;
+      button.disabled = false;
+      button.textContent = 'Hide sample rows';
+    };
+    const cached = this.cacheGet(url);
+    if (cached) {
+      apply(cached);
+      return;
+    }
+    fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then((res) => res.ok ? res.json() : res.text().then((t) => { throw new Error(t || 'HTTP ' + res.status); }))
+      .then((payload) => {
+        this.cacheSet(url, payload);
+        apply(payload);
+      })
+      .catch((err) => {
+        button.disabled = false;
+        button.textContent = original;
+        sampleHost.innerHTML = '';
+        const errEl = document.createElement('div');
+        errEl.className = 'dkan-aiq-browse-error';
+        errEl.textContent = 'Could not load sample: ' + (err.message || err);
+        sampleHost.appendChild(errEl);
+        sampleHost.hidden = false;
+      });
+  };
+
+  BrowseTab.prototype.renderSample = function (host, payload) {
+    host.innerHTML = '';
+    const rows = (payload && payload.rows) || [];
+    if (!rows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'dkan-aiq-browse-empty';
+      empty.textContent = 'No rows returned.';
+      host.appendChild(empty);
+      return;
+    }
+    const head = document.createElement('h5');
+    head.className = 'dkan-aiq-browse-sample-title';
+    head.textContent = 'Sample rows';
+    host.appendChild(head);
+
+    const table = document.createElement('table');
+    table.className = 'dkan-aiq-browse-sample-table';
+    const headers = Object.keys(rows[0]);
+
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    headers.forEach(function (h) {
+      const th = document.createElement('th');
+      th.textContent = h;
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    rows.forEach(function (row) {
+      const tr = document.createElement('tr');
+      headers.forEach(function (h) {
+        const td = document.createElement('td');
+        const v = row[h];
+        td.textContent = v == null ? '' : String(v);
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    host.appendChild(table);
+  };
+
+  /**
+   * Lazy-fetch distinct values for one column and toggle a chip panel
+   * inserted as a sibling row beneath the column's row.
+   */
+  BrowseTab.prototype.handleDistinctLoad = function (rid, col, columnRow, button) {
+    const next = columnRow.nextElementSibling;
+    if (next && next.classList.contains('dkan-aiq-browse-distinct-row')) {
+      next.remove();
+      button.textContent = 'Distinct';
+      return;
+    }
+    button.disabled = true;
+    const original = button.textContent;
+    button.textContent = 'Loading…';
+    const url = BROWSE_BASE + '/resources/' + encodeURIComponent(rid) + '/distinct/' + encodeURIComponent(col) + '?limit=50';
+    const apply = (payload) => {
+      const row = this.buildDistinctRow(columnRow, payload);
+      columnRow.parentNode.insertBefore(row, columnRow.nextSibling);
+      button.disabled = false;
+      button.textContent = 'Hide';
+    };
+    const cached = this.cacheGet(url);
+    if (cached) {
+      apply(cached);
+      return;
+    }
+    fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then((res) => res.ok ? res.json() : res.text().then((t) => { throw new Error(t || 'HTTP ' + res.status); }))
+      .then((payload) => {
+        this.cacheSet(url, payload);
+        apply(payload);
+      })
+      .catch((err) => {
+        button.disabled = false;
+        button.textContent = original;
+        // eslint-disable-next-line no-alert
+        alert('Could not load distinct values: ' + (err.message || err));
+      });
+  };
+
+  /**
+   * Compose a question about a column, switch to chat, prefill the input.
+   * Falls back to the dataset identifier when title is missing so the
+   * agent can still resolve the dataset.
+   */
+  BrowseTab.prototype.askAboutColumn = function (columnName, dataset) {
+    const title = (dataset && dataset.title) || (dataset && dataset.identifier) || '';
+    const phrase = title
+      ? 'Tell me about the "' + columnName + '" column in "' + title + '".'
+      : 'Tell me about the "' + columnName + '" column.';
+    this.widget.openChatWith(phrase);
+  };
+
+  BrowseTab.prototype.buildDistinctRow = function (columnRow, payload) {
+    const row = document.createElement('tr');
+    row.className = 'dkan-aiq-browse-distinct-row';
+    const cell = document.createElement('td');
+    cell.colSpan = columnRow.children.length;
+    cell.className = 'dkan-aiq-browse-distinct-cell';
+
+    const values = (payload && payload.values) || [];
+    if (!values.length) {
+      const empty = document.createElement('div');
+      empty.className = 'dkan-aiq-browse-empty';
+      empty.textContent = 'No distinct values returned.';
+      cell.appendChild(empty);
+    }
+    else {
+      const head = document.createElement('div');
+      head.className = 'dkan-aiq-browse-distinct-head';
+      const count = (payload.value_count != null) ? Number(payload.value_count) : values.length;
+      head.textContent = count + (count === 1 ? ' value' : ' values') + (payload.truncated ? ' (truncated at 50)' : '');
+      cell.appendChild(head);
+
+      const chips = document.createElement('div');
+      chips.className = 'dkan-aiq-browse-distinct-chips';
+      values.forEach(function (v) {
+        const chip = document.createElement('span');
+        chip.className = 'dkan-aiq-browse-distinct-chip';
+        chip.textContent = v == null ? '(null)' : String(v);
+        chips.appendChild(chip);
+      });
+      cell.appendChild(chips);
+    }
+    row.appendChild(cell);
+    return row;
+  };
+
+  /**
+   * Minimal CSS.escape polyfill for the resource_id attribute selector.
+   * The `__` separator and slash characters in resource ids are otherwise
+   * fine, but underscores still need escaping in some browsers' selectors.
+   */
+  function cssEscape(value) {
+    if (window.CSS && typeof window.CSS.escape === 'function') {
+      return window.CSS.escape(value);
+    }
+    return String(value).replace(/([^\w-])/g, '\\$1');
+  }
 })(Drupal, drupalSettings, once);

@@ -65,6 +65,72 @@ dkan_drupal_ai_query.conversation_toggle_pin:
   options:
     no_cache: TRUE
 
+dkan_drupal_ai_query.browse_datasets:
+  path: '/api/dkan-ai-query/browse/datasets'
+  defaults:
+    _controller: 'dkan_drupal_ai_query.browse_controller:datasets'
+  methods: [GET]
+  requirements:
+    _permission: 'use dkan drupal ai query'
+  options:
+    no_cache: TRUE
+
+dkan_drupal_ai_query.browse_dataset:
+  path: '/api/dkan-ai-query/browse/datasets/{uuid}'
+  defaults:
+    _controller: 'dkan_drupal_ai_query.browse_controller:dataset'
+  methods: [GET]
+  requirements:
+    _permission: 'use dkan drupal ai query'
+    uuid: '[a-zA-Z0-9_-]+'
+  options:
+    no_cache: TRUE
+
+dkan_drupal_ai_query.browse_resource_schema:
+  path: '/api/dkan-ai-query/browse/resources/{rid}/schema'
+  defaults:
+    _controller: 'dkan_drupal_ai_query.browse_controller:schema'
+  methods: [GET]
+  requirements:
+    _permission: 'use dkan drupal ai query'
+    rid: '[a-zA-Z0-9_]+__[a-zA-Z0-9_]+'
+  options:
+    no_cache: TRUE
+
+dkan_drupal_ai_query.browse_resource_stats:
+  path: '/api/dkan-ai-query/browse/resources/{rid}/stats'
+  defaults:
+    _controller: 'dkan_drupal_ai_query.browse_controller:stats'
+  methods: [GET]
+  requirements:
+    _permission: 'use dkan drupal ai query'
+    rid: '[a-zA-Z0-9_]+__[a-zA-Z0-9_]+'
+  options:
+    no_cache: TRUE
+
+dkan_drupal_ai_query.browse_resource_sample:
+  path: '/api/dkan-ai-query/browse/resources/{rid}/sample'
+  defaults:
+    _controller: 'dkan_drupal_ai_query.browse_controller:sample'
+  methods: [GET]
+  requirements:
+    _permission: 'use dkan drupal ai query'
+    rid: '[a-zA-Z0-9_]+__[a-zA-Z0-9_]+'
+  options:
+    no_cache: TRUE
+
+dkan_drupal_ai_query.browse_resource_distinct:
+  path: '/api/dkan-ai-query/browse/resources/{rid}/distinct/{col}'
+  defaults:
+    _controller: 'dkan_drupal_ai_query.browse_controller:distinct'
+  methods: [GET]
+  requirements:
+    _permission: 'use dkan drupal ai query'
+    rid: '[a-zA-Z0-9_]+__[a-zA-Z0-9_]+'
+    col: '[a-zA-Z0-9_]+'
+  options:
+    no_cache: TRUE
+
 dkan_drupal_ai_query.admin:
   path: '/admin/dkan/ai-query'
   defaults:

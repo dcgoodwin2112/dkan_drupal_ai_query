@@ -123,6 +123,20 @@ Drupal's Request Path block-visibility condition does **literal** path matching.
 /dataset/*
 ```
 
+## Browse catalog tab
+
+A second tab inside the widget — **Browse catalog** — exposes a non-chat, read-only view of the catalog so users can discover what's available before composing a question. Toggleable via **Widget interface → Show "Browse catalog" tab** in the settings form (default on).
+
+The tab renders three views, all powered by the read-only `/api/dkan-ai-query/browse/*` endpoints:
+
+- **Catalog list.** Paginated dataset cards with debounced keyword search. Cards show distribution count and an amber "Curator notes" badge when the dataset has a caveat record.
+- **Dataset detail.** Title, description, theme/keyword/modified badges, dataset-level caveat banner, and one section per distribution (mediaType + monospace `resource_id` + Download link). Each distribution lazy-loads its column schema beneath the section header.
+- **Per-resource lazy actions.** Each columns table has a top-bar with **Load column stats** (splices null %, distinct count, and min/max into the table) and **Load sample rows** (renders the first 5 rows beneath the table). Each column row exposes **Distinct** (chips of up to 50 distinct values) and **Ask** (cross-mode handoff: switches to the Ask tab and pre-fills the chat input with `Tell me about the "{column}" column in "{title}".`).
+
+Block-scoped widgets (those with a Dataset UUID configured) auto-open the Browse tab to that dataset's detail view; the "← All datasets" affordance is hidden so the block's scope is honored as a constraint. Deep links via `#browse/datasets/<uuid>` are supported, and the browser back button is wired through the standard popstate/pushState path.
+
+The tab is fully usable with the mock provider — none of its endpoints involve an LLM call.
+
 ## Endpoints
 
 | Method | Path | Purpose |
@@ -133,6 +147,12 @@ Drupal's Request Path block-visibility condition does **literal** path matching.
 | GET | `/api/dkan-ai-query/conversations/{id}` | Load a conversation with messages and artifacts |
 | DELETE | `/api/dkan-ai-query/conversations/{id}` | Delete a conversation and its messages |
 | POST | `/api/dkan-ai-query/conversations/{id}/pin` | Toggle the pinned flag |
+| GET | `/api/dkan-ai-query/browse/datasets?offset=&limit=&q=` | Browse-tab catalog list. Empty `q` routes through the metastore; non-empty routes through the search API (page-size capped at 50). |
+| GET | `/api/dkan-ai-query/browse/datasets/{uuid}` | Browse-tab dataset detail (title, description, distributions, caveats). |
+| GET | `/api/dkan-ai-query/browse/resources/{rid}/schema` | Dictionary-enriched column schema for one distribution. |
+| GET | `/api/dkan-ai-query/browse/resources/{rid}/stats` | Per-column null/distinct/min/max. Heavier than `schema` — surfaced behind a "Load stats" button in the UI. |
+| GET | `/api/dkan-ai-query/browse/resources/{rid}/sample?n=` | First N rows (clamped to 50). |
+| GET | `/api/dkan-ai-query/browse/resources/{rid}/distinct/{col}?limit=` | Distinct values for a column (clamped to 500, with `truncated` flag). |
 
 `/start` request body:
 

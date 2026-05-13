@@ -32,55 +32,78 @@
   </div>
 
   <div class="dkan-aiq-main">
-  <div class="dkan-aiq-thread-header" hidden>
-    <button type="button" class="dkan-aiq-new-conversation">New conversation</button>
-  </div>
-  <div class="dkan-aiq-thread"></div>
+    {# Tab nav. Stays hidden until JS detects showSchemaBrowser=true so
+       the no-JS / feature-disabled paths render identically to a
+       single-mode widget. #}
+    <nav class="dkan-aiq-tabs" role="tablist" aria-label="Widget mode" hidden>
+      <button type="button"
+              class="dkan-aiq-tab is-active"
+              role="tab"
+              aria-selected="true"
+              data-mode="chat">Ask</button>
+      <button type="button"
+              class="dkan-aiq-tab"
+              role="tab"
+              aria-selected="false"
+              data-mode="browse">Browse catalog</button>
+    </nav>
 
-  <div class="dkan-aiq-status" hidden>
-    <span class="dkan-aiq-spinner"></span>
-    <span class="dkan-aiq-status-text"></span>
-  </div>
-
-  <div class="dkan-aiq-error" hidden></div>
-
-  <form class="dkan-aiq-form">
-    <div class="dkan-aiq-dataset-selector"{% if dataset_id %} hidden{% endif %}>
-      <label for="dkan-aiq-dataset-select" class="dkan-aiq-dataset-label">Dataset</label>
-      <select id="dkan-aiq-dataset-select" class="dkan-aiq-dataset-select">
-        <option value="">All datasets (AI will find the right one)</option>
-      </select>
-    </div>
-    <div class="dkan-aiq-input-wrapper">
-      <label for="dkan-aiq-input" class="visually-hidden">Ask a question about this dataset</label>
-      <textarea
-        id="dkan-aiq-input"
-        class="dkan-aiq-input"
-        placeholder="Ask a question about this data..."
-        autocomplete="off"
-        spellcheck="false"
-        rows="1"
-        required
-      ></textarea>
-      <button type="submit" class="dkan-aiq-submit">Ask</button>
-    </div>
-    <div class="dkan-aiq-footer">
-      <div class="dkan-aiq-examples">
-        <span class="dkan-aiq-examples-label">Try:</span>
-        <button type="button" class="dkan-aiq-example" data-question="Show me the first 5 rows">First 5 rows</button>
-        <button type="button" class="dkan-aiq-example" data-question="How many records are in this dataset?">Record count</button>
-        <button type="button" class="dkan-aiq-example" data-question="Summarize this dataset">Summarize</button>
+    <div class="dkan-aiq-mode dkan-aiq-mode-chat" data-mode="chat" role="tabpanel" aria-label="Ask the AI">
+      <div class="dkan-aiq-thread-header" hidden>
+        <button type="button" class="dkan-aiq-new-conversation">New conversation</button>
       </div>
-      <div class="dkan-aiq-model-selector">
-        <label for="dkan-aiq-model" class="dkan-aiq-model-label">Model:</label>
-        <select id="dkan-aiq-model" class="dkan-aiq-model-select"></select>
-      </div>
-    </div>
-  </form>
+      <div class="dkan-aiq-thread"></div>
 
-  <details class="dkan-aiq-debug">
-    <summary class="dkan-aiq-debug-summary">Agent diagnostics</summary>
-    <div class="dkan-aiq-debug-log"></div>
-  </details>
+      <div class="dkan-aiq-status" hidden>
+        <span class="dkan-aiq-spinner"></span>
+        <span class="dkan-aiq-status-text"></span>
+      </div>
+
+      <div class="dkan-aiq-error" hidden></div>
+
+      <form class="dkan-aiq-form">
+        <div class="dkan-aiq-dataset-selector"{% if dataset_id %} hidden{% endif %}>
+          <label for="dkan-aiq-dataset-select" class="dkan-aiq-dataset-label">Dataset</label>
+          <select id="dkan-aiq-dataset-select" class="dkan-aiq-dataset-select">
+            <option value="">All datasets (AI will find the right one)</option>
+          </select>
+        </div>
+        <div class="dkan-aiq-input-wrapper">
+          <label for="dkan-aiq-input" class="visually-hidden">Ask a question about this dataset</label>
+          <textarea
+            id="dkan-aiq-input"
+            class="dkan-aiq-input"
+            placeholder="Ask a question about this data..."
+            autocomplete="off"
+            spellcheck="false"
+            rows="1"
+            required
+          ></textarea>
+          <button type="submit" class="dkan-aiq-submit">Ask</button>
+        </div>
+        <div class="dkan-aiq-footer">
+          <div class="dkan-aiq-examples">
+            <span class="dkan-aiq-examples-label">Try:</span>
+            <button type="button" class="dkan-aiq-example" data-question="Show me the first 5 rows">First 5 rows</button>
+            <button type="button" class="dkan-aiq-example" data-question="How many records are in this dataset?">Record count</button>
+            <button type="button" class="dkan-aiq-example" data-question="Summarize this dataset">Summarize</button>
+          </div>
+          <div class="dkan-aiq-model-selector">
+            <label for="dkan-aiq-model" class="dkan-aiq-model-label">Model:</label>
+            <select id="dkan-aiq-model" class="dkan-aiq-model-select"></select>
+          </div>
+        </div>
+      </form>
+
+      <details class="dkan-aiq-debug">
+        <summary class="dkan-aiq-debug-summary">Agent diagnostics</summary>
+        <div class="dkan-aiq-debug-log"></div>
+      </details>
+    </div>
+
+    <div class="dkan-aiq-mode dkan-aiq-mode-browse" data-mode="browse" role="tabpanel" aria-label="Browse catalog" hidden>
+      {# Populated by widget.js BrowseTab module on first activation. #}
+      <div class="dkan-aiq-browse"></div>
+    </div>
   </div>
 </div>

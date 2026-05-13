@@ -39,6 +39,11 @@ Then either:
 The widget at `/drupal-ai-query` (or wherever the block is placed) will now
 replay scripted scenarios instead of calling Anthropic / OpenAI.
 
+The widget's **Browse catalog** tab is unaffected by the mock provider —
+its endpoints (`/api/dkan-ai-query/browse/*`) are read-only and never call
+the LLM. With the parks fixture installed it makes a self-contained,
+offline-runnable demo of the catalog discovery flow.
+
 On install the submodule auto-appends `dkan_aiq_mock__scripted` to
 `dkan_drupal_ai_query.settings:allowed_models` if a curated list exists, so
 the mock model shows up in the widget's model dropdown. Uninstall removes
