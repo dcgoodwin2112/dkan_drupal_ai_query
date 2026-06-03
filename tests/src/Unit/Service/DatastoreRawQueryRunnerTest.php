@@ -2,8 +2,8 @@
 
 namespace Drupal\Tests\dkan_drupal_ai_query\Unit\Service;
 
-use Drupal\datastore\Service\DatastoreQuery;
-use Drupal\datastore\Service\Query;
+use Drupal\dkan_datastore\Service\DatastoreQuery;
+use Drupal\dkan_datastore\Service\Query;
 use Drupal\dkan_drupal_ai_query\Service\DatastoreRawQueryRunner;
 use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
 use Opis\JsonSchema\ValidationError;

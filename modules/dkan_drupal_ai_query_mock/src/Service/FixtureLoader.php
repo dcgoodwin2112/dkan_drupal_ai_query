@@ -9,8 +9,8 @@ use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Queue\QueueWorkerManagerInterface;
 use Drupal\Core\State\StateInterface;
-use Drupal\harvest\HarvestService;
-use Drupal\metastore\MetastoreService;
+use Drupal\dkan_harvest\HarvestService;
+use Drupal\dkan_metastore\MetastoreService;
 use Psr\Log\LoggerInterface;
 
 /**

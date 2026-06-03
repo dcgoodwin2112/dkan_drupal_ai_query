@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Drupal\dkan_drupal_ai_query\Service;
 
-use Drupal\datastore\Service\DatastoreQuery;
-use Drupal\datastore\Service\Query;
+use Drupal\dkan_datastore\Service\DatastoreQuery;
+use Drupal\dkan_datastore\Service\Query;
 use RootedData\Exception\ValidationException;
 
 /**
@@ -13,7 +13,7 @@ use RootedData\Exception\ValidationException;
  *
  * Backs the `query_datastore_raw` FunctionCall plugin: the agent passes a JSON
  * string in DKAN's documented DatastoreQuery DSL and we hand it to
- * \Drupal\datastore\Service\Query::runQuery() with no flat-tool transforms.
+ * \Drupal\dkan_datastore\Service\Query::runQuery() with no flat-tool transforms.
  * Lives in its own service so it can be unit-tested without booting the
  * FunctionCallBase plugin scaffold.
  *

@@ -6,7 +6,7 @@ use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
 use Drupal\ai_agents\Event\AgentToolPreExecuteEvent;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\ImmutableConfig;
-use Drupal\datastore\DatastoreService;
+use Drupal\dkan_datastore\DatastoreService;
 use Drupal\dkan_drupal_ai_query\EventSubscriber\ArtifactCaptureSubscriber;
 use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
 use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
