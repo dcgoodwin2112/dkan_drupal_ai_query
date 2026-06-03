@@ -132,8 +132,8 @@ time. `FixtureLoader::install()` writes that value once the harvest finishes.
 ## Tests
 
 ```bash
-cd web/modules/custom/dkan_drupal_ai_query/modules/dkan_drupal_ai_query_mock
-../../../dkan_query_tools/vendor/bin/phpunit
+cd docroot/modules/custom/dkan_drupal_ai_query/modules/dkan_drupal_ai_query_mock
+../../../../../../vendor/bin/phpunit
 ```
 
 Unit tests cover YAML parsing, scenario validation, and matcher precedence.

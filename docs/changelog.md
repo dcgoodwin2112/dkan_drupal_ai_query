@@ -40,7 +40,7 @@ refusal at three strikes, prompt v2 requires acknowledging sanity
 flags, read-only MariaDB role documented (auto-switch deferred). The
 previously flaky `dsl_above_avg_crime` case stabilized as a pass. See
 [refusal-flow.md](refusal-flow.md) and the upstream
-[tool-responses.md](../../dkan_query_tools/docs/tool-responses.md).
+[tool-responses.md](../../dkan_mcp_server/modules/dkan_query_tools/docs/tool-responses.md).
 
 ## Phase 5: Provenance and UI ([PR #8](https://github.com/dcgoodwin2112/dkan_drupal_ai_query/pull/8))
 

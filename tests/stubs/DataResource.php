@@ -1,9 +1,9 @@
 <?php
 
-namespace Drupal\common;
+namespace Drupal\dkan_common;
 
 /**
- * Stub for Drupal\common\DataResource.
+ * Stub for Drupal\dkan_common\DataResource.
  *
  * Implements only the helper used by ArtifactCaptureSubscriber.
  */
