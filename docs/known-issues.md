@@ -16,7 +16,7 @@ tool-call JSON — `"&gt;"` instead of `">"`, `"&gt;="` instead of
 strict operator enum and rejects the encoded form.
 
 **Mitigation in place.** `DatastoreTools::canonicalizeOperators()`
-([`web/modules/custom/dkan_query_tools/src/Tool/DatastoreTools.php:1100`](../../dkan_query_tools/src/Tool/DatastoreTools.php))
+([`dkan_mcp_server/modules/dkan_query_tools/src/Tool/DatastoreTools.php:1100`](../../dkan_mcp_server/modules/dkan_query_tools/src/Tool/DatastoreTools.php))
 runs `html_entity_decode` on every condition's `operator` field before
 the query executes. Called from both `queryDatastore()` (line 147) and
 `queryDatastoreJoin()` (line 608). Touches `operator` only — `value`
@@ -71,7 +71,7 @@ DKAN's `RootedJsonData` rejects the empty operator with the cryptic
 the agent has no way to diagnose and self-correct.
 
 **Mitigation in place.**
-[`DatastoreTools::validateOperators()`](../../dkan_query_tools/src/Tool/DatastoreTools.php)
+[`DatastoreTools::validateOperators()`](../../dkan_mcp_server/modules/dkan_query_tools/src/Tool/DatastoreTools.php)
 runs after `canonicalizeOperators()` and rejects any condition whose
 operator is missing from DKAN's enum. Returns a structured error
 naming the property and listing the allowed operators:

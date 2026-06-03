@@ -34,20 +34,30 @@ While `solve()` blocks server-side, `ai_agents` writes per-iteration status even
 
 - Drupal 10.5+ or 11
 - DKAN (`metastore`, `datastore` modules enabled)
-- `dkan_query_tools` module enabled — provides the catalog/datastore/search tool classes that the FunctionCall plugins call into. See [dkan_query_tools README](../dkan_query_tools/README.md).
+- `dkan_query_tools` module enabled — provides the catalog/datastore/search tool classes that the FunctionCall plugins call into. It ships as a submodule of `dcgoodwin2112/dkan_mcp_server`; see its [README](../dkan_mcp_server/modules/dkan_query_tools/README.md).
 - `drupal/ai` ^1.2 with `drupal/ai_agents` ^1.2
 - An AI provider module: `drupal/ai_provider_anthropic` and/or `drupal/ai_provider_openai`
 - API key for the chosen provider
 
 ## Installing
 
-1. Install the `dkan_query_tools` module first (see its README for the Composer config). In short:
+1. Pull in `dkan_query_tools` first. It ships inside the `dcgoodwin2112/dkan_mcp_server`
+   package, which is not on Packagist/drupal.org, so the root project needs a VCS
+   `repositories` entry for it (and `minimum-stability: dev`):
+
+   ```jsonc
+   "repositories": {
+     "dkan_mcp_server": { "type": "vcs", "url": "https://github.com/dcgoodwin2112/dkan_mcp_server" }
+   }
+   ```
 
    ```bash
-   # Add the path repo or VCS entry to composer.json, then:
-   composer update dcgoodwin2112/dkan_query_tools
-   ddev drush en dkan_query_tools
+   composer require dcgoodwin2112/dkan_mcp_server
+   ddev drush en dkan_query_tools   # the query lib alone; does not enable the MCP server
    ```
+
+   This places `dkan_mcp_server` (and its `drupal/mcp_server` + `mcp/sdk` deps) on
+   disk. Enable only `dkan_query_tools` if you don't want the MCP server running.
 
 2. Make sure the Drupal AI stack is in place:
 
@@ -218,7 +228,7 @@ Topic guides live in [docs/](docs/):
 
 Upstream tool-response contract (success / error / sanity-flag shapes
 returned by `DatastoreTools`) lives at
-[../dkan_query_tools/docs/tool-responses.md](../dkan_query_tools/docs/tool-responses.md).
+[../dkan_mcp_server/modules/dkan_query_tools/docs/tool-responses.md](../dkan_mcp_server/modules/dkan_query_tools/docs/tool-responses.md).
 
 ## Tests
 

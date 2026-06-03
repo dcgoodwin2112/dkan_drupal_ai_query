@@ -41,7 +41,7 @@ properties:
 
 The query-tool response shape (success, error, sanity flags) is owned
 by the upstream module and documented at
-[../../dkan_query_tools/docs/tool-responses.md](../../dkan_query_tools/docs/tool-responses.md).
+[../../dkan_mcp_server/modules/dkan_query_tools/docs/tool-responses.md](../../dkan_mcp_server/modules/dkan_query_tools/docs/tool-responses.md).
 
 ## How a single answer flows through the stack
 

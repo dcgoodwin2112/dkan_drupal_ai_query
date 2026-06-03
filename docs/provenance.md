@@ -7,7 +7,7 @@ that block; the prompt requires the agent to acknowledge any
 non-default flag in its final answer.
 
 The DatastoreTools-side contract for these flags lives at
-[../../dkan_query_tools/docs/tool-responses.md](../../dkan_query_tools/docs/tool-responses.md).
+[../../dkan_mcp_server/modules/dkan_query_tools/docs/tool-responses.md](../../dkan_mcp_server/modules/dkan_query_tools/docs/tool-responses.md).
 This doc covers the agent-side capture and the widget rendering.
 
 ## Artifact shape

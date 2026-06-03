@@ -4,18 +4,18 @@
  * @file
  * Bootstrap for dkan_drupal_ai_query_mock unit tests.
  *
- * Reuses dkan_query_tools' vendor for PHPUnit + getdkan/mock-chain. PSR-4
- * registers the submodule's namespace plus the parent module and the AI
+ * Loads the site-level Composer autoloader for PHPUnit + getdkan/mock-chain.
+ * PSR-4 registers the submodule's namespace plus the parent module and the AI
  * module's chat-types subtree so ChatInput/ChatMessage/ToolsFunctionOutput
  * can be exercised without a full Drupal kernel.
  */
 
-$qtAutoload = __DIR__ . '/../../../../dkan_query_tools/vendor/autoload.php';
-if (!file_exists($qtAutoload)) {
-  fwrite(STDERR, "ERROR: dkan_query_tools/vendor/autoload.php missing.\n  Run `composer install` in web/modules/custom/dkan_query_tools first.\n");
+$siteAutoload = __DIR__ . '/../../../../../../../vendor/autoload.php';
+if (!file_exists($siteAutoload)) {
+  fwrite(STDERR, "ERROR: site vendor/autoload.php missing.\n  Run `composer install` at the project root first.\n");
   exit(1);
 }
-require_once $qtAutoload;
+require_once $siteAutoload;
 
 spl_autoload_register(function ($class) {
   $prefixes = [
