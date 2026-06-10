@@ -10,4 +10,4 @@ dependencies:
   - ai:ai
   - ai_agents:ai_agents
   - key:key
-  - dkan_query_tools:dkan_query_tools
+  - dkan_mcp_server:dkan_query_tools

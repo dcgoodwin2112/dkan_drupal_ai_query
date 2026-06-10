@@ -7,7 +7,8 @@
     "drupal/ai_agents": "^1.2",
     "drupal/ai_provider_anthropic": "^1.2",
     "drupal/key": "^1.20",
-    "dcgoodwin2112/dkan_mcp_server": "dev-main"
+    "drupal/dkan_mcp_server": "^1.0@alpha",
+    "drupal/dkan_query_tools": "^1.0@alpha"
   },
   "require-dev": {
     "drupal/core": "^10.2 || ^11",
@@ -15,15 +16,13 @@
     "getdkan/mock-chain": "^1"
   },
   "repositories": {
-    "dkan_mcp_server": {
-      "type": "vcs",
-      "url": "https://github.com/dcgoodwin2112/dkan_mcp_server"
-    },
     "drupal": {
       "type": "composer",
       "url": "https://packages.drupal.org/8"
     }
   },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
   "config": {
     "allow-plugins": {
       "drupal/core-composer-scaffold": false,
