@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="dkan_ai_query">
+  <description>PHPCS configuration for dkan_ai_query.</description>
+
+  <!-- Scan the module, including the bundled dkan_ai_query_mock submodule. -->
+  <file>.</file>
+
+  <!-- PHP and YAML only; JS/CSS are linted by core's eslint/stylelint jobs. -->
+  <arg name="extensions" value="php,module,inc,install,yml"/>
+  <arg name="basepath" value="."/>
+  <arg name="colors"/>
+  <arg value="sp"/>
+
+  <!-- Build artefacts and any vendored deps must not be sniffed. -->
+  <exclude-pattern>*/vendor/*</exclude-pattern>
+  <exclude-pattern>*.phpunit.result.cache</exclude-pattern>
+
+  <!-- Prose docs are not code; do not subject Markdown/text to code sniffs. -->
+  <exclude-pattern>*.md</exclude-pattern>
+  <exclude-pattern>*.txt</exclude-pattern>
+
+  <!-- Versioned system prompts and eval run artifacts are data, not code. -->
+  <exclude-pattern>prompts/*</exclude-pattern>
+  <exclude-pattern>tests/eval/*</exclude-pattern>
+
+  <rule ref="Drupal"/>
+  <rule ref="DrupalPractice"/>
+
+  <!-- Test stubs mirror third-party classes (Opis, ai_agents, DKAN), so their
+       class names intentionally differ from filenames and carry no project
+       prefix. -->
+  <rule ref="Drupal.Classes.ClassFileName">
+    <exclude-pattern>tests/stubs/*</exclude-pattern>
+  </rule>
+  <rule ref="DrupalPractice.General.ClassName">
+    <exclude-pattern>tests/stubs/*</exclude-pattern>
+  </rule>
+</ruleset>

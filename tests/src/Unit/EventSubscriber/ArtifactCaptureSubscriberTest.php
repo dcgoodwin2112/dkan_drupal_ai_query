@@ -15,6 +15,11 @@ use Drupal\dkan_ai_query\Service\SystemPromptLoader;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Tests ArtifactCaptureSubscriber artifact capture paths.
+ *
+ * @group dkan_ai_query
+ */
 class ArtifactCaptureSubscriberTest extends TestCase {
 
   /**
@@ -33,6 +38,9 @@ class ArtifactCaptureSubscriberTest extends TestCase {
       });
   }
 
+  /**
+   * Builds the subscriber with mock collaborators.
+   */
   protected function buildSubscriber(
     ArtifactStorage $artifacts,
     ?ResourceIdResolver $resolver = NULL,
@@ -95,6 +103,9 @@ class ArtifactCaptureSubscriberTest extends TestCase {
     $this->assertSame(1234, $captured['count'], 'Artifact count must reflect total_rows from queryDatastore');
   }
 
+  /**
+   * Error output skips the data artifact but keeps the snapshot.
+   */
   public function testCaptureDataIgnoresErrorOutput(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
     // Even when the tool errors, the debug-panel snapshot still goes through
@@ -119,6 +130,9 @@ class ArtifactCaptureSubscriberTest extends TestCase {
     $this->assertContains('tool_call', $types, 'Tool-call debug snapshot is captured even on error');
   }
 
+  /**
+   * A chart spec passed as a JSON string is decoded.
+   */
   public function testCaptureChartParsesJsonString(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
     $captured = NULL;
@@ -142,6 +156,9 @@ class ArtifactCaptureSubscriberTest extends TestCase {
     $this->assertSame('bar', $captured['spec']['mark']);
   }
 
+  /**
+   * Unrelated tools produce only the tool_call snapshot.
+   */
   public function testNoDomainArtifactForUnrelatedTools(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
     $appended = [];
@@ -169,6 +186,9 @@ class ArtifactCaptureSubscriberTest extends TestCase {
     $this->assertSame(['tool_call'], $types);
   }
 
+  /**
+   * Data artifacts carry a full provenance block.
+   */
   public function testCaptureDataAttachesProvenanceBlock(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
     $captured = NULL;
@@ -214,9 +234,17 @@ class ArtifactCaptureSubscriberTest extends TestCase {
     // Conditions are decoded from JSON so the UI / judge can read structure.
     $this->assertIsArray($prov['query_summary']['conditions']);
     $this->assertSame('Houston', $prov['query_summary']['conditions'][0]['value']);
-    $this->assertSame(['zero_rows' => FALSE, 'all_null_columns' => [], 'row_cap_hit' => FALSE, 'coverage_warning' => NULL], $prov['sanity_flags']);
+    $this->assertSame([
+      'zero_rows' => FALSE,
+      'all_null_columns' => [],
+      'row_cap_hit' => FALSE,
+      'coverage_warning' => NULL,
+    ], $prov['sanity_flags']);
   }
 
+  /**
+   * Join queries record join fields in the provenance summary.
+   */
   public function testProvenanceForJoinIncludesJoinFields(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
     $captured = NULL;
@@ -247,6 +275,9 @@ class ArtifactCaptureSubscriberTest extends TestCase {
     $this->assertSame('state=state', $summary['join_on']);
   }
 
+  /**
+   * Sanity flags from the tool output surface in provenance.
+   */
   public function testProvenanceSurfacesSanityFlagsWhenSet(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);
     $captured = NULL;
@@ -522,7 +553,12 @@ class ArtifactCaptureSubscriberTest extends TestCase {
         'row_count' => 100,
         'results' => [
           ['op' => 'median', 'column' => 'pop', 'value' => 4.2],
-          ['op' => 'quartiles', 'column' => 'pop', 'value' => ['q1' => 10, 'q2' => 20, 'q3' => 30, 'iqr' => 20], 'rows_skipped' => 3],
+          [
+            'op' => 'quartiles',
+            'column' => 'pop',
+            'value' => ['q1' => 10, 'q2' => 20, 'q3' => 30, 'iqr' => 20],
+            'rows_skipped' => 3,
+          ],
         ],
         'warnings' => ['Computed on rows you passed in.'],
       ]),
@@ -607,8 +643,22 @@ class ArtifactCaptureSubscriberTest extends TestCase {
         'resource_id' => 'rid__1',
         'total_rows' => 12400,
         'columns' => [
-          ['name' => 'city', 'type' => 'string', 'null_count' => 0, 'distinct_count' => 50, 'min' => 'Austin', 'max' => 'Yorba'],
-          ['name' => 'pop', 'type' => 'integer', 'null_count' => 12, 'distinct_count' => 4000, 'min' => 1, 'max' => 9000000],
+          [
+            'name' => 'city',
+            'type' => 'string',
+            'null_count' => 0,
+            'distinct_count' => 50,
+            'min' => 'Austin',
+            'max' => 'Yorba',
+          ],
+          [
+            'name' => 'pop',
+            'type' => 'integer',
+            'null_count' => 12,
+            'distinct_count' => 4000,
+            'min' => 1,
+            'max' => 9000000,
+          ],
         ],
       ]),
       ['resource_id' => 'rid__1'],
@@ -722,7 +772,7 @@ class ArtifactCaptureSubscriberTest extends TestCase {
   }
 
   /**
-   * error_present is true when the tool's JSON output has a top-level error.
+   * Error_present is true when the tool's JSON output has a top-level error.
    */
   public function testToolCallSnapshotFlagsErrorOutput(): void {
     $artifacts = $this->createMock(ArtifactStorage::class);

@@ -136,7 +136,7 @@ class SettingsForm extends ConfigFormBase {
     $form['provider']['allowed_models_section'] = [
       '#type' => 'details',
       '#title' => $this->t('Allowed models'),
-      '#description' => $this->t('Optional. Restricts the widget\'s model dropdown to the models you check below. Leave all unchecked to allow every chat-tools-capable model from configured providers. The default model above is independent of this list — pick a default that is also checked here, or end users will fall back to the first allowed model.'),
+      '#description' => $this->t("Optional. Restricts the widget's model dropdown to the models you check below. Leave all unchecked to allow every chat-tools-capable model from configured providers. The default model above is independent of this list — pick a default that is also checked here, or end users will fall back to the first allowed model."),
       '#open' => !empty($savedAllowed),
       '#tree' => FALSE,
     ];
@@ -235,7 +235,7 @@ class SettingsForm extends ConfigFormBase {
       '#type' => 'checkbox',
       '#title' => $this->t('Show "Supporting data" panel'),
       '#default_value' => $config->get('show_aux_tool_calls') ?? FALSE,
-      '#description' => $this->t('Adds a collapsible panel below the answer listing tool calls the agent made that don\'t produce a primary table — computed statistics, data dictionaries, and column-level stats. Off by default; turn on for power-user / admin contexts where users want to verify the agent\'s work.'),
+      '#description' => $this->t("Adds a collapsible panel below the answer listing tool calls the agent made that don't produce a primary table — computed statistics, data dictionaries, and column-level stats. Off by default; turn on for power-user / admin contexts where users want to verify the agent's work."),
     ];
 
     $form['actions_group']['show_rest_playground_sidebar'] = [

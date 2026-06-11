@@ -14,6 +14,11 @@ use Opis\JsonSchema\ValidationResult;
  */
 class ValidationException extends \InvalidArgumentException {
 
+  /**
+   * The validation result carried by the exception.
+   *
+   * @var \Opis\JsonSchema\ValidationResult
+   */
   private ValidationResult $validationResult;
 
   public function __construct(string $message, ValidationResult $validationResult) {
@@ -21,6 +26,9 @@ class ValidationException extends \InvalidArgumentException {
     $this->validationResult = $validationResult;
   }
 
+  /**
+   * Returns the validation result.
+   */
   public function getResult(): ValidationResult {
     return $this->validationResult;
   }

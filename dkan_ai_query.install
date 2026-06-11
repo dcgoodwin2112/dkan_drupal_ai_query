@@ -141,7 +141,7 @@ function dkan_ai_query_update_10006(): string {
 /**
  * Sync the v10 system prompt onto the dkan_data_query agent.
  *
- * v10 adds the "Raw query (advanced)" section documenting when to use
+ * V10 adds the "Raw query (advanced)" section documenting when to use
  * the new query_datastore_raw passthrough tool. The raw tool itself is
  * gated by the enable_raw_query_tool setting (default off) and registered
  * separately via SettingsForm submit / AgentPromptSync::syncTools().

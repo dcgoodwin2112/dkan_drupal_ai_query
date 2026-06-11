@@ -7,8 +7,16 @@ namespace Drupal\Tests\dkan_ai_query\Unit\Service;
 use Drupal\dkan_ai_query\Service\EvalToolCallCollector;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Tests EvalToolCallCollector recording and input sanitizing.
+ *
+ * @group dkan_ai_query
+ */
 class EvalToolCallCollectorTest extends TestCase {
 
+  /**
+   * Calls are recorded in order with incrementing iterations.
+   */
   public function testRecordsInOrderWithIncrementingIteration(): void {
     $c = new EvalToolCallCollector();
     $c->record('t1', 'list_datasets', [], 100);
@@ -23,11 +31,17 @@ class EvalToolCallCollectorTest extends TestCase {
     $this->assertSame(['resource_id' => 'abc__v1'], $calls[1]['input']);
   }
 
+  /**
+   * Load() returns an empty array for an unknown thread.
+   */
   public function testLoadUnknownThreadReturnsEmpty(): void {
     $c = new EvalToolCallCollector();
     $this->assertSame([], $c->load('missing'));
   }
 
+  /**
+   * Forget() clears a thread's recorded calls.
+   */
   public function testForgetClears(): void {
     $c = new EvalToolCallCollector();
     $c->record('t1', 'a', [], 0);
@@ -35,6 +49,9 @@ class EvalToolCallCollectorTest extends TestCase {
     $this->assertSame([], $c->load('t1'));
   }
 
+  /**
+   * Recorded calls are isolated per thread.
+   */
   public function testThreadsAreIsolated(): void {
     $c = new EvalToolCallCollector();
     $c->record('a', 'tool_a', [], 0);
@@ -46,6 +63,9 @@ class EvalToolCallCollectorTest extends TestCase {
     $this->assertSame(1, $c->load('b')[0]['iteration']);
   }
 
+  /**
+   * Long string inputs are truncated to 200 chars plus ellipsis.
+   */
   public function testLongStringInputIsTruncated(): void {
     $c = new EvalToolCallCollector();
     $long = str_repeat('x', 500);
@@ -56,12 +76,18 @@ class EvalToolCallCollectorTest extends TestCase {
     $this->assertStringEndsWith('…', $captured);
   }
 
+  /**
+   * Non-scalar inputs are redacted to their type name.
+   */
   public function testNonScalarInputIsRedactedToTypeName(): void {
     $c = new EvalToolCallCollector();
     $c->record('t', 'q', ['ctx' => new \stdClass()], 0);
     $this->assertSame('<stdClass>', $c->load('t')[0]['input']['ctx']);
   }
 
+  /**
+   * Scalar input values are preserved as-is.
+   */
   public function testScalarTypesArePreserved(): void {
     $c = new EvalToolCallCollector();
     $c->record('t', 'q', ['n' => 42, 'b' => TRUE, 'nul' => NULL, 'short' => 'ok'], 0);

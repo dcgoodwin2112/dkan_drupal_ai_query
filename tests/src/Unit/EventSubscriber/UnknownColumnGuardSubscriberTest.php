@@ -10,20 +10,46 @@ use Drupal\dkan_ai_query\Service\RefusalCollector;
 use Drupal\dkan_ai_query\Service\UnknownColumnCounter;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Tests UnknownColumnGuardSubscriber refusal tripping.
+ *
+ * @group dkan_ai_query
+ */
 class UnknownColumnGuardSubscriberTest extends TestCase {
 
+  /**
+   * Counter backing the subscriber under test.
+   *
+   * @var \Drupal\dkan_ai_query\Service\UnknownColumnCounter
+   */
   protected UnknownColumnCounter $counter;
 
+  /**
+   * Collector receiving recorded refusals.
+   *
+   * @var \Drupal\dkan_ai_query\Service\RefusalCollector
+   */
   protected RefusalCollector $refusals;
 
+  /**
+   * The subscriber under test.
+   *
+   * @var \Drupal\dkan_ai_query\EventSubscriber\UnknownColumnGuardSubscriber
+   */
   protected UnknownColumnGuardSubscriber $subscriber;
 
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp(): void {
     $this->counter = new UnknownColumnCounter();
     $this->refusals = new RefusalCollector();
     $this->subscriber = new UnknownColumnGuardSubscriber($this->counter, $this->refusals);
   }
 
+  /**
+   * Builds a query_datastore stub emitting an unknown_column error.
+   */
   protected function unknownColumnTool(string $col = 'rate_per_100k', array $available = ['state', 'year']): \FunctionCallStub {
     return new \FunctionCallStub(
       'query_datastore',
@@ -37,6 +63,9 @@ class UnknownColumnGuardSubscriberTest extends TestCase {
     );
   }
 
+  /**
+   * The first two unknown-column errors pass through untouched.
+   */
   public function testFirstTwoUnknownColumnsAreNotRefused(): void {
     foreach ([1, 2] as $i) {
       $tool = $this->unknownColumnTool();
@@ -48,6 +77,9 @@ class UnknownColumnGuardSubscriberTest extends TestCase {
     $this->assertNull($this->refusals->get('thread-1'));
   }
 
+  /**
+   * The third unknown-column error becomes a refusal payload.
+   */
   public function testThirdUnknownColumnRewritesOutputAndRecordsRefusal(): void {
     foreach ([1, 2, 3] as $i) {
       $tool = $this->unknownColumnTool('foo' . $i);
@@ -65,6 +97,9 @@ class UnknownColumnGuardSubscriberTest extends TestCase {
     $this->assertSame('repeated_unknown_column', $recorded['reason_category']);
   }
 
+  /**
+   * Tools outside the guarded set are ignored.
+   */
   public function testIgnoresNonGuardedTools(): void {
     $tool = new \FunctionCallStub(
       'sample_rows',
@@ -76,6 +111,9 @@ class UnknownColumnGuardSubscriberTest extends TestCase {
     $this->assertSame(0, $this->counter->count('thread-1'));
   }
 
+  /**
+   * Successful query output does not bump the counter.
+   */
   public function testIgnoresSuccessfulQueryResults(): void {
     $tool = new \FunctionCallStub(
       'query_datastore',
@@ -87,6 +125,9 @@ class UnknownColumnGuardSubscriberTest extends TestCase {
     $this->assertSame(0, $this->counter->count('thread-1'));
   }
 
+  /**
+   * An empty thread id falls back to the runner id.
+   */
   public function testFallsBackToRunnerIdWhenThreadIdEmpty(): void {
     $tool = $this->unknownColumnTool();
     // ThreadId empty (CLI eval), runner id provided.
@@ -95,6 +136,9 @@ class UnknownColumnGuardSubscriberTest extends TestCase {
     $this->assertSame(1, $this->counter->count('runner-7'));
   }
 
+  /**
+   * Unknown-column hits are counted per thread.
+   */
   public function testThreadsCountIndependently(): void {
     foreach (['a', 'a', 'b'] as $tid) {
       $tool = $this->unknownColumnTool();

@@ -8,16 +8,32 @@ use Drupal\Core\Extension\ExtensionPathResolver;
 use Drupal\dkan_ai_query\Service\SystemPromptLoader;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Tests SystemPromptLoader file loading and version handling.
+ *
+ * @group dkan_ai_query
+ */
 class SystemPromptLoaderTest extends TestCase {
 
+  /**
+   * Throwaway temp directory simulating the module path.
+   *
+   * @var string
+   */
   protected string $tmpDir;
 
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp(): void {
     $this->tmpDir = sys_get_temp_dir() . '/prompts_' . bin2hex(random_bytes(4));
     mkdir($this->tmpDir);
     mkdir($this->tmpDir . '/prompts');
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function tearDown(): void {
     foreach (glob($this->tmpDir . '/prompts/*') as $f) {
       @unlink($f);
@@ -35,16 +51,25 @@ class SystemPromptLoaderTest extends TestCase {
     return new SystemPromptLoader($resolver);
   }
 
+  /**
+   * Loads a prompt from its versioned Markdown file.
+   */
   public function testLoadsPromptFromMarkdownFile(): void {
     file_put_contents($this->tmpDir . '/prompts/query_system_prompt.v1.md', "Hello prompt v1\n");
     $loader = $this->makeLoader();
     $this->assertSame('Hello prompt v1', $loader->load('v1'));
   }
 
+  /**
+   * Load() returns NULL when the prompt file is missing.
+   */
   public function testReturnsNullWhenFileMissing(): void {
     $this->assertNull($this->makeLoader()->load('v99'));
   }
 
+  /**
+   * Prompt content is cached after the first load.
+   */
   public function testCachesAfterFirstLoad(): void {
     file_put_contents($this->tmpDir . '/prompts/query_system_prompt.v1.md', 'first');
     $loader = $this->makeLoader();
@@ -54,10 +79,16 @@ class SystemPromptLoaderTest extends TestCase {
     $this->assertSame('first', $loader->load('v1'));
   }
 
+  /**
+   * ActiveVersion() defaults to DEFAULT_VERSION.
+   */
   public function testActiveVersionDefault(): void {
     $this->assertSame('v10', $this->makeLoader()->activeVersion());
   }
 
+  /**
+   * SetOverride() changes and resets the active version.
+   */
   public function testActiveVersionOverride(): void {
     $loader = $this->makeLoader();
     $loader->setOverride('v2');
@@ -70,11 +101,17 @@ class SystemPromptLoaderTest extends TestCase {
     $this->assertSame('v10', $loader->activeVersion());
   }
 
+  /**
+   * Loaded prompt content is trimmed.
+   */
   public function testStripsTrailingWhitespace(): void {
     file_put_contents($this->tmpDir . '/prompts/query_system_prompt.v1.md', "  body\n\n\n");
     $this->assertSame('body', $this->makeLoader()->load('v1'));
   }
 
+  /**
+   * Versions resolve with or without the 'v' prefix.
+   */
   public function testVersionPrefixHandling(): void {
     file_put_contents($this->tmpDir . '/prompts/query_system_prompt.v2.md', 'two');
     $loader = $this->makeLoader();

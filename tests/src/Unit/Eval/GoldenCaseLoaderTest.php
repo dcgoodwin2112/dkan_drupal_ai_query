@@ -7,18 +7,37 @@ namespace Drupal\Tests\dkan_ai_query\Unit\Eval;
 use Drupal\dkan_ai_query\Eval\GoldenCaseLoader;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Tests GoldenCaseLoader YAML parsing and validation.
+ *
+ * @group dkan_ai_query
+ */
 class GoldenCaseLoaderTest extends TestCase {
 
+  /**
+   * Path to a throwaway temp YAML file.
+   *
+   * @var string
+   */
   protected string $tmp;
 
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp(): void {
     $this->tmp = tempnam(sys_get_temp_dir(), 'golden_');
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function tearDown(): void {
     @unlink($this->tmp);
   }
 
+  /**
+   * A valid YAML file loads into GoldenCase objects.
+   */
   public function testLoadsValidYaml(): void {
     file_put_contents($this->tmp, <<<YAML
 cases:
@@ -38,6 +57,9 @@ YAML);
     $this->assertFalse($cases[0]->expectedRefusal);
   }
 
+  /**
+   * Duplicate case ids are rejected.
+   */
   public function testRejectsDuplicateIds(): void {
     file_put_contents($this->tmp, <<<YAML
 cases:
@@ -49,6 +71,9 @@ YAML);
     (new GoldenCaseLoader())->load($this->tmp);
   }
 
+  /**
+   * A case without a question is rejected.
+   */
   public function testRejectsMissingQuestion(): void {
     file_put_contents($this->tmp, <<<YAML
 cases:
@@ -58,6 +83,9 @@ YAML);
     (new GoldenCaseLoader())->load($this->tmp);
   }
 
+  /**
+   * YAML without a top-level 'cases' list is rejected.
+   */
   public function testRejectsMissingCasesKey(): void {
     file_put_contents($this->tmp, "not_cases: []\n");
     $this->expectException(\RuntimeException::class);
@@ -65,11 +93,17 @@ YAML);
     (new GoldenCaseLoader())->load($this->tmp);
   }
 
+  /**
+   * A missing file path throws.
+   */
   public function testRejectsMissingFile(): void {
     $this->expectException(\RuntimeException::class);
     (new GoldenCaseLoader())->load('/nonexistent/path.yml');
   }
 
+  /**
+   * Optional fields default to NULL or empty values.
+   */
   public function testDefaultsApplied(): void {
     file_put_contents($this->tmp, <<<YAML
 cases:

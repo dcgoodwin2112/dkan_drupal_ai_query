@@ -10,6 +10,11 @@ use Drupal\dkan_ai_query\DatasetCaveatInterface;
 use Drupal\dkan_ai_query\Service\DatasetCaveatRegistry;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Tests DatasetCaveatRegistry lookups and payload attachment.
+ *
+ * @group dkan_ai_query
+ */
 class DatasetCaveatRegistryTest extends TestCase {
 
   /**
@@ -33,6 +38,9 @@ class DatasetCaveatRegistryTest extends TestCase {
     return $entity;
   }
 
+  /**
+   * Empty storage yields no caveats or datasets.
+   */
   public function testEmptyStorageReturnsNothing(): void {
     $registry = $this->makeRegistry([]);
     $this->assertNull($registry->getCaveats('any-uuid'));
@@ -40,6 +48,9 @@ class DatasetCaveatRegistryTest extends TestCase {
     $this->assertSame([], $registry->listDatasets());
   }
 
+  /**
+   * A registered dataset returns its caveat record.
+   */
   public function testReturnsCaveatsForRegisteredDataset(): void {
     $registry = $this->makeRegistry([
       'abc_123' => $this->caveat('abc-123', [
@@ -58,6 +69,9 @@ class DatasetCaveatRegistryTest extends TestCase {
     $this->assertEquals(['abc-123'], $registry->listDatasets());
   }
 
+  /**
+   * A blank record returns an empty array, not NULL.
+   */
   public function testEmptyEntityYieldsEmptyArrayNotNull(): void {
     // A saved entity with all fields blank surfaces as an empty array — the
     // caller can distinguish "no record" (null) from "blank record" ([]).
@@ -69,6 +83,9 @@ class DatasetCaveatRegistryTest extends TestCase {
     $this->assertEquals(['abc-123'], $registry->listDatasets());
   }
 
+  /**
+   * An unknown dataset UUID returns NULL.
+   */
   public function testUnknownDatasetReturnsNull(): void {
     $registry = $this->makeRegistry([
       'abc_123' => $this->caveat('abc-123', ['suppression' => 'x']),
@@ -77,6 +94,9 @@ class DatasetCaveatRegistryTest extends TestCase {
     $this->assertSame([], $registry->getColumnCaveats('different-uuid'));
   }
 
+  /**
+   * Storage failures degrade to empty results.
+   */
   public function testStorageFailureIsHandledSoftly(): void {
     $etm = $this->createMock(EntityTypeManagerInterface::class);
     $etm->method('getStorage')->willThrowException(new \RuntimeException('storage unavailable'));
@@ -85,6 +105,9 @@ class DatasetCaveatRegistryTest extends TestCase {
     $this->assertNull($registry->getCaveats('anything'));
   }
 
+  /**
+   * Entities without a dataset UUID are skipped.
+   */
   public function testEntityWithoutUuidIsSkipped(): void {
     $registry = $this->makeRegistry([
       'broken' => $this->caveat('', ['suppression' => 'x']),
@@ -93,6 +116,9 @@ class DatasetCaveatRegistryTest extends TestCase {
     $this->assertEquals(['abc-123'], $registry->listDatasets());
   }
 
+  /**
+   * Multiple caveat records are tracked per dataset.
+   */
   public function testMultipleDatasets(): void {
     $registry = $this->makeRegistry([
       'a_1' => $this->caveat('a-1', ['suppression' => 'A']),
@@ -103,6 +129,9 @@ class DatasetCaveatRegistryTest extends TestCase {
     $this->assertEquals(['x' => 'B'], $registry->getColumnCaveats('b-2'));
   }
 
+  /**
+   * Attach() merges caveats into a payload.
+   */
   public function testAttachAddsCaveatsWhenPopulated(): void {
     $registry = $this->makeRegistry([
       'abc_123' => $this->caveat('abc-123', [
@@ -117,6 +146,9 @@ class DatasetCaveatRegistryTest extends TestCase {
     $this->assertSame($payload['distributions'], $merged['distributions']);
   }
 
+  /**
+   * Attach() leaves the payload untouched without a record.
+   */
   public function testAttachSkipsWhenNoRecord(): void {
     $registry = $this->makeRegistry([]);
     $payload = ['distributions' => [['resource_id' => 'rid__1']]];
@@ -125,6 +157,9 @@ class DatasetCaveatRegistryTest extends TestCase {
     $this->assertSame($payload, $merged);
   }
 
+  /**
+   * Attach() skips a blank caveat record.
+   */
   public function testAttachSkipsWhenRecordExistsButBlank(): void {
     // Empty caveat record (saved entity, all fields blank). The registry
     // returns [] to distinguish from "no record" (NULL), but attach() must
@@ -138,6 +173,9 @@ class DatasetCaveatRegistryTest extends TestCase {
     $this->assertArrayNotHasKey('caveats', $merged);
   }
 
+  /**
+   * Attach() overwrites a pre-existing caveats key.
+   */
   public function testAttachOverwritesExistingCaveatsKey(): void {
     // Defensive: if a caller has already populated `caveats`, the registry's
     // authoritative record wins.
@@ -149,6 +187,9 @@ class DatasetCaveatRegistryTest extends TestCase {
     $this->assertSame(['suppression' => 'fresh'], $merged['caveats']);
   }
 
+  /**
+   * ResetCache() forces a storage reload.
+   */
   public function testResetCacheForcesReload(): void {
     $storage = $this->createMock(EntityStorageInterface::class);
     $storage->expects($this->exactly(2))

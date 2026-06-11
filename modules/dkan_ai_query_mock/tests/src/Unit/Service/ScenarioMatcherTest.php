@@ -18,6 +18,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * Unit-tests for ScenarioMatcher: header > cookie > state > question > NULL.
  *
  * @covers \Drupal\dkan_ai_query_mock\Service\ScenarioMatcher
+ * @group dkan_ai_query_mock
  */
 class ScenarioMatcherTest extends TestCase {
 

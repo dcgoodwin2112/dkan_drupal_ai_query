@@ -5,6 +5,9 @@
  * Hook implementations for dkan_ai_query.
  */
 
+use Drupal\Core\Entity\EntityFormInterface;
+use Drupal\Core\Form\FormStateInterface;
+
 /**
  * Implements hook_modules_installed().
  *
@@ -77,12 +80,12 @@ function dkan_ai_query_cron(): void {
  * default prompt is sourced from a markdown file in this module, not from this
  * form's text area.
  */
-function dkan_ai_query_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id): void {
+function dkan_ai_query_form_alter(array &$form, FormStateInterface $form_state, $form_id): void {
   if ($form_id !== 'ai_agent_edit_form' && $form_id !== 'ai_agent_add_form') {
     return;
   }
-  $entity = $form_state->getFormObject() instanceof \Drupal\Core\Entity\EntityFormInterface
-    ? $form_state->getFormObject()->getEntity()
+  $entity = $form_state->getFormObject() instanceof
+  EntityFormInterface ? $form_state->getFormObject()->getEntity()
     : NULL;
   if ($entity === NULL || $entity->id() !== 'dkan_data_query') {
     return;

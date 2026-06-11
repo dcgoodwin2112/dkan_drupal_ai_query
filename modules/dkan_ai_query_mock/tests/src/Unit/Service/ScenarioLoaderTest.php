@@ -13,6 +13,7 @@ use PHPUnit\Framework\TestCase;
  * Unit-tests for ScenarioLoader: YAML discovery and structural validation.
  *
  * @covers \Drupal\dkan_ai_query_mock\Service\ScenarioLoader
+ * @group dkan_ai_query_mock
  */
 class ScenarioLoaderTest extends TestCase {
 
