@@ -33,31 +33,26 @@ While `solve()` blocks server-side, `ai_agents` writes per-iteration status even
 ## Requirements
 
 - Drupal 10.5+ or 11
-- DKAN (`metastore`, `datastore` modules enabled)
-- `dkan_query_tools` module enabled — provides the catalog/datastore/search tool classes that the FunctionCall plugins call into. It ships as a submodule of `dcgoodwin2112/dkan_mcp_server`; see its [README](../dkan_mcp_server/modules/dkan_query_tools/README.md).
+- DKAN 4.1+ (`dkan_metastore`, `dkan_datastore` modules enabled)
+- `dkan_query_tools` module enabled — provides the catalog/datastore/search tool classes that the FunctionCall plugins call into. It ships as a submodule of the [dkan_mcp_server](https://www.drupal.org/project/dkan_mcp_server) project.
 - `drupal/ai` ^1.2 with `drupal/ai_agents` ^1.2
 - An AI provider module: `drupal/ai_provider_anthropic` and/or `drupal/ai_provider_openai`
 - API key for the chosen provider
 
 ## Installing
 
-1. Pull in `dkan_query_tools` first. It ships inside the `dcgoodwin2112/dkan_mcp_server`
-   package, which is not on Packagist/drupal.org, so the root project needs a VCS
-   `repositories` entry for it (and `minimum-stability: dev`):
-
-   ```jsonc
-   "repositories": {
-     "dkan_mcp_server": { "type": "vcs", "url": "https://github.com/dcgoodwin2112/dkan_mcp_server" }
-   }
-   ```
+1. Pull in `dkan_query_tools` first. It ships inside the
+   [dkan_mcp_server](https://www.drupal.org/project/dkan_mcp_server) project:
 
    ```bash
-   composer require dcgoodwin2112/dkan_mcp_server
+   composer require drupal/dkan_mcp_server:^1.0@alpha drupal/dkan_query_tools:^1.0@alpha drupal/mcp_server:2.x-dev
    ddev drush en dkan_query_tools   # the query lib alone; does not enable the MCP server
    ```
 
-   This places `dkan_mcp_server` (and its `drupal/mcp_server` + `mcp/sdk` deps) on
-   disk. Enable only `dkan_query_tools` if you don't want the MCP server running.
+   The explicit constraints matter: the alpha release depends on alpha/dev
+   packages (`drupal/dkan_query_tools`, `drupal/mcp_server 2.x-dev`), which
+   a default `minimum-stability: stable` root won't accept otherwise. Enable
+   only `dkan_query_tools` if you don't want the MCP server running.
 
 2. Make sure the Drupal AI stack is in place:
 
@@ -228,7 +223,7 @@ Topic guides live in [docs/](docs/):
 
 Upstream tool-response contract (success / error / sanity-flag shapes
 returned by `DatastoreTools`) lives at
-[../dkan_mcp_server/modules/dkan_query_tools/docs/tool-responses.md](../dkan_mcp_server/modules/dkan_query_tools/docs/tool-responses.md).
+[dkan_query_tools/docs/tool-responses.md](https://git.drupalcode.org/project/dkan_mcp_server/-/blob/1.0.x/modules/dkan_query_tools/docs/tool-responses.md).
 
 ## Tests
 
