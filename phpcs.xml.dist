@@ -13,6 +13,7 @@
 
   <!-- Build artefacts and any vendored deps must not be sniffed. -->
   <exclude-pattern>*/vendor/*</exclude-pattern>
+  <exclude-pattern>*/web/*</exclude-pattern>
   <exclude-pattern>*.phpunit.result.cache</exclude-pattern>
 
   <!-- Prose docs are not code; do not subject Markdown/text to code sniffs. -->

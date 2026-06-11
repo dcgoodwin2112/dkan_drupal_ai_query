@@ -43,7 +43,7 @@
   "extra": {
     "drupal-scaffold": {
       "locations": {
-        "web-root": "vendor/scaffold-sink/"
+        "web-root": "web/"
       },
       "file-mapping": {
         "[project-root]/.editorconfig": false,

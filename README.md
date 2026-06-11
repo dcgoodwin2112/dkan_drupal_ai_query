@@ -1,5 +1,11 @@
 # DKAN AI Query
 
+> [!IMPORTANT]
+> **This project has moved to [drupal.org](https://www.drupal.org/project/dkan_ai_query).**
+> Development, releases, and the issue queue are there now — code at
+> <https://git.drupalcode.org/project/dkan_ai_query>. This GitHub repository is
+> an archived snapshot and is no longer maintained.
+
 Natural-language query widget for DKAN datasets. Built on `drupal/ai` + `drupal/ai_agents` + `dkan_query_tools`. Polling-based architecture (long-blocking POST + 500 ms GET poll) aligned with the Drupal AI initiative's roadmap.
 
 Project page: <https://www.drupal.org/project/dkan_ai_query>
