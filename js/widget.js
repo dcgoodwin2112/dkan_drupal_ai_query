@@ -1,6 +1,6 @@
 /**
  * @file
- * dkan_drupal_ai_query chat widget.
+ * dkan_ai_query chat widget.
  *
  * Network protocol: POST /api/dkan-ai-query/start (long-blocking), parallel
  * GET /api/dkan-ai-query/poll/{thread_id} every 500 ms. Status events drive

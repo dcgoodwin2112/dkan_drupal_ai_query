@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\dkan_drupal_ai_query\Unit\Service;
+namespace Drupal\Tests\dkan_ai_query\Unit\Service;
 
 use Drupal\Core\Cache\CacheBackendInterface;
-use Drupal\dkan_drupal_ai_query\Service\CatalogContextBuilder;
+use Drupal\dkan_ai_query\Service\CatalogContextBuilder;
 use Drupal\dkan_query_tools\Tool\MetastoreTools;
 use PHPUnit\Framework\TestCase;
 

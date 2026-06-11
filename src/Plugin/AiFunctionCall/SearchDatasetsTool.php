@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Plugin\AiFunctionCall;
+namespace Drupal\dkan_ai_query\Plugin\AiFunctionCall;
 
 use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
@@ -15,11 +15,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Search datasets by keyword.
  */
 #[FunctionCall(
-  id: 'dkan_drupal_ai_query:search_datasets',
+  id: 'dkan_ai_query:search_datasets',
   function_name: 'search_datasets',
   name: 'Search datasets',
   description: 'Search datasets by keyword. Returns matching datasets with title, identifier, description, and distribution count.',
-  group: 'dkan_drupal_ai_query',
+  group: 'dkan_ai_query',
   context_definitions: [
     'keyword' => new ContextDefinition(
       data_type: 'string',

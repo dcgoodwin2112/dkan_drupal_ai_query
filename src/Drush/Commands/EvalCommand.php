@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Drupal\dkan_drupal_ai_query\Drush\Commands;
+namespace Drupal\dkan_ai_query\Drush\Commands;
 
-use Drupal\dkan_drupal_ai_query\Eval\EvalRunner;
-use Drupal\dkan_drupal_ai_query\Eval\GoldenCaseLoader;
-use Drupal\dkan_drupal_ai_query\Eval\RunReporter;
-use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
+use Drupal\dkan_ai_query\Eval\EvalRunner;
+use Drupal\dkan_ai_query\Eval\GoldenCaseLoader;
+use Drupal\dkan_ai_query\Eval\RunReporter;
+use Drupal\dkan_ai_query\Service\SystemPromptLoader;
 use Drupal\dkan_query_tools\Tool\DatastoreTools;
 use Drush\Attributes as CLI;
 use Drush\Boot\DrupalBootLevels;
@@ -15,7 +15,7 @@ use Drush\Commands\DrushCommands;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * Drush commands for the dkan_drupal_ai_query eval harness.
+ * Drush commands for the dkan_ai_query eval harness.
  */
 class EvalCommand extends DrushCommands {
 
@@ -38,17 +38,17 @@ class EvalCommand extends DrushCommands {
    */
   public static function create(ContainerInterface $container): self {
     return new self(
-      $container->get('dkan_drupal_ai_query.eval.loader'),
-      $container->get('dkan_drupal_ai_query.eval.runner'),
-      $container->get('dkan_drupal_ai_query.eval.reporter'),
-      $container->get('dkan_drupal_ai_query.system_prompt_loader'),
+      $container->get('dkan_ai_query.eval.loader'),
+      $container->get('dkan_ai_query.eval.runner'),
+      $container->get('dkan_ai_query.eval.reporter'),
+      $container->get('dkan_ai_query.system_prompt_loader'),
       $container->get('dkan_query_tools.datastore'),
-      $container->get('extension.list.module')->getPath('dkan_drupal_ai_query'),
+      $container->get('extension.list.module')->getPath('dkan_ai_query'),
     );
   }
 
   /**
-   * Run the dkan_drupal_ai_query eval harness against the golden set.
+   * Run the dkan_ai_query eval harness against the golden set.
    */
   #[CLI\Command(name: 'dkan-aiq:eval', aliases: ['dkan-aiq-eval'])]
   #[CLI\Option(name: 'set', description: 'Path to the golden set YAML.')]

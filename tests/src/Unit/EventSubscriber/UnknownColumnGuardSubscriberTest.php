@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\dkan_drupal_ai_query\Unit\EventSubscriber;
+namespace Drupal\Tests\dkan_ai_query\Unit\EventSubscriber;
 
 use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
-use Drupal\dkan_drupal_ai_query\EventSubscriber\UnknownColumnGuardSubscriber;
-use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
-use Drupal\dkan_drupal_ai_query\Service\UnknownColumnCounter;
+use Drupal\dkan_ai_query\EventSubscriber\UnknownColumnGuardSubscriber;
+use Drupal\dkan_ai_query\Service\RefusalCollector;
+use Drupal\dkan_ai_query\Service\UnknownColumnCounter;
 use PHPUnit\Framework\TestCase;
 
 class UnknownColumnGuardSubscriberTest extends TestCase {

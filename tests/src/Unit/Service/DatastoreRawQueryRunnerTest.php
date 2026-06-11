@@ -1,11 +1,11 @@
 <?php
 
-namespace Drupal\Tests\dkan_drupal_ai_query\Unit\Service;
+namespace Drupal\Tests\dkan_ai_query\Unit\Service;
 
 use Drupal\dkan_datastore\Service\DatastoreQuery;
 use Drupal\dkan_datastore\Service\Query;
-use Drupal\dkan_drupal_ai_query\Service\DatastoreRawQueryRunner;
-use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
+use Drupal\dkan_ai_query\Service\DatastoreRawQueryRunner;
+use Drupal\dkan_ai_query\Service\ResourceIdResolver;
 use Opis\JsonSchema\ValidationError;
 use Opis\JsonSchema\ValidationResult;
 use PHPUnit\Framework\TestCase;
@@ -13,7 +13,7 @@ use RootedData\Exception\ValidationException;
 use RootedData\RootedJsonData;
 
 /**
- * @covers \Drupal\dkan_drupal_ai_query\Service\DatastoreRawQueryRunner
+ * @covers \Drupal\dkan_ai_query\Service\DatastoreRawQueryRunner
  */
 class DatastoreRawQueryRunnerTest extends TestCase {
 

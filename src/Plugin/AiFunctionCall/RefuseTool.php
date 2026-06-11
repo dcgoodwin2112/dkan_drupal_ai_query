@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Plugin\AiFunctionCall;
+namespace Drupal\dkan_ai_query\Plugin\AiFunctionCall;
 
 use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
@@ -25,11 +25,11 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
  * Downstream UI can render refusal cards distinctly from answers.
  */
 #[FunctionCall(
-  id: 'dkan_drupal_ai_query:refuse',
+  id: 'dkan_ai_query:refuse',
   function_name: 'refuse',
   name: 'Refuse',
   description: 'Terminate the conversation with a structured refusal. Use when the question cannot be answered: no matching dataset, out of scope, out of coverage, DSL limitation, or repeated tool errors. Always include reason_category and a short explanation.',
-  group: 'dkan_drupal_ai_query',
+  group: 'dkan_ai_query',
   context_definitions: [
     'reason_category' => new ContextDefinition(
       data_type: 'string',

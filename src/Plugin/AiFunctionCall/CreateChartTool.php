@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Plugin\AiFunctionCall;
+namespace Drupal\dkan_ai_query\Plugin\AiFunctionCall;
 
 use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
@@ -16,11 +16,11 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
  * to keep the LLM-visible result compact.
  */
 #[FunctionCall(
-  id: 'dkan_drupal_ai_query:create_chart',
+  id: 'dkan_ai_query:create_chart',
   function_name: 'create_chart',
   name: 'Create chart',
   description: 'Render an interactive chart from query results. Pass a Vega-Lite v5 specification with data.values containing the rows. Use after query_datastore when visualization would help. Good for: comparisons (bar), trends (line), distributions (histogram), proportions (arc), correlations (point). The spec must include the $schema field.',
-  group: 'dkan_drupal_ai_query',
+  group: 'dkan_ai_query',
   context_definitions: [
     'spec' => new ContextDefinition(
       data_type: 'string',

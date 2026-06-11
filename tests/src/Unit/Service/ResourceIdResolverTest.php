@@ -1,8 +1,8 @@
 <?php
 
-namespace Drupal\Tests\dkan_drupal_ai_query\Unit\Service;
+namespace Drupal\Tests\dkan_ai_query\Unit\Service;
 
-use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
+use Drupal\dkan_ai_query\Service\ResourceIdResolver;
 use Drupal\dkan_query_tools\Tool\DatastoreTools;
 use Drupal\dkan_query_tools\Tool\MetastoreTools;
 use PHPUnit\Framework\TestCase;

@@ -1,16 +1,16 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\EventSubscriber;
+namespace Drupal\dkan_ai_query\EventSubscriber;
 
 use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
 use Drupal\ai_agents\Event\AgentToolPreExecuteEvent;
 use Drupal\dkan_common\DataResource;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\dkan_datastore\DatastoreService;
-use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
-use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
-use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
-use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
+use Drupal\dkan_ai_query\Service\ArtifactStorage;
+use Drupal\dkan_ai_query\Service\RefusalCollector;
+use Drupal\dkan_ai_query\Service\ResourceIdResolver;
+use Drupal\dkan_ai_query\Service\SystemPromptLoader;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -154,7 +154,7 @@ class ArtifactCaptureSubscriber implements EventSubscriberInterface {
     $tool = $event->getTool();
     $name = $tool->getFunctionName();
 
-    if (($this->configFactory->get('dkan_drupal_ai_query.settings')->get('debug_log_level') ?? 'off') === 'debug') {
+    if (($this->configFactory->get('dkan_ai_query.settings')->get('debug_log_level') ?? 'off') === 'debug') {
       try {
         $args = $tool->getContextValues();
       }

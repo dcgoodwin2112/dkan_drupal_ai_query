@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Service;
+namespace Drupal\dkan_ai_query\Service;
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\TempStore\PrivateTempStoreFactory;
@@ -14,7 +14,7 @@ use Drupal\Core\TempStore\PrivateTempStoreFactory;
  */
 class ArtifactStorage {
 
-  protected const STORE_NAME = 'dkan_drupal_ai_query_artifacts';
+  protected const STORE_NAME = 'dkan_ai_query_artifacts';
 
   public function __construct(
     protected PrivateTempStoreFactory $tempStore,

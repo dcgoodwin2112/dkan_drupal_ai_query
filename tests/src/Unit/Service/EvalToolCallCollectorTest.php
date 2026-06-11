@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\dkan_drupal_ai_query\Unit\Service;
+namespace Drupal\Tests\dkan_ai_query\Unit\Service;
 
-use Drupal\dkan_drupal_ai_query\Service\EvalToolCallCollector;
+use Drupal\dkan_ai_query\Service\EvalToolCallCollector;
 use PHPUnit\Framework\TestCase;
 
 class EvalToolCallCollectorTest extends TestCase {

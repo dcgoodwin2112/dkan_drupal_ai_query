@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\dkan_drupal_ai_query\Service;
+namespace Drupal\dkan_ai_query\Service;
 
 /**
  * Pure-PHP statistics for ops the DSL cannot express.

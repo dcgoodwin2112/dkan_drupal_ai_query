@@ -1,9 +1,9 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Service;
+namespace Drupal\dkan_ai_query\Service;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\dkan_drupal_ai_query\DatasetCaveatInterface;
+use Drupal\dkan_ai_query\DatasetCaveatInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 

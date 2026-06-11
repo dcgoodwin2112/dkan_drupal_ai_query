@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\dkan_drupal_ai_query\Unit\Service;
+namespace Drupal\Tests\dkan_ai_query\Unit\Service;
 
 use Drupal\Core\Extension\ExtensionPathResolver;
-use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
+use Drupal\dkan_ai_query\Service\SystemPromptLoader;
 use PHPUnit\Framework\TestCase;
 
 class SystemPromptLoaderTest extends TestCase {

@@ -1,0 +1,22 @@
+use dkan ai query:
+  title: 'Use the DKAN AI query widget'
+  description: 'Submit natural-language queries against DKAN datasets.'
+
+administer dkan ai query:
+  title: 'Administer DKAN AI query'
+  description: 'Configure agents, prompts, and settings for the DKAN AI query module.'
+  restrict access: true
+
+manage own dkan ai query conversations:
+  title: 'Manage own DKAN AI query conversations'
+  description: 'Save, list, load, pin, and delete one''s own conversations.'
+
+administer dkan ai query conversations:
+  title: 'Administer DKAN AI query conversations'
+  description: 'View and manage conversations belonging to other users.'
+  restrict access: true
+
+administer dkan dataset caveats:
+  title: 'Administer DKAN dataset caveats'
+  description: 'Create, edit, and delete per-dataset caveats shown to the AI query agent.'
+  restrict access: true

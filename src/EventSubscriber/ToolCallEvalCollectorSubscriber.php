@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Drupal\dkan_drupal_ai_query\EventSubscriber;
+namespace Drupal\dkan_ai_query\EventSubscriber;
 
 use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
-use Drupal\dkan_drupal_ai_query\Service\EvalToolCallCollector;
+use Drupal\dkan_ai_query\Service\EvalToolCallCollector;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**

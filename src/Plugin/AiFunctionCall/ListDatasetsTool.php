@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Plugin\AiFunctionCall;
+namespace Drupal\dkan_ai_query\Plugin\AiFunctionCall;
 
 use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
@@ -15,11 +15,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * List datasets with pagination.
  */
 #[FunctionCall(
-  id: 'dkan_drupal_ai_query:list_datasets',
+  id: 'dkan_ai_query:list_datasets',
   function_name: 'list_datasets',
   name: 'List datasets',
   description: 'List all datasets with pagination. Returns title, identifier, description, distribution count.',
-  group: 'dkan_drupal_ai_query',
+  group: 'dkan_ai_query',
   context_definitions: [
     'offset' => new ContextDefinition(
       data_type: 'integer',

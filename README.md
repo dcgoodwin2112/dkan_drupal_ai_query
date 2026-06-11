@@ -64,7 +64,7 @@ While `solve()` blocks server-side, `ai_agents` writes per-iteration status even
 3. Enable this module:
 
    ```bash
-   ddev drush en dkan_drupal_ai_query
+   ddev drush en dkan_ai_query
    ```
 
 The install hook installs the `dkan_aiq_conversation` and `dkan_aiq_message` entity types. Configure API keys at `/admin/config/system/keys` (see Configuring below).
@@ -80,18 +80,18 @@ ddev drush updb
 The install does NOT auto-grant permissions to existing roles (Drupal core does not do this for module enables). Run:
 
 ```bash
-ddev drush role:perm:add authenticated 'use dkan drupal ai query'
-ddev drush role:perm:add authenticated 'manage own dkan drupal ai query conversations'
-ddev drush role:perm:add administrator 'administer dkan drupal ai query'
-ddev drush role:perm:add administrator 'administer dkan drupal ai query conversations'
+ddev drush role:perm:add authenticated 'use dkan ai query'
+ddev drush role:perm:add authenticated 'manage own dkan ai query conversations'
+ddev drush role:perm:add administrator 'administer dkan ai query'
+ddev drush role:perm:add administrator 'administer dkan ai query conversations'
 ```
 
 | Permission | Use |
 |---|---|
-| `use dkan drupal ai query` | Submit questions through the widget |
-| `manage own dkan drupal ai query conversations` | Save / list / pin / delete one's own conversation history |
-| `administer dkan drupal ai query` | Access the settings form at `/admin/dkan/ai-query/settings` |
-| `administer dkan drupal ai query conversations` | View and manage other users' conversations |
+| `use dkan ai query` | Submit questions through the widget |
+| `manage own dkan ai query conversations` | Save / list / pin / delete one's own conversation history |
+| `administer dkan ai query` | Access the settings form at `/admin/dkan/ai-query/settings` |
+| `administer dkan ai query conversations` | View and manage other users' conversations |
 
 ## Configuring
 
@@ -230,11 +230,11 @@ returned by `DatastoreTools`) lives at
 PHPUnit:
 
 ```bash
-cd web/modules/custom/dkan_drupal_ai_query && ../../../vendor/bin/phpunit
+cd web/modules/custom/dkan_ai_query && ../../../vendor/bin/phpunit
 ```
 
 Lint (PHP only — JS sniffs in Drupal phpcs misfire on modern JS):
 
 ```bash
-ddev exec vendor/bin/phpcs --standard=Drupal,DrupalPractice --extensions=php,module web/modules/custom/dkan_drupal_ai_query/
+ddev exec vendor/bin/phpcs --standard=Drupal,DrupalPractice --extensions=php,module web/modules/custom/dkan_ai_query/
 ```

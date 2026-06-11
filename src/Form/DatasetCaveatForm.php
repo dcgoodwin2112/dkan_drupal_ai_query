@@ -1,10 +1,10 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Form;
+namespace Drupal\dkan_ai_query\Form;
 
 use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\dkan_drupal_ai_query\Entity\DatasetCaveat;
+use Drupal\dkan_ai_query\Entity\DatasetCaveat;
 use Drupal\dkan_query_tools\Tool\MetastoreTools;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Yaml\Exception\ParseException;
@@ -43,7 +43,7 @@ class DatasetCaveatForm extends EntityForm {
    */
   public function form(array $form, FormStateInterface $form_state): array {
     $form = parent::form($form, $form_state);
-    /** @var \Drupal\dkan_drupal_ai_query\Entity\DatasetCaveat $entity */
+    /** @var \Drupal\dkan_ai_query\Entity\DatasetCaveat $entity */
     $entity = $this->entity;
     $isNew = $entity->isNew();
 
@@ -121,7 +121,7 @@ class DatasetCaveatForm extends EntityForm {
   public function validateForm(array &$form, FormStateInterface $form_state): void {
     parent::validateForm($form, $form_state);
 
-    /** @var \Drupal\dkan_drupal_ai_query\Entity\DatasetCaveat $entity */
+    /** @var \Drupal\dkan_ai_query\Entity\DatasetCaveat $entity */
     $entity = $this->entity;
 
     if ($entity->isNew()) {
@@ -177,7 +177,7 @@ class DatasetCaveatForm extends EntityForm {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state): void {
-    /** @var \Drupal\dkan_drupal_ai_query\Entity\DatasetCaveat $entity */
+    /** @var \Drupal\dkan_ai_query\Entity\DatasetCaveat $entity */
     $entity = $this->entity;
 
     if ($entity->isNew()) {

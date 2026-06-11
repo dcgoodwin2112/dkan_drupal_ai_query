@@ -1,9 +1,9 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Entity;
+namespace Drupal\dkan_ai_query\Entity;
 
 use Drupal\Core\Config\Entity\ConfigEntityBase;
-use Drupal\dkan_drupal_ai_query\DatasetCaveatInterface;
+use Drupal\dkan_ai_query\DatasetCaveatInterface;
 
 /**
  * Defines the DatasetCaveat config entity.
@@ -21,10 +21,10 @@ use Drupal\dkan_drupal_ai_query\DatasetCaveatInterface;
  *   label_singular = @Translation("dataset caveat"),
  *   label_plural = @Translation("dataset caveats"),
  *   handlers = {
- *     "list_builder" = "Drupal\dkan_drupal_ai_query\DatasetCaveatListBuilder",
+ *     "list_builder" = "Drupal\dkan_ai_query\DatasetCaveatListBuilder",
  *     "form" = {
- *       "add" = "Drupal\dkan_drupal_ai_query\Form\DatasetCaveatForm",
- *       "edit" = "Drupal\dkan_drupal_ai_query\Form\DatasetCaveatForm",
+ *       "add" = "Drupal\dkan_ai_query\Form\DatasetCaveatForm",
+ *       "edit" = "Drupal\dkan_ai_query\Form\DatasetCaveatForm",
  *       "delete" = "Drupal\Core\Entity\EntityDeleteForm"
  *     },
  *     "route_provider" = {

@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query;
+namespace Drupal\dkan_ai_query;
 
 use Drupal\Core\Config\Entity\ConfigEntityListBuilder;
 use Drupal\Core\Entity\EntityInterface;
@@ -26,7 +26,7 @@ class DatasetCaveatListBuilder extends ConfigEntityListBuilder {
    * {@inheritdoc}
    */
   public function buildRow(EntityInterface $entity): array {
-    /** @var \Drupal\dkan_drupal_ai_query\DatasetCaveatInterface $entity */
+    /** @var \Drupal\dkan_ai_query\DatasetCaveatInterface $entity */
     return [
       'label' => $entity->label(),
       'uuid' => $entity->getDatasetUuid(),

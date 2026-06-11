@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query;
+namespace Drupal\dkan_ai_query;
 
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
 

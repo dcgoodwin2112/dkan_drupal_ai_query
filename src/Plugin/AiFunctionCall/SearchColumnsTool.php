@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Plugin\AiFunctionCall;
+namespace Drupal\dkan_ai_query\Plugin\AiFunctionCall;
 
 use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
@@ -15,11 +15,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Search column names/descriptions across all imported datastore resources.
  */
 #[FunctionCall(
-  id: 'dkan_drupal_ai_query:search_columns',
+  id: 'dkan_ai_query:search_columns',
   function_name: 'search_columns',
   name: 'Search columns',
   description: 'Search column names and descriptions across ALL imported datastore resources. Use to find which datasets contain specific data (e.g. "state", "price", "smoking").',
-  group: 'dkan_drupal_ai_query',
+  group: 'dkan_ai_query',
   context_definitions: [
     'search_term' => new ContextDefinition(
       data_type: 'string',

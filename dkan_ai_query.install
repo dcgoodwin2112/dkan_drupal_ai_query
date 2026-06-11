@@ -1,0 +1,151 @@
+<?php
+
+/**
+ * @file
+ * Install, update, and uninstall hooks for dkan_ai_query.
+ */
+
+use Drupal\Core\Url;
+use Drupal\ai\Enum\AiModelCapability;
+use Drupal\dkan_ai_query\Entity\Conversation;
+use Drupal\dkan_ai_query\Entity\Message;
+
+/**
+ * Implements hook_requirements().
+ *
+ * Verifies a chat-with-tools provider is usable. The module no longer hard-
+ * depends on ai_provider_anthropic, so a CI/dev install needs either a real
+ * provider configured or the dkan_ai_query_mock submodule enabled.
+ */
+function dkan_ai_query_requirements(string $phase): array {
+  if ($phase !== 'runtime') {
+    return [];
+  }
+  $manager = \Drupal::service('ai.provider');
+  $providers = $manager->getProvidersForOperationType('chat', TRUE, [AiModelCapability::ChatTools]);
+  if (!empty($providers)) {
+    return [];
+  }
+  return [
+    'dkan_ai_query_chat_provider' => [
+      'title' => t('DKAN AI Query: chat-with-tools provider'),
+      'value' => t('No chat-with-tools provider is configured.'),
+      'severity' => REQUIREMENT_WARNING,
+      'description' => t(
+        'Configure a provider at <a href=":providers">/admin/config/ai/providers</a>, set a default at <a href=":settings">/admin/config/ai/settings</a>, or enable the <code>dkan_ai_query_mock</code> submodule for fixture-driven local development.',
+        [
+          ':providers' => Url::fromUri('base:/admin/config/ai/providers')->toString(),
+          ':settings' => Url::fromUri('base:/admin/config/ai/settings')->toString(),
+        ],
+      ),
+    ],
+  ];
+}
+
+/**
+ * Implements hook_install().
+ */
+function dkan_ai_query_install(): void {
+  $update_manager = \Drupal::entityDefinitionUpdateManager();
+  foreach (['dkan_aiq_conversation' => Conversation::class, 'dkan_aiq_message' => Message::class] as $eid => $class) {
+    if ($update_manager->getEntityType($eid)) {
+      continue;
+    }
+    $type = \Drupal::entityTypeManager()->getDefinition($eid);
+    $update_manager->installEntityType($type);
+  }
+  // Replace the stub system_prompt that shipped via config/install with the
+  // active markdown file. The .md is the editable source of truth.
+  $result = \Drupal::service('dkan_ai_query.agent_prompt_sync')->sync();
+  \Drupal::logger('dkan_ai_query')->notice($result['message']);
+}
+
+/**
+ * Implements hook_uninstall().
+ *
+ * Removes the Conversation and Message tables. Does NOT delete Key entities
+ * configured for AI providers — they outlive this module.
+ */
+function dkan_ai_query_uninstall(): void {
+  $update_manager = \Drupal::entityDefinitionUpdateManager();
+  foreach (['dkan_aiq_message', 'dkan_aiq_conversation'] as $eid) {
+    if ($type = $update_manager->getEntityType($eid)) {
+      $update_manager->uninstallEntityType($type);
+    }
+  }
+}
+
+/**
+ * Clear stale default_model values that pre-date the dynamic provider list.
+ *
+ * The dropdown previously stored bare model ids (e.g. "claude-haiku-4-5-…")
+ * which no longer match — options are now "<provider>__<model>". Clear any
+ * legacy value so the form reverts to "Use global default" and the operator
+ * can re-pick from the live, accurate list.
+ */
+function dkan_ai_query_update_10003(): string {
+  $config = \Drupal::configFactory()->getEditable('dkan_ai_query.settings');
+  $current = (string) ($config->get('default_model') ?? '');
+  if ($current === '' || str_contains($current, '__')) {
+    return 'No legacy default_model to clear.';
+  }
+  $config->set('default_model', '')->save();
+  return sprintf('Cleared legacy default_model "%s"; pick a new value at /admin/dkan/ai-query/settings.', $current);
+}
+
+/**
+ * Register the compute_stats tool on the dkan_data_query agent.
+ */
+function dkan_ai_query_update_10004(): string {
+  $config = \Drupal::configFactory()->getEditable('ai_agents.ai_agent.dkan_data_query');
+  $tools = $config->get('tools') ?? [];
+  $key = 'dkan_ai_query:compute_stats';
+  if (array_key_exists($key, $tools)) {
+    return 'compute_stats already registered.';
+  }
+  $tools[$key] = TRUE;
+  $config->set('tools', $tools)->save();
+  return 'Registered compute_stats tool on dkan_data_query agent.';
+}
+
+/**
+ * Register the get_data_dictionary tool on the dkan_data_query agent.
+ *
+ * The plugin and the v3/v4 prompt both reference this tool, but it was
+ * never added to the agent's tools map when data dictionaries were wired
+ * in — so the agent could not actually invoke it.
+ */
+function dkan_ai_query_update_10005(): string {
+  $config = \Drupal::configFactory()->getEditable('ai_agents.ai_agent.dkan_data_query');
+  $tools = $config->get('tools') ?? [];
+  $key = 'dkan_ai_query:get_data_dictionary';
+  if (array_key_exists($key, $tools)) {
+    return 'get_data_dictionary already registered.';
+  }
+  $tools[$key] = TRUE;
+  $config->set('tools', $tools)->save();
+  return 'Registered get_data_dictionary tool on dkan_data_query agent.';
+}
+
+/**
+ * Sync the active markdown system prompt into the agent config entity.
+ *
+ * Existing installs were running with a stub prompt in the config entity
+ * because a now-removed event subscriber substituted the markdown at runtime.
+ * This update aligns the admin UI with what the LLM actually receives.
+ */
+function dkan_ai_query_update_10006(): string {
+  return (string) \Drupal::service('dkan_ai_query.agent_prompt_sync')->sync()['message'];
+}
+
+/**
+ * Sync the v10 system prompt onto the dkan_data_query agent.
+ *
+ * v10 adds the "Raw query (advanced)" section documenting when to use
+ * the new query_datastore_raw passthrough tool. The raw tool itself is
+ * gated by the enable_raw_query_tool setting (default off) and registered
+ * separately via SettingsForm submit / AgentPromptSync::syncTools().
+ */
+function dkan_ai_query_update_10007(): string {
+  return (string) \Drupal::service('dkan_ai_query.agent_prompt_sync')->sync()['message'];
+}

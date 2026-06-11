@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\dkan_drupal_ai_query\Eval;
+namespace Drupal\dkan_ai_query\Eval;
 
 /**
  * Decides pass/fail for a single case given the agent's output.

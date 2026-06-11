@@ -1,17 +1,17 @@
 <?php
 
-namespace Drupal\Tests\dkan_drupal_ai_query\Unit\EventSubscriber;
+namespace Drupal\Tests\dkan_ai_query\Unit\EventSubscriber;
 
 use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
 use Drupal\ai_agents\Event\AgentToolPreExecuteEvent;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\ImmutableConfig;
 use Drupal\dkan_datastore\DatastoreService;
-use Drupal\dkan_drupal_ai_query\EventSubscriber\ArtifactCaptureSubscriber;
-use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
-use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
-use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
-use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
+use Drupal\dkan_ai_query\EventSubscriber\ArtifactCaptureSubscriber;
+use Drupal\dkan_ai_query\Service\ArtifactStorage;
+use Drupal\dkan_ai_query\Service\RefusalCollector;
+use Drupal\dkan_ai_query\Service\ResourceIdResolver;
+use Drupal\dkan_ai_query\Service\SystemPromptLoader;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 

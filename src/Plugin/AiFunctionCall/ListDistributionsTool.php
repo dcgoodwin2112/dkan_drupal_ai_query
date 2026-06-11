@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Plugin\AiFunctionCall;
+namespace Drupal\dkan_ai_query\Plugin\AiFunctionCall;
 
 use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
@@ -8,8 +8,8 @@ use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
 use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\dkan_drupal_ai_query\Service\DatasetCaveatRegistry;
-use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
+use Drupal\dkan_ai_query\Service\DatasetCaveatRegistry;
+use Drupal\dkan_ai_query\Service\ResourceIdResolver;
 use Drupal\dkan_query_tools\Tool\MetastoreTools;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -17,11 +17,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Get distributions (data files) for a dataset.
  */
 #[FunctionCall(
-  id: 'dkan_drupal_ai_query:list_distributions',
+  id: 'dkan_ai_query:list_distributions',
   function_name: 'list_distributions',
   name: 'List distributions',
   description: 'Get distributions (data files) for a dataset. Accepts a dataset UUID, resource_id (identifier__version), or dataset title for fuzzy lookup. Returns the resource_id needed for datastore tools, plus any dataset-level caveats.',
-  group: 'dkan_drupal_ai_query',
+  group: 'dkan_ai_query',
   context_definitions: [
     'dataset_id' => new ContextDefinition(
       data_type: 'string',
@@ -43,14 +43,14 @@ class ListDistributionsTool extends FunctionCallBase implements ExecutableFuncti
   /**
    * The resource id resolver.
    *
-   * @var \Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver
+   * @var \Drupal\dkan_ai_query\Service\ResourceIdResolver
    */
   protected ResourceIdResolver $resolver;
 
   /**
    * The dataset caveat registry.
    *
-   * @var \Drupal\dkan_drupal_ai_query\Service\DatasetCaveatRegistry
+   * @var \Drupal\dkan_ai_query\Service\DatasetCaveatRegistry
    */
   protected DatasetCaveatRegistry $caveats;
 
@@ -60,8 +60,8 @@ class ListDistributionsTool extends FunctionCallBase implements ExecutableFuncti
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): FunctionCallInterface|static {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->metastoreTools = $container->get('dkan_query_tools.metastore');
-    $instance->resolver = $container->get('dkan_drupal_ai_query.resource_id_resolver');
-    $instance->caveats = $container->get('dkan_drupal_ai_query.dataset_caveat_registry');
+    $instance->resolver = $container->get('dkan_ai_query.resource_id_resolver');
+    $instance->caveats = $container->get('dkan_ai_query.dataset_caveat_registry');
     return $instance;
   }
 

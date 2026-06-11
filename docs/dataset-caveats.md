@@ -29,7 +29,7 @@ The original Phase 2 plan called for a static
    `DefaultHtmlRouteProvider` generates the CRUD routes; we just provide
    the form.
 3. **Config sync travels caveats correctly.** `drush config:export`
-   produces one `dkan_drupal_ai_query.caveat.<id>.yml` file per record;
+   produces one `dkan_ai_query.caveat.<id>.yml` file per record;
    commit per environment as you would any other config entity.
 
 Extending DKAN's metastore JSON Schema was rejected outright — the
@@ -120,7 +120,7 @@ into its dataset choice, not just its column choice.
 ## Service API
 
 ```php
-$registry = \Drupal::service('dkan_drupal_ai_query.dataset_caveat_registry');
+$registry = \Drupal::service('dkan_ai_query.dataset_caveat_registry');
 
 $registry->getCaveats($datasetUuid);          // full block, NULL if no record
 $registry->getColumnCaveats($datasetUuid);    // ['col' => 'text', ...]

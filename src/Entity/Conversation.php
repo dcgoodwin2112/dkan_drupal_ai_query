@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Entity;
+namespace Drupal\dkan_ai_query\Entity;
 
 use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\EntityTypeInterface;
@@ -16,7 +16,7 @@ use Drupal\Core\Field\BaseFieldDefinition;
  *   label_singular = @Translation("conversation"),
  *   label_plural = @Translation("conversations"),
  *   handlers = {
- *     "access" = "Drupal\dkan_drupal_ai_query\Entity\ConversationAccessControlHandler",
+ *     "access" = "Drupal\dkan_ai_query\Entity\ConversationAccessControlHandler",
  *   },
  *   base_table = "dkan_aiq_conversations",
  *   entity_keys = {

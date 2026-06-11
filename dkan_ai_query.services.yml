@@ -1,0 +1,148 @@
+services:
+  dkan_ai_query.resource_id_resolver:
+    class: Drupal\dkan_ai_query\Service\ResourceIdResolver
+    arguments:
+      - '@dkan_query_tools.metastore'
+      - '@dkan_query_tools.datastore'
+      - '@logger.channel.dkan_ai_query'
+
+  dkan_ai_query.artifact_storage:
+    class: Drupal\dkan_ai_query\Service\ArtifactStorage
+    arguments:
+      - '@tempstore.private'
+
+  dkan_ai_query.refusal_collector:
+    class: Drupal\dkan_ai_query\Service\RefusalCollector
+
+  dkan_ai_query.unknown_column_counter:
+    class: Drupal\dkan_ai_query\Service\UnknownColumnCounter
+
+  dkan_ai_query.stats_calculator:
+    class: Drupal\dkan_ai_query\Service\StatsCalculator
+
+  dkan_ai_query.unknown_column_guard_subscriber:
+    class: Drupal\dkan_ai_query\EventSubscriber\UnknownColumnGuardSubscriber
+    arguments:
+      - '@dkan_ai_query.unknown_column_counter'
+      - '@dkan_ai_query.refusal_collector'
+    tags:
+      - { name: event_subscriber }
+
+  dkan_ai_query.artifact_capture_subscriber:
+    class: Drupal\dkan_ai_query\EventSubscriber\ArtifactCaptureSubscriber
+    arguments:
+      - '@dkan_ai_query.artifact_storage'
+      - '@logger.channel.dkan_ai_query'
+      - '@dkan_ai_query.resource_id_resolver'
+      - '@dkan.datastore.service'
+      - '@dkan_ai_query.refusal_collector'
+      - '@config.factory'
+      - '@dkan_ai_query.system_prompt_loader'
+    tags:
+      - { name: event_subscriber }
+
+  dkan_ai_query.conversation_storage:
+    class: Drupal\dkan_ai_query\Service\ConversationStorage
+    arguments:
+      - '@entity_type.manager'
+
+  dkan_ai_query.system_prompt_loader:
+    class: Drupal\dkan_ai_query\Service\SystemPromptLoader
+    arguments:
+      - '@extension.path.resolver'
+
+  dkan_ai_query.agent_prompt_sync:
+    class: Drupal\dkan_ai_query\Service\AgentPromptSync
+    arguments:
+      - '@dkan_ai_query.system_prompt_loader'
+      - '@entity_type.manager'
+
+  dkan_ai_query.dataset_caveat_registry:
+    class: Drupal\dkan_ai_query\Service\DatasetCaveatRegistry
+    arguments:
+      - '@entity_type.manager'
+      - '@logger.channel.dkan_ai_query'
+
+  dkan_ai_query.catalog_context_builder:
+    class: Drupal\dkan_ai_query\Service\CatalogContextBuilder
+    arguments:
+      - '@dkan_query_tools.metastore'
+      - '@cache.default'
+
+  dkan_ai_query.suggestion_generator:
+    class: Drupal\dkan_ai_query\Service\SuggestionGenerator
+    arguments:
+      - '@ai.provider'
+      - '@logger.channel.dkan_ai_query'
+
+  dkan_ai_query.raw_query_runner:
+    class: Drupal\dkan_ai_query\Service\DatastoreRawQueryRunner
+    arguments:
+      - '@dkan.datastore.query'
+      - '@dkan_ai_query.resource_id_resolver'
+
+  dkan_ai_query.controller:
+    class: Drupal\dkan_ai_query\Controller\NlQueryController
+    arguments:
+      - '@plugin.manager.ai_agents'
+      - '@ai.provider'
+      - '@ai_agents.agent_status_poller'
+      - '@dkan_ai_query.artifact_storage'
+      - '@dkan_ai_query.conversation_storage'
+      - '@current_user'
+      - '@logger.channel.dkan_ai_query'
+      - '@config.factory'
+      - '@dkan_ai_query.suggestion_generator'
+      - '@dkan_ai_query.system_prompt_loader'
+      - '@dkan_ai_query.refusal_collector'
+      - '@dkan_ai_query.unknown_column_counter'
+      - '@dkan_ai_query.catalog_context_builder'
+    tags:
+      - { name: 'controller.service_arguments' }
+
+  dkan_ai_query.conversation_controller:
+    class: Drupal\dkan_ai_query\Controller\ConversationController
+    arguments:
+      - '@dkan_ai_query.conversation_storage'
+      - '@current_user'
+      - '@request_stack'
+    tags:
+      - { name: 'controller.service_arguments' }
+
+  logger.channel.dkan_ai_query:
+    class: Drupal\Core\Logger\LoggerChannel
+    factory: ['@logger.factory', 'get']
+    arguments: ['dkan_ai_query']
+
+  dkan_ai_query.eval.tool_call_collector:
+    class: Drupal\dkan_ai_query\Service\EvalToolCallCollector
+
+  dkan_ai_query.eval.tool_call_subscriber:
+    class: Drupal\dkan_ai_query\EventSubscriber\ToolCallEvalCollectorSubscriber
+    arguments:
+      - '@dkan_ai_query.eval.tool_call_collector'
+    tags:
+      - { name: event_subscriber }
+
+  dkan_ai_query.eval.loader:
+    class: Drupal\dkan_ai_query\Eval\GoldenCaseLoader
+
+  dkan_ai_query.eval.evaluator:
+    class: Drupal\dkan_ai_query\Eval\CaseEvaluator
+
+  dkan_ai_query.eval.reporter:
+    class: Drupal\dkan_ai_query\Eval\RunReporter
+
+  dkan_ai_query.eval.runner:
+    class: Drupal\dkan_ai_query\Eval\EvalRunner
+    arguments:
+      - '@plugin.manager.ai_agents'
+      - '@ai.provider'
+      - '@dkan_ai_query.artifact_storage'
+      - '@dkan_ai_query.eval.evaluator'
+      - '@logger.channel.dkan_ai_query'
+      - '@dkan_ai_query.refusal_collector'
+      - '@dkan_ai_query.system_prompt_loader'
+      - '@dkan_ai_query.unknown_column_counter'
+      - '@dkan_ai_query.eval.tool_call_collector'
+      - '@dkan_ai_query.catalog_context_builder'

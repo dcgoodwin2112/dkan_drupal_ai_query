@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Service;
+namespace Drupal\dkan_ai_query\Service;
 
 use Drupal\dkan_query_tools\Tool\DatastoreTools;
 use Drupal\dkan_query_tools\Tool\MetastoreTools;

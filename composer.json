@@ -1,5 +1,5 @@
 {
-  "name": "getdkan/dkan_drupal_ai_query",
+  "name": "getdkan/dkan_ai_query",
   "type": "drupal-custom-module",
   "description": "Natural-language query for DKAN datasets, built on Drupal AI agents.",
   "require": {

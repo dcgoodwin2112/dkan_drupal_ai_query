@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\dkan_drupal_ai_query\Eval;
+namespace Drupal\dkan_ai_query\Eval;
 
 use Symfony\Component\Yaml\Yaml;
 
@@ -17,7 +17,7 @@ class GoldenCaseLoader {
    * @param string $path
    *   Absolute path to the YAML file.
    *
-   * @return \Drupal\dkan_drupal_ai_query\Eval\GoldenCase[]
+   * @return \Drupal\dkan_ai_query\Eval\GoldenCase[]
    *   Cases in the order they appear in the file.
    */
   public function load(string $path): array {

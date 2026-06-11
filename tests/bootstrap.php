@@ -40,9 +40,9 @@ if ($queryTools === NULL) {
 // resolver depends on (bundled in dkan_mcp_server's submodule).
 spl_autoload_register(function ($class) use ($queryTools) {
   $prefixes = [
-    'Drupal\\dkan_drupal_ai_query\\' => __DIR__ . '/../src/',
+    'Drupal\\dkan_ai_query\\' => __DIR__ . '/../src/',
     'Drupal\\dkan_query_tools\\' => $queryTools . '/src/',
-    'Drupal\\Tests\\dkan_drupal_ai_query\\' => __DIR__ . '/src/',
+    'Drupal\\Tests\\dkan_ai_query\\' => __DIR__ . '/src/',
   ];
   foreach ($prefixes as $prefix => $base) {
     if (str_starts_with($class, $prefix)) {

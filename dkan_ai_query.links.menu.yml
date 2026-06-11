@@ -1,0 +1,20 @@
+dkan_ai_query.admin:
+  title: 'AI Query'
+  description: 'Natural-language query widget settings and curator-authored dataset caveats.'
+  parent: system.admin_dkan
+  route_name: dkan_ai_query.admin
+  weight: 16
+
+dkan_ai_query.settings_form:
+  title: 'Settings'
+  description: 'Default model, widget display toggles, agent runtime limits, conversation retention, and debug logging.'
+  parent: dkan_ai_query.admin
+  route_name: dkan_ai_query.settings_form
+  weight: 0
+
+entity.dataset_caveat.collection:
+  title: 'Dataset caveats'
+  description: 'Curate per-dataset caveats (suppression, column gotchas, freshness) shown to the AI query agent.'
+  parent: dkan_ai_query.admin
+  route_name: entity.dataset_caveat.collection
+  weight: 1

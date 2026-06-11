@@ -15,7 +15,7 @@ Both end up shaped identically and flow through `RefusalCollector`.
 
 ## RefuseTool
 
-`#[FunctionCall(id: 'dkan_drupal_ai_query:refuse', function_name: 'refuse')]`
+`#[FunctionCall(id: 'dkan_ai_query:refuse', function_name: 'refuse')]`
 in `src/Plugin/AiFunctionCall/RefuseTool.php`.
 
 Arguments:
@@ -54,7 +54,7 @@ Output payload (set as the tool's readable output):
 In-process registry keyed by thread id (a.k.a. agent runner id):
 
 ```php
-$refusals = \Drupal::service('dkan_drupal_ai_query.refusal_collector');
+$refusals = \Drupal::service('dkan_ai_query.refusal_collector');
 $refusals->record($threadId, $payload);
 $refusals->get($threadId);     // returns the last recorded payload, or NULL
 $refusals->forget($threadId);  // called between eval cases

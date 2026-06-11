@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\dkan_drupal_ai_query\Unit\Eval;
+namespace Drupal\Tests\dkan_ai_query\Unit\Eval;
 
-use Drupal\dkan_drupal_ai_query\Eval\CaseEvaluator;
-use Drupal\dkan_drupal_ai_query\Eval\CaseResult;
-use Drupal\dkan_drupal_ai_query\Eval\GoldenCase;
+use Drupal\dkan_ai_query\Eval\CaseEvaluator;
+use Drupal\dkan_ai_query\Eval\CaseResult;
+use Drupal\dkan_ai_query\Eval\GoldenCase;
 use PHPUnit\Framework\TestCase;
 
 class CaseEvaluatorTest extends TestCase {

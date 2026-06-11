@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Plugin\AiFunctionCall;
+namespace Drupal\dkan_ai_query\Plugin\AiFunctionCall;
 
 use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
@@ -8,7 +8,7 @@ use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
 use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
+use Drupal\dkan_ai_query\Service\ResourceIdResolver;
 use Drupal\dkan_query_tools\Tool\DatastoreTools;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -16,11 +16,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Query a DKAN datastore resource with filters, sorting, and aggregation.
  */
 #[FunctionCall(
-  id: 'dkan_drupal_ai_query:query_datastore',
+  id: 'dkan_ai_query:query_datastore',
   function_name: 'query_datastore',
   name: 'Query datastore',
   description: 'Query a DKAN datastore resource with filters, sorting, pagination, and aggregation. resource_id accepts {identifier}__{version} OR a dataset title for fuzzy lookup. Conditions must be a JSON string array. Operators: =, <>, <, <=, >, >=, like, contains, starts with, in, not in, between. All data is stored as text — string comparisons apply ("9" > "10" alphabetically); use aggregate expressions for true numeric ordering. Default 100 rows; up to 5000 when you need to feed create_chart with a long time series — keep it ≤500 for browsing.',
-  group: 'dkan_drupal_ai_query',
+  group: 'dkan_ai_query',
   context_definitions: [
     'resource_id' => new ContextDefinition(
       data_type: 'string',
@@ -90,7 +90,7 @@ class QueryDatastoreTool extends FunctionCallBase implements ExecutableFunctionC
   /**
    * The resource id resolver service.
    *
-   * @var \Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver
+   * @var \Drupal\dkan_ai_query\Service\ResourceIdResolver
    */
   protected ResourceIdResolver $resolver;
 
@@ -100,7 +100,7 @@ class QueryDatastoreTool extends FunctionCallBase implements ExecutableFunctionC
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): FunctionCallInterface|static {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->datastoreTools = $container->get('dkan_query_tools.datastore');
-    $instance->resolver = $container->get('dkan_drupal_ai_query.resource_id_resolver');
+    $instance->resolver = $container->get('dkan_ai_query.resource_id_resolver');
     return $instance;
   }
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\dkan_drupal_ai_query\Service;
+namespace Drupal\dkan_ai_query\Service;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 
@@ -22,7 +22,7 @@ class AgentPromptSync {
   /**
    * Plugin id of the optional raw passthrough tool.
    */
-  public const RAW_TOOL_ID = 'dkan_drupal_ai_query:query_datastore_raw';
+  public const RAW_TOOL_ID = 'dkan_ai_query:query_datastore_raw';
 
   public function __construct(
     protected SystemPromptLoader $loader,
@@ -47,7 +47,7 @@ class AgentPromptSync {
       return [
         'status' => 'missing-agent',
         'enabled' => $enableRawTool,
-        'message' => sprintf('ai_agent "%s" not found; install dkan_drupal_ai_query first.', self::AGENT_ID),
+        'message' => sprintf('ai_agent "%s" not found; install dkan_ai_query first.', self::AGENT_ID),
       ];
     }
     $tools = (array) $agent->get('tools');
@@ -98,7 +98,7 @@ class AgentPromptSync {
       return [
         'status' => 'missing-agent',
         'version' => $version,
-        'message' => sprintf('ai_agent "%s" not found; install dkan_drupal_ai_query first.', self::AGENT_ID),
+        'message' => sprintf('ai_agent "%s" not found; install dkan_ai_query first.', self::AGENT_ID),
       ];
     }
     if ((string) $agent->get('system_prompt') === $body) {

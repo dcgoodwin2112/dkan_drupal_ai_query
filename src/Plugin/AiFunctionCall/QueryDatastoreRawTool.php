@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Plugin\AiFunctionCall;
+namespace Drupal\dkan_ai_query\Plugin\AiFunctionCall;
 
 use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
@@ -8,7 +8,7 @@ use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
 use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\dkan_drupal_ai_query\Service\DatastoreRawQueryRunner;
+use Drupal\dkan_ai_query\Service\DatastoreRawQueryRunner;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -22,11 +22,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * DKAN's REST endpoint verbatim and does not include `sanity_flags`.
  */
 #[FunctionCall(
-  id: 'dkan_drupal_ai_query:query_datastore_raw',
+  id: 'dkan_ai_query:query_datastore_raw',
   function_name: 'query_datastore_raw',
   name: 'Query datastore (raw)',
   description: 'Advanced escape hatch. Pass a JSON DatastoreQuery payload (DKAN DSL: resources, properties, conditions, joins, groupings, sorts, limit, offset, count, results, schema, keys). Use ONLY for shapes the flat query_datastore tools cannot express — nested groupOperator OR, three-way joins, compound expressions. Response is the raw REST shape; no sanity_flags. Single resource example: {"resources":[{"id":"<resource_id>","alias":"t"}],"conditions":[{"property":"state","value":"CA","operator":"="}],"limit":10}.',
-  group: 'dkan_drupal_ai_query',
+  group: 'dkan_ai_query',
   context_definitions: [
     'payload' => new ContextDefinition(
       data_type: 'string',
@@ -41,7 +41,7 @@ class QueryDatastoreRawTool extends FunctionCallBase implements ExecutableFuncti
   /**
    * The raw query runner service.
    *
-   * @var \Drupal\dkan_drupal_ai_query\Service\DatastoreRawQueryRunner
+   * @var \Drupal\dkan_ai_query\Service\DatastoreRawQueryRunner
    */
   protected DatastoreRawQueryRunner $runner;
 
@@ -50,7 +50,7 @@ class QueryDatastoreRawTool extends FunctionCallBase implements ExecutableFuncti
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): FunctionCallInterface|static {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
-    $instance->runner = $container->get('dkan_drupal_ai_query.raw_query_runner');
+    $instance->runner = $container->get('dkan_ai_query.raw_query_runner');
     return $instance;
   }
 

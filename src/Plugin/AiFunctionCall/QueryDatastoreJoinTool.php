@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Plugin\AiFunctionCall;
+namespace Drupal\dkan_ai_query\Plugin\AiFunctionCall;
 
 use Drupal\ai\Attribute\FunctionCall;
 use Drupal\ai\Base\FunctionCallBase;
@@ -8,7 +8,7 @@ use Drupal\ai\Service\FunctionCalling\ExecutableFunctionCallInterface;
 use Drupal\ai\Service\FunctionCalling\FunctionCallInterface;
 use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver;
+use Drupal\dkan_ai_query\Service\ResourceIdResolver;
 use Drupal\dkan_query_tools\Tool\DatastoreTools;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -16,11 +16,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Join and query two DKAN datastore resources.
  */
 #[FunctionCall(
-  id: 'dkan_drupal_ai_query:query_datastore_join',
+  id: 'dkan_ai_query:query_datastore_join',
   function_name: 'query_datastore_join',
   name: 'Query datastore (join)',
   description: 'Join and query two datastore resources. Primary aliased as "t", joined as "j". Qualify columns with alias: "t.state,j.rate". Add "resource":"j" to a condition to filter the joined table.',
-  group: 'dkan_drupal_ai_query',
+  group: 'dkan_ai_query',
   context_definitions: [
     'resource_id' => new ContextDefinition(
       data_type: 'string',
@@ -102,7 +102,7 @@ class QueryDatastoreJoinTool extends FunctionCallBase implements ExecutableFunct
   /**
    * The resource id resolver.
    *
-   * @var \Drupal\dkan_drupal_ai_query\Service\ResourceIdResolver
+   * @var \Drupal\dkan_ai_query\Service\ResourceIdResolver
    */
   protected ResourceIdResolver $resolver;
 
@@ -112,7 +112,7 @@ class QueryDatastoreJoinTool extends FunctionCallBase implements ExecutableFunct
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): FunctionCallInterface|static {
     $instance = parent::create($container, $configuration, $plugin_id, $plugin_definition);
     $instance->datastoreTools = $container->get('dkan_query_tools.datastore');
-    $instance->resolver = $container->get('dkan_drupal_ai_query.resource_id_resolver');
+    $instance->resolver = $container->get('dkan_ai_query.resource_id_resolver');
     return $instance;
   }
 
