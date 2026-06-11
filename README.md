@@ -33,7 +33,7 @@ While `solve()` blocks server-side, `ai_agents` writes per-iteration status even
 ## Requirements
 
 - Drupal 10.5+ or 11
-- DKAN (`metastore`, `datastore` modules enabled)
+- DKAN 4.1+ (`dkan_metastore`, `dkan_datastore` modules enabled)
 - `dkan_query_tools` module enabled — provides the catalog/datastore/search tool classes that the FunctionCall plugins call into. It ships as a submodule of the [dkan_mcp_server](https://www.drupal.org/project/dkan_mcp_server) project.
 - `drupal/ai` ^1.2 with `drupal/ai_agents` ^1.2
 - An AI provider module: `drupal/ai_provider_anthropic` and/or `drupal/ai_provider_openai`
@@ -50,10 +50,9 @@ While `solve()` blocks server-side, `ai_agents` writes per-iteration status even
    ```
 
    The explicit constraints matter: the alpha release depends on alpha/dev
-   packages (`drupal/dkan_query_tools`, `drupal/mcp_server 2.x-dev`,
-   `drupal/dkan 4.x-dev`), which a default `minimum-stability: stable` root
-   won't accept otherwise. Enable only `dkan_query_tools` if you don't want
-   the MCP server running.
+   packages (`drupal/dkan_query_tools`, `drupal/mcp_server 2.x-dev`), which
+   a default `minimum-stability: stable` root won't accept otherwise. Enable
+   only `dkan_query_tools` if you don't want the MCP server running.
 
 2. Make sure the Drupal AI stack is in place:
 
