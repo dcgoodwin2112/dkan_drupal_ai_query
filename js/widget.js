@@ -12,8 +12,6 @@
  * showApiCall, showSql, showProvenance, showDownloadCsv, showCopyButtons.
  */
 (function (Drupal, drupalSettings, once) {
-  'use strict';
-
   const POLL_INTERVAL_MS = 500;
 
   // History sidebar pagination — server returns N at a time and a "Load more"
@@ -229,31 +227,28 @@
     const phrases = [];
     Object.keys(counts).forEach((tool) => {
       const n = counts[tool];
-      const pair = TOOL_PLURAL_NAMES[tool] || [tool, tool + 's'];
-      phrases.push(n + ' ' + (n === 1 ? pair[0] : pair[1]));
+      const pair = TOOL_PLURAL_NAMES[tool] || [tool, `${tool}s`];
+      phrases.push(`${n} ${n === 1 ? pair[0] : pair[1]}`);
     });
     if (chartCount) {
-      phrases.push(chartCount + ' chart' + (chartCount === 1 ? '' : 's'));
+      phrases.push(`${chartCount} chart${chartCount === 1 ? '' : 's'}`);
     }
     if (auxCount) {
-      phrases.push(
-        auxCount + ' supporting lookup' + (auxCount === 1 ? '' : 's'),
-      );
+      phrases.push(`${auxCount} supporting lookup${auxCount === 1 ? '' : 's'}`);
     }
     if (!phrases.length) return null;
     let joined;
     if (phrases.length === 1) joined = phrases[0];
-    else if (phrases.length === 2) joined = phrases[0] + ' and ' + phrases[1];
+    else if (phrases.length === 2) joined = `${phrases[0]} and ${phrases[1]}`;
     else
-      joined =
-        phrases.slice(0, -1).join(', ') +
-        ', and ' +
-        phrases[phrases.length - 1];
-    return 'Answered using ' + joined + '.';
+      joined = `${phrases.slice(0, -1).join(', ')}, and ${
+        phrases[phrases.length - 1]
+      }`;
+    return `Answered using ${joined}.`;
   }
 
   Drupal.behaviors.dkanAiQueryWidget = {
-    attach: function (context) {
+    attach(context) {
       once('dkan-aiq-widget', '.dkan-aiq-widget', context).forEach(
         function (root) {
           new Widget(root).init();
@@ -446,7 +441,7 @@
           const opt = document.createElement('option');
           opt.value = value;
           opt.textContent = models[value].replace(
-            providerId.charAt(0).toUpperCase() + providerId.slice(1) + ' - ',
+            `${providerId.charAt(0).toUpperCase() + providerId.slice(1)} - `,
             '',
           );
           if (value === defaultValue) {
@@ -520,10 +515,9 @@
     const out = [];
     function loadPage(offset) {
       return fetch(
-        '/api/1/metastore/schemas/dataset/items?limit=' +
-          PAGE_SIZE +
-          '&offset=' +
-          offset,
+        `/api/1/metastore/schemas/dataset/items?limit=${PAGE_SIZE}&offset=${
+          offset
+        }`,
         {
           credentials: 'same-origin',
         },
@@ -562,8 +556,7 @@
     // Auto-resize textarea.
     this.dom.input.addEventListener('input', () => {
       this.dom.input.style.height = 'auto';
-      this.dom.input.style.height =
-        Math.min(this.dom.input.scrollHeight, 200) + 'px';
+      this.dom.input.style.height = `${Math.min(this.dom.input.scrollHeight, 200)}px`;
     });
   };
 
@@ -697,7 +690,7 @@
     }
     this.sidebarOffset = 0;
     fetch(
-      '/api/dkan-ai-query/conversations?offset=0&limit=' + SIDEBAR_PAGE_SIZE,
+      `/api/dkan-ai-query/conversations?offset=0&limit=${SIDEBAR_PAGE_SIZE}`,
       {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
@@ -718,10 +711,9 @@
     }
     const nextOffset = this.sidebarOffset + SIDEBAR_PAGE_SIZE;
     fetch(
-      '/api/dkan-ai-query/conversations?offset=' +
-        nextOffset +
-        '&limit=' +
-        SIDEBAR_PAGE_SIZE,
+      `/api/dkan-ai-query/conversations?offset=${nextOffset}&limit=${
+        SIDEBAR_PAGE_SIZE
+      }`,
       {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
@@ -802,11 +794,9 @@
       this.dom.sidebarRailSummary.setAttribute(
         'aria-label',
         total
-          ? 'Expand history sidebar (' +
-              total +
-              ' conversation' +
-              (total !== 1 ? 's' : '') +
-              ')'
+          ? `Expand history sidebar (${total} conversation${
+              total !== 1 ? 's' : ''
+            })`
           : 'Expand history sidebar',
       );
     }
@@ -819,11 +809,9 @@
       return;
     }
     if (loaded >= total) {
-      this.dom.sidebarFooter.textContent =
-        total + ' conversation' + (total !== 1 ? 's' : '');
+      this.dom.sidebarFooter.textContent = `${total} conversation${total !== 1 ? 's' : ''}`;
     } else {
-      this.dom.sidebarFooter.textContent =
-        loaded + ' of ' + total + ' conversations';
+      this.dom.sidebarFooter.textContent = `${loaded} of ${total} conversations`;
     }
   };
 
@@ -876,7 +864,7 @@
       e.stopPropagation();
       ensureCsrfToken()
         .then((token) =>
-          fetch('/api/dkan-ai-query/conversations/' + conv.id + '/pin', {
+          fetch(`/api/dkan-ai-query/conversations/${conv.id}/pin`, {
             method: 'POST',
             headers: { 'X-CSRF-Token': token },
             credentials: 'same-origin',
@@ -905,7 +893,7 @@
       }
       ensureCsrfToken()
         .then((token) =>
-          fetch('/api/dkan-ai-query/conversations/' + conv.id, {
+          fetch(`/api/dkan-ai-query/conversations/${conv.id}`, {
             method: 'DELETE',
             headers: { 'X-CSRF-Token': token },
             credentials: 'same-origin',
@@ -950,7 +938,7 @@
   };
 
   Widget.prototype.loadConversation = function (id) {
-    fetch('/api/dkan-ai-query/conversations/' + id, {
+    fetch(`/api/dkan-ai-query/conversations/${id}`, {
       headers: { Accept: 'application/json' },
       credentials: 'same-origin',
     })
@@ -1019,12 +1007,12 @@
       this.debugToolStarted({
         tool_name: a.tool_name || '',
         tool_input: a.tool_input || '',
-        tool_id: 'replay-' + this.debugToolCount,
+        tool_id: `replay-${this.debugToolCount}`,
       });
       this.debugToolFinished({
         tool_name: a.tool_name || '',
         tool_results: a.tool_results || '',
-        tool_id: 'replay-' + this.debugToolCount,
+        tool_id: `replay-${this.debugToolCount}`,
       });
     });
     this.debugFooter();
@@ -1040,8 +1028,7 @@
       .forEach((el) => el.classList.add('dkan-aiq-refusal--historical'));
     this.appendUserBubble(question);
     const bubble = this.appendAssistantBubble();
-    const threadId =
-      'aiq-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    const threadId = `aiq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     this.dom.input.value = '';
     this.dom.input.placeholder = this.followUpPlaceholder;
     this.dom.submit.disabled = true;
@@ -1057,8 +1044,7 @@
       const t = ev.type || '';
       if (t === 'tool_started') {
         const fb =
-          ev.tool_feedback_message ||
-          'Calling ' + (ev.tool_name || 'tool') + '…';
+          ev.tool_feedback_message || `Calling ${ev.tool_name || 'tool'}…`;
         this.setStatus(fb);
         this.debugToolStarted(ev);
       } else if (t === 'tool_finished') {
@@ -1079,7 +1065,7 @@
       (this.dom.datasetSelect ? this.dom.datasetSelect.value : '');
     const model = this.dom.modelSelect ? this.dom.modelSelect.value : '';
     const body = JSON.stringify({
-      question: question,
+      question,
       thread_id: threadId,
       dataset_id: dataset || null,
       model: model || null,
@@ -1087,7 +1073,7 @@
     });
 
     const pollHandle = setInterval(() => {
-      fetch('/api/dkan-ai-query/poll/' + encodeURIComponent(threadId), {
+      fetch(`/api/dkan-ai-query/poll/${encodeURIComponent(threadId)}`, {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
       })
@@ -1120,7 +1106,7 @@
             Accept: 'application/json',
             'X-CSRF-Token': token,
           },
-          body: body,
+          body,
           credentials: 'same-origin',
         }),
       )
@@ -1416,9 +1402,9 @@
 
     const meta = document.createElement('span');
     meta.className = 'dkan-aiq-table-meta';
-    let countText = rows.length + ' row' + (rows.length !== 1 ? 's' : '');
+    let countText = `${rows.length} row${rows.length !== 1 ? 's' : ''}`;
     if (artifact.count != null && artifact.count > rows.length) {
-      countText += ' of ' + artifact.count + ' total';
+      countText += ` of ${artifact.count} total`;
     }
     meta.textContent = countText;
     summary.appendChild(meta);
@@ -1426,8 +1412,7 @@
     if (cols.length) {
       const shape = document.createElement('span');
       shape.className = 'dkan-aiq-table-shape';
-      shape.textContent =
-        cols.length + ' column' + (cols.length !== 1 ? 's' : '');
+      shape.textContent = `${cols.length} column${cols.length !== 1 ? 's' : ''}`;
       summary.appendChild(shape);
     }
 
@@ -1611,12 +1596,12 @@
             // (or hover for the title tooltip) away.
             td.classList.add('dkan-aiq-cell-truncated');
             td.title = text;
-            td.textContent = text.slice(0, CELL_TRUNCATE_LEN) + '…';
+            td.textContent = `${text.slice(0, CELL_TRUNCATE_LEN)}…`;
             td.addEventListener('click', () => {
               const expanded = td.classList.toggle('dkan-aiq-cell-expanded');
               td.textContent = expanded
                 ? text
-                : text.slice(0, CELL_TRUNCATE_LEN) + '…';
+                : `${text.slice(0, CELL_TRUNCATE_LEN)}…`;
             });
           } else {
             td.textContent = text;
@@ -1697,7 +1682,7 @@
           if (!r || typeof r !== 'object') return r;
           const id = r.id;
           if (typeof id === 'string' && uuidMap[id]) {
-            return Object.assign({}, r, { id: uuidMap[id] });
+            return { ...r, id: uuidMap[id] };
           }
           return r;
         });
@@ -1707,7 +1692,7 @@
       // that explicitly pass resources ("Joins are not available and resources
       // should not be explicitly passed when using the resource query endpoint").
       const url = '/api/1/datastore/query';
-      return { method: 'POST', url: url, body: body };
+      return { method: 'POST', url, body };
     }
 
     // search_datasets maps to /api/1/search (GET with query string params),
@@ -1748,7 +1733,7 @@
       const datasetId = input.dataset_id || '';
       return {
         method: 'GET',
-        url: '/api/1/metastore/schemas/dataset/items/' + datasetId,
+        url: `/api/1/metastore/schemas/dataset/items/${datasetId}`,
         body: { 'show-reference-ids': true },
         note: 'First hop only. The tool walks the dataset’s distribution references client-side; this REST call returns the parent dataset.',
       };
@@ -1760,7 +1745,7 @@
       const dictId = (input && input.dictionary_identifier) || '';
       return {
         method: 'GET',
-        url: '/api/1/metastore/schemas/data-dictionary/items/' + dictId,
+        url: `/api/1/metastore/schemas/data-dictionary/items/${dictId}`,
         body: {},
         note: 'First hop only. The tool resolves the dictionary identifier from the dataset/distribution refs; this REST call returns the resolved data-dictionary item.',
       };
@@ -1774,7 +1759,7 @@
       const n = Math.max(1, Math.min(parseInt(input.n, 10) || 5, 50));
       return {
         method: 'POST',
-        url: '/api/1/datastore/query/' + sampleId,
+        url: `/api/1/datastore/query/${sampleId}`,
         body: {
           sorts: [{ property: 'record_number', order: 'asc' }],
           limit: n,
@@ -1794,7 +1779,7 @@
       );
       return {
         method: 'POST',
-        url: '/api/1/datastore/query/' + dvId,
+        url: `/api/1/datastore/query/${dvId}`,
         body: {
           properties: col ? [col] : [],
           groupings: col ? [col] : [],
@@ -1808,7 +1793,7 @@
       const schId = resolvedResourceId || input.resource_id || '';
       return {
         method: 'POST',
-        url: '/api/1/datastore/query/' + schId,
+        url: `/api/1/datastore/query/${schId}`,
         // DKAN's REST schema enforces limit ≥ 1, so even a schema-only
         // payload needs limit=1 (results:false suppresses the row anyway).
         body: {
@@ -1836,20 +1821,20 @@
       cols.forEach((c) => {
         exprs.push({
           expression: { operator: 'min', operands: [c] },
-          alias: c + '_min',
+          alias: `${c}_min`,
         });
         exprs.push({
           expression: { operator: 'max', operands: [c] },
-          alias: c + '_max',
+          alias: `${c}_max`,
         });
         exprs.push({
           expression: { operator: 'count', operands: [c] },
-          alias: c + '_count',
+          alias: `${c}_count`,
         });
       });
       return {
         method: 'POST',
-        url: '/api/1/datastore/query/' + stId,
+        url: `/api/1/datastore/query/${stId}`,
         body: {
           properties: exprs,
           limit: 1,
@@ -1984,8 +1969,8 @@
 
     const url = isJoin
       ? '/api/1/datastore/query'
-      : '/api/1/datastore/query/' + resourceId;
-    return { method: 'POST', url: url, body: body };
+      : `/api/1/datastore/query/${resourceId}`;
+    return { method: 'POST', url, body };
   }
 
   /**
@@ -1994,9 +1979,7 @@
    * can consume the structured form without re-parsing.
    */
   function formatApiEquivalent(api) {
-    return (
-      api.method + ' ' + api.url + '\n' + JSON.stringify(api.body, null, 2)
-    );
+    return `${api.method} ${api.url}\n${JSON.stringify(api.body, null, 2)}`;
   }
 
   /**
@@ -2050,7 +2033,7 @@
       const headers =
         stored && stored.etag ? { 'If-None-Match': stored.etag } : {};
       inFlight = fetch(SPEC_URL, {
-        headers: headers,
+        headers,
         credentials: 'same-origin',
       })
         .then((res) => {
@@ -2072,7 +2055,7 @@
           }
           const etag = res.headers.get('ETag') || null;
           return res.json().then((spec) => {
-            memCache = { spec: spec, etag: etag, fetchedAt: Date.now() };
+            memCache = { spec, etag, fetchedAt: Date.now() };
             writeStorage(memCache);
             return spec;
           });
@@ -2222,7 +2205,7 @@
       return out;
     }
 
-    return { load: load, describe: describe };
+    return { load, describe };
   })();
 
   function buildSqlEquivalent(
@@ -2257,9 +2240,9 @@
             col = col.join(', ');
           }
           const alias = expr.alias || '';
-          let exprStr = fn + '(' + col + ')';
+          let exprStr = `${fn}(${col})`;
           if (alias) {
-            exprStr += ' AS ' + alias;
+            exprStr += ` AS ${alias}`;
           }
           selectCols.push(exprStr);
         });
@@ -2267,28 +2250,28 @@
         /* ignore */
       }
     }
-    parts.push('SELECT ' + (selectCols.length ? selectCols.join(', ') : '*'));
+    parts.push(`SELECT ${selectCols.length ? selectCols.join(', ') : '*'}`);
 
     // Prefer the physical table name resolved by the backend
     // (datastore_<md5>) over a name built from the resource id, which would
     // be wrong because the actual table uses md5(identifier__version__perspective).
     const tableName =
-      input.table_name || 'datastore_' + resourceId.replace(/-/g, '_');
+      input.table_name || `datastore_${resourceId.replace(/-/g, '_')}`;
     if (isJoin) {
-      parts.push('FROM ' + tableName + ' AS t');
+      parts.push(`FROM ${tableName} AS t`);
     } else {
-      parts.push('FROM ' + tableName);
+      parts.push(`FROM ${tableName}`);
     }
 
     if (isJoin && input.join_on) {
       const joinTable =
-        input.join_table_name || 'datastore_' + joinId.replace(/-/g, '_');
+        input.join_table_name || `datastore_${joinId.replace(/-/g, '_')}`;
       const joinOn = input.join_on.trim();
       let onClause = '';
       if (joinOn.charAt(0) === '{') {
         try {
           const parsed = JSON.parse(joinOn);
-          onClause = (parsed.left || 't.id') + ' = ' + (parsed.right || 'j.id');
+          onClause = `${parsed.left || 't.id'} = ${parsed.right || 'j.id'}`;
         } catch (e) {
           onClause = joinOn;
         }
@@ -2297,16 +2280,16 @@
         let left = eqParts[0].trim();
         let right = eqParts[1].trim();
         if (left.indexOf('.') === -1) {
-          left = 't.' + left;
+          left = `t.${left}`;
         }
         if (right.indexOf('.') === -1) {
-          right = 'j.' + right;
+          right = `j.${right}`;
         }
-        onClause = left + ' = ' + right;
+        onClause = `${left} = ${right}`;
       } else {
         onClause = joinOn;
       }
-      parts.push('JOIN ' + joinTable + ' AS j ON ' + onClause);
+      parts.push(`JOIN ${joinTable} AS j ON ${onClause}`);
     }
 
     if (input.conditions) {
@@ -2316,31 +2299,31 @@
           const whereClauses = conditions.map((cond) => {
             let col = cond.property || cond.column || '?';
             if (isJoin && cond.resource) {
-              col = cond.resource + '.' + col;
+              col = `${cond.resource}.${col}`;
             }
             const op = (cond.operator || '=').toUpperCase();
             let val = cond.value;
             if (typeof val === 'string') {
-              val = "'" + val.replace(/'/g, "''") + "'";
+              val = `'${val.replace(/'/g, "''")}'`;
             }
             if (op === 'LIKE' || op === 'NOT LIKE') {
-              return col + ' ' + op + ' ' + val;
+              return `${col} ${op} ${val}`;
             }
             if (op === 'IN' || op === 'NOT IN') {
               const vals = Array.isArray(cond.value)
                 ? cond.value
                 : [cond.value];
               const formatted = vals.map((v) =>
-                typeof v === 'string' ? "'" + v.replace(/'/g, "''") + "'" : v,
+                typeof v === 'string' ? `'${v.replace(/'/g, "''")}'` : v,
               );
-              return col + ' ' + op + ' (' + formatted.join(', ') + ')';
+              return `${col} ${op} (${formatted.join(', ')})`;
             }
             if (op === 'BETWEEN') {
-              return col + ' BETWEEN ' + cond.value;
+              return `${col} BETWEEN ${cond.value}`;
             }
-            return col + ' ' + op + ' ' + val;
+            return `${col} ${op} ${val}`;
           });
-          parts.push('WHERE ' + whereClauses.join('\n  AND '));
+          parts.push(`WHERE ${whereClauses.join('\n  AND ')}`);
         }
       } catch (e) {
         /* ignore */
@@ -2348,18 +2331,18 @@
     }
 
     if (input.groupings) {
-      parts.push('GROUP BY ' + input.groupings);
+      parts.push(`GROUP BY ${input.groupings}`);
     }
 
     if (input.sort_field) {
       const dir = (input.sort_direction || 'asc').toUpperCase();
-      parts.push('ORDER BY ' + input.sort_field + ' ' + dir);
+      parts.push(`ORDER BY ${input.sort_field} ${dir}`);
     }
 
     const limit = input.limit || 100;
-    parts.push('LIMIT ' + limit);
+    parts.push(`LIMIT ${limit}`);
     if (input.offset) {
-      parts.push('OFFSET ' + input.offset);
+      parts.push(`OFFSET ${input.offset}`);
     }
 
     return parts.join('\n');
@@ -2371,7 +2354,7 @@
       str.indexOf('"') !== -1 ||
       str.indexOf('\n') !== -1
     ) {
-      return '"' + str.replace(/"/g, '""') + '"';
+      return `"${str.replace(/"/g, '""')}"`;
     }
     return str;
   }
@@ -2404,7 +2387,7 @@
     if (sqlPrimary && sqlPrimary !== apiPrimary) {
       const note = document.createElement('div');
       note.className = 'dkan-aiq-id-note';
-      note.textContent = 'Internal datastore resource id: ' + sqlPrimary;
+      note.textContent = `Internal datastore resource id: ${sqlPrimary}`;
       wrap.appendChild(note);
     }
     if (showCopy) {
@@ -2442,7 +2425,7 @@
     if (apiPrimary && apiPrimary !== sqlPrimary) {
       const note = document.createElement('div');
       note.className = 'dkan-aiq-id-note';
-      note.textContent = 'Public distribution UUID: ' + apiPrimary;
+      note.textContent = `Public distribution UUID: ${apiPrimary}`;
       wrap.appendChild(note);
     }
     if (showCopy) {
@@ -2510,7 +2493,7 @@
     if (prov.row_count != null) {
       let countText = String(prov.row_count);
       if (prov.total_rows != null && prov.total_rows !== prov.row_count) {
-        countText += ' (of ' + prov.total_rows + ' total)';
+        countText += ` (of ${prov.total_rows} total)`;
       }
       addRow(PROV_LABELS.rows, countText);
     }
@@ -2616,7 +2599,7 @@
 
     // Always fill the bubble width — the LLM's explicit pixel width isn't
     // meaningful in this chat context. Default the height when missing.
-    const spec = Object.assign({}, artifact.spec);
+    const spec = { ...artifact.spec };
     spec.width = 'container';
     if (spec.height === undefined) {
       spec.height = 360;
@@ -2693,7 +2676,7 @@
     if (items.length) {
       const note = document.createElement('p');
       note.className = 'dkan-aiq-refusal-searched';
-      note.textContent = 'Searched: ' + items.join(', ');
+      note.textContent = `Searched: ${items.join(', ')}`;
       card.appendChild(note);
     }
 
@@ -2744,7 +2727,7 @@
     // "Supporting data — 3 tool calls" without having to expand first.
     const count = list.children.length;
     outer.querySelector('.dkan-aiq-aux-tools-summary').textContent =
-      'Supporting data — ' + count + ' tool call' + (count !== 1 ? 's' : '');
+      `Supporting data — ${count} tool call${count !== 1 ? 's' : ''}`;
 
     this.scrollToBottom();
   };
@@ -2759,7 +2742,7 @@
    * button. NULL when no apiCall could be built.
    */
   Widget.prototype.buildAuxPlaygroundCallback = function (artifact) {
-    const inp = Object.assign({}, artifact.input || {});
+    const inp = { ...(artifact.input || {}) };
     if (
       artifact.tool === 'get_data_dictionary' &&
       artifact.raw &&
@@ -3174,8 +3157,7 @@
     const editorLabel = document.createElement('label');
     editorLabel.className = 'dkan-aiq-playground-editor-label';
     editorLabel.textContent = 'Request body (JSON)';
-    const textareaId =
-      'dkan-aiq-playground-body-' + Math.random().toString(36).slice(2, 8);
+    const textareaId = `dkan-aiq-playground-body-${Math.random().toString(36).slice(2, 8)}`;
     editorLabel.setAttribute('for', textareaId);
     // Editor box wraps the textarea + a syntax-highlighted overlay <pre>.
     // The textarea text is rendered transparent (caret stays visible), and
@@ -3221,8 +3203,7 @@
           validityEl.classList.remove('is-invalid');
           validityEl.classList.add('is-valid');
         } else {
-          const where =
-            v.line >= 0 ? 'Line ' + v.line + ', col ' + v.col + ': ' : '';
+          const where = v.line >= 0 ? `Line ${v.line}, col ${v.col}: ` : '';
           validityEl.textContent = where + v.message;
           validityEl.classList.remove('is-valid');
           validityEl.classList.add('is-invalid');
@@ -3371,8 +3352,7 @@
     this.playground.responseHost.hidden = true;
     this.playground.responseHost.innerHTML = '';
     this.playground.methodEl.textContent = request.method;
-    this.playground.methodEl.className =
-      'dkan-aiq-playground-method is-' + request.method.toLowerCase();
+    this.playground.methodEl.className = `dkan-aiq-playground-method is-${request.method.toLowerCase()}`;
     this.playground.urlEl.textContent = request.url;
     this.playground.openTabBtn.hidden = request.method !== 'GET';
     if (this.playground.noteEl) {
@@ -3479,11 +3459,9 @@
       this.playground.railSummary.setAttribute(
         'aria-label',
         count
-          ? 'Expand API playground (' +
-              count +
-              ' recent run' +
-              (count !== 1 ? 's' : '') +
-              ')'
+          ? `Expand API playground (${count} recent run${
+              count !== 1 ? 's' : ''
+            })`
           : 'Expand API playground',
       );
     }
@@ -3611,7 +3589,7 @@
       parsed = JSON.parse(raw);
     } catch (e) {
       this.playground.errorEl.hidden = false;
-      this.playground.errorEl.textContent = 'Invalid JSON: ' + e.message;
+      this.playground.errorEl.textContent = `Invalid JSON: ${e.message}`;
       return;
     }
     this.playground.errorEl.hidden = true;
@@ -3633,8 +3611,7 @@
         }
       } catch (e) {
         this.playground.errorEl.hidden = false;
-        this.playground.errorEl.textContent =
-          'Could not parse request URL: ' + e.message;
+        this.playground.errorEl.textContent = `Could not parse request URL: ${e.message}`;
         return;
       }
     }
@@ -3648,7 +3625,7 @@
       const qsStr = paramsToQueryString(cur.body);
       runReq = {
         method: 'GET',
-        url: cur.url + (qsStr ? '?' + qsStr : ''),
+        url: cur.url + (qsStr ? `?${qsStr}` : ''),
         body: cur.body,
       };
     } else {
@@ -3675,9 +3652,9 @@
       })
       .catch((err) => {
         this.playground.errorEl.hidden = false;
-        this.playground.errorEl.textContent =
-          'Playground error: ' +
-          (err && err.message ? err.message : String(err));
+        this.playground.errorEl.textContent = `Playground error: ${
+          err && err.message ? err.message : String(err)
+        }`;
       })
       .then(() => {
         this.playground.runBtn.disabled = false;
@@ -3699,12 +3676,12 @@
       parsed = JSON.parse(this.playground.editor.value);
     } catch (e) {
       this.playground.errorEl.hidden = false;
-      this.playground.errorEl.textContent = 'Invalid JSON: ' + e.message;
+      this.playground.errorEl.textContent = `Invalid JSON: ${e.message}`;
       return;
     }
     this.playground.errorEl.hidden = true;
     const qsStr = paramsToQueryString(parsed);
-    const fullUrl = cur.url + (qsStr ? '?' + qsStr : '');
+    const fullUrl = cur.url + (qsStr ? `?${qsStr}` : '');
     // Promote to absolute so window.open behaves identically regardless of
     // the page's base href; same-origin by construction.
     const absUrl = /^https?:/i.test(fullUrl)
@@ -3755,7 +3732,7 @@
     u = u.replace(/^\/api\/1\//, '');
     if (u.length > 48) {
       const segs = u.split('/');
-      u = '…/' + segs[segs.length - 1];
+      u = `…/${segs[segs.length - 1]}`;
     }
     return u;
   }
@@ -3768,11 +3745,11 @@
   function formatTimeAgo(ts) {
     const sec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
     if (sec < 5) return 'just now';
-    if (sec < 60) return sec + 's ago';
+    if (sec < 60) return `${sec}s ago`;
     const min = Math.floor(sec / 60);
-    if (min < 60) return min + 'm ago';
+    if (min < 60) return `${min}m ago`;
     const hr = Math.floor(min / 60);
-    return hr + 'h ago';
+    return `${hr}h ago`;
   }
 
   /**
@@ -3892,12 +3869,12 @@
       if (t.type === 'ws' || t.type === 'unknown') {
         out += safe;
       } else {
-        out += '<span class="dkan-aiq-tok-' + t.type + '">' + safe + '</span>';
+        out += `<span class="dkan-aiq-tok-${t.type}">${safe}</span>`;
       }
     }
     // Trailing space keeps the overlay's last line tall enough that the
     // textarea's caret on a final blank line still has a row to align to.
-    return out + ' ';
+    return `${out} `;
   }
 
   /**
@@ -3934,7 +3911,7 @@
         line = l;
         col = c;
       }
-      return { ok: false, message: msg, line: line, col: col };
+      return { ok: false, message: msg, line, col };
     }
   }
 
@@ -3946,8 +3923,8 @@
   Widget.prototype.recordPlaygroundRun = function (request, result, csrfToken) {
     this.playgroundHistory.unshift({
       request: { method: request.method, url: request.url, body: request.body },
-      result: result,
-      csrfToken: csrfToken,
+      result,
+      csrfToken,
       timestamp: Date.now(),
     });
     if (this.playgroundHistory.length > PLAYGROUND_HISTORY_CAP) {
@@ -3970,28 +3947,25 @@
       return;
     }
     this.playground.historyEl.hidden = false;
-    this.playground.historySummaryEl.textContent =
-      'Recent runs (' + this.playgroundHistory.length + ')';
+    this.playground.historySummaryEl.textContent = `Recent runs (${this.playgroundHistory.length})`;
     this.playgroundHistory.forEach((entry) => {
       const li = document.createElement('li');
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'dkan-aiq-playground-history-item';
       const status = document.createElement('span');
-      status.className =
-        'dkan-aiq-playground-history-status ' + statusClassFor(entry.result);
+      status.className = `dkan-aiq-playground-history-status ${statusClassFor(entry.result)}`;
       status.textContent = entry.result.networkError
         ? 'ERR'
         : String(entry.result.status);
       btn.appendChild(status);
       const endpoint = document.createElement('span');
       endpoint.className = 'dkan-aiq-playground-history-endpoint';
-      endpoint.textContent =
-        entry.request.method + ' ' + shortenUrl(entry.request.url);
+      endpoint.textContent = `${entry.request.method} ${shortenUrl(entry.request.url)}`;
       btn.appendChild(endpoint);
       const dur = document.createElement('span');
       dur.className = 'dkan-aiq-playground-history-dur';
-      dur.textContent = entry.result.durationMs + 'ms';
+      dur.textContent = `${entry.result.durationMs}ms`;
       btn.appendChild(dur);
       const ago = document.createElement('span');
       ago.className = 'dkan-aiq-playground-history-ago';
@@ -4021,8 +3995,7 @@
     this.playground.dirty = false;
     this.playground.errorEl.hidden = true;
     this.playground.methodEl.textContent = entry.request.method;
-    this.playground.methodEl.className =
-      'dkan-aiq-playground-method is-' + entry.request.method.toLowerCase();
+    this.playground.methodEl.className = `dkan-aiq-playground-method is-${entry.request.method.toLowerCase()}`;
     this.playground.urlEl.textContent = this.playground.current.url;
     if (this.playground.openTabBtn) {
       this.playground.openTabBtn.hidden = entry.request.method !== 'GET';
@@ -4057,7 +4030,7 @@
     const start = performance.now();
     return fetch(req.url, {
       method: req.method,
-      headers: headers,
+      headers,
       body: bodyText,
       credentials: 'same-origin',
     })
@@ -4079,8 +4052,8 @@
             statusText: response.statusText,
             headers: headerMap,
             bodyText: text,
-            parsedBody: parsedBody,
-            durationMs: durationMs,
+            parsedBody,
+            durationMs,
             networkError: null,
           };
         });
@@ -4124,12 +4097,12 @@
               ? 'is-2xx'
               : 'is-info';
       badge.classList.add(cls);
-      badge.textContent = result.status + ' ' + (result.statusText || '');
+      badge.textContent = `${result.status} ${result.statusText || ''}`;
     }
     statusRow.appendChild(badge);
     const dur = document.createElement('span');
     dur.className = 'dkan-aiq-playground-duration';
-    dur.textContent = result.durationMs + ' ms';
+    dur.textContent = `${result.durationMs} ms`;
     statusRow.appendChild(dur);
     if (result.status === 403 && !csrfToken) {
       const hint = document.createElement('span');
@@ -4180,7 +4153,7 @@
     tabSpecs.forEach((spec, i) => {
       const tab = document.createElement('button');
       tab.type = 'button';
-      tab.className = 'dkan-aiq-playground-tab' + (i === 0 ? ' is-active' : '');
+      tab.className = `dkan-aiq-playground-tab${i === 0 ? ' is-active' : ''}`;
       tab.textContent = spec.label;
       tab.addEventListener('click', () => {
         tabs
@@ -4270,7 +4243,7 @@
               ? JSON.stringify(v)
               : String(v);
         if (text.length > CELL_TRUNCATE_LEN) {
-          td.textContent = text.slice(0, CELL_TRUNCATE_LEN) + '…';
+          td.textContent = `${text.slice(0, CELL_TRUNCATE_LEN)}…`;
           td.classList.add('is-truncated');
           td.title = 'Click to expand';
           let expanded = false;
@@ -4278,7 +4251,7 @@
             expanded = !expanded;
             td.textContent = expanded
               ? text
-              : text.slice(0, CELL_TRUNCATE_LEN) + '…';
+              : `${text.slice(0, CELL_TRUNCATE_LEN)}…`;
           });
         } else {
           td.textContent = text;
@@ -4302,9 +4275,7 @@
           ? parsedBody.total
           : null;
     footer.textContent =
-      total != null
-        ? rows.length + ' of ' + total + ' rows'
-        : rows.length + ' rows';
+      total != null ? `${rows.length} of ${total} rows` : `${rows.length} rows`;
     wrap.appendChild(footer);
 
     return wrap;
@@ -4326,7 +4297,7 @@
         : result.bodyText;
     const truncated = fullText.length > PLAYGROUND_RESPONSE_DISPLAY_CAP;
     const display = truncated
-      ? fullText.slice(0, PLAYGROUND_RESPONSE_DISPLAY_CAP) + '\n\n…[truncated]'
+      ? `${fullText.slice(0, PLAYGROUND_RESPONSE_DISPLAY_CAP)}\n\n…[truncated]`
       : fullText;
     if (result.parsedBody === null && result.bodyText) {
       const note = document.createElement('div');
@@ -4354,10 +4325,7 @@
         });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download =
-          'playground-response-' +
-          Date.now() +
-          (result.parsedBody !== null ? '.json' : '.txt');
+        a.download = `playground-response-${Date.now()}${result.parsedBody !== null ? '.json' : '.txt'}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -4496,16 +4464,16 @@
    */
   function buildCurlCommand(req, csrfToken) {
     const absUrl = playgroundAbsUrl(req);
-    const lines = ['curl -X ' + req.method + " '" + absUrl + "' \\"];
+    const lines = [`curl -X ${req.method} '${absUrl}' \\`];
     lines.push("  -H 'Accept: application/json' \\");
     if (req.method !== 'GET') {
       lines.push("  -H 'Content-Type: application/json' \\");
       if (csrfToken) {
-        lines.push("  -H 'X-CSRF-Token: " + csrfToken + "' \\");
+        lines.push(`  -H 'X-CSRF-Token: ${csrfToken}' \\`);
       }
       const bodyJson = JSON.stringify(req.body);
       const escaped = bodyJson.replace(/'/g, "'\\''");
-      lines.push("  --data-raw '" + escaped + "'");
+      lines.push(`  --data-raw '${escaped}'`);
     } else {
       // Drop the trailing backslash from the previous line for GET requests.
       lines[lines.length - 1] = lines[lines.length - 1].replace(/ \\$/, '');
@@ -4522,16 +4490,16 @@
     // Build all body lines first, then join with a trailing-backslash
     // continuation so the final line never has a stray slash. Avoids the
     // contortion of conditionally appending " \\" on every push.
-    const parts = ['http ' + req.method + " '" + absUrl + "'"];
+    const parts = [`http ${req.method} '${absUrl}'`];
     parts.push('  Accept:application/json');
     if (req.method !== 'GET') {
       parts.push('  Content-Type:application/json');
       if (csrfToken) {
-        parts.push('  X-CSRF-Token:' + csrfToken);
+        parts.push(`  X-CSRF-Token:${csrfToken}`);
       }
       const bodyJson = JSON.stringify(req.body);
       const escaped = bodyJson.replace(/'/g, "'\\''");
-      parts.push("  --raw='" + escaped + "'");
+      parts.push(`  --raw='${escaped}'`);
     }
     return parts.join(' \\\n');
   }
@@ -4544,12 +4512,12 @@
   function buildPythonRequestsCode(req, csrfToken) {
     const absUrl = playgroundAbsUrl(req);
     const out = ['import requests', ''];
-    out.push('url = "' + absUrl + '"');
+    out.push(`url = "${absUrl}"`);
     const headerLines = ['    "Accept": "application/json",'];
     if (req.method !== 'GET') {
       headerLines.push('    "Content-Type": "application/json",');
       if (csrfToken) {
-        headerLines.push('    "X-CSRF-Token": "' + csrfToken + '",');
+        headerLines.push(`    "X-CSRF-Token": "${csrfToken}",`);
       }
     }
     out.push('headers = {');
@@ -4559,12 +4527,10 @@
       // Triple-quoted string keeps embedded " from JSON safe. JSON cannot
       // contain unescaped """ so the literal is unambiguous in practice.
       const bodyPretty = JSON.stringify(req.body, null, 2);
-      out.push('body = """' + bodyPretty + '"""');
+      out.push(`body = """${bodyPretty}"""`);
       out.push('');
       out.push(
-        'response = requests.' +
-          req.method.toLowerCase() +
-          '(url, headers=headers, data=body)',
+        `response = requests.${req.method.toLowerCase()}(url, headers=headers, data=body)`,
       );
     } else {
       out.push('');
@@ -4584,21 +4550,21 @@
   function buildJavaScriptFetchCode(req, csrfToken) {
     const absUrl = playgroundAbsUrl(req);
     const out = [];
-    out.push("const response = await fetch('" + absUrl + "', {");
-    out.push("  method: '" + req.method + "',");
+    out.push(`const response = await fetch('${absUrl}', {`);
+    out.push(`  method: '${req.method}',`);
     out.push("  credentials: 'same-origin',");
     out.push('  headers: {');
     out.push("    'Accept': 'application/json',");
     if (req.method !== 'GET') {
       out.push("    'Content-Type': 'application/json',");
       if (csrfToken) {
-        out.push("    'X-CSRF-Token': '" + csrfToken + "',");
+        out.push(`    'X-CSRF-Token': '${csrfToken}',`);
       }
     }
     out.push('  },');
     if (req.method !== 'GET') {
       const bodyJson = JSON.stringify(req.body);
-      out.push('  body: JSON.stringify(' + bodyJson + '),');
+      out.push(`  body: JSON.stringify(${bodyJson}),`);
     }
     out.push('});');
     out.push('const data = await response.json();');
@@ -4614,26 +4580,24 @@
   function buildPhpCurlCode(req, csrfToken) {
     const absUrl = playgroundAbsUrl(req);
     const out = [];
-    out.push("$ch = curl_init('" + absUrl + "');");
+    out.push(`$ch = curl_init('${absUrl}');`);
     out.push('curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);');
     if (req.method !== 'GET') {
       if (req.method === 'POST') {
         out.push('curl_setopt($ch, CURLOPT_POST, true);');
       } else {
-        out.push(
-          "curl_setopt($ch, CURLOPT_CUSTOMREQUEST, '" + req.method + "');",
-        );
+        out.push(`curl_setopt($ch, CURLOPT_CUSTOMREQUEST, '${req.method}');`);
       }
       const bodyJson = JSON.stringify(req.body);
       const phpEscaped = bodyJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-      out.push("curl_setopt($ch, CURLOPT_POSTFIELDS, '" + phpEscaped + "');");
+      out.push(`curl_setopt($ch, CURLOPT_POSTFIELDS, '${phpEscaped}');`);
     }
     out.push('curl_setopt($ch, CURLOPT_HTTPHEADER, [');
     out.push("    'Accept: application/json',");
     if (req.method !== 'GET') {
       out.push("    'Content-Type: application/json',");
       if (csrfToken) {
-        out.push("    'X-CSRF-Token: " + csrfToken + "',");
+        out.push(`    'X-CSRF-Token: ${csrfToken}',`);
       }
     }
     out.push(']);');
@@ -4698,8 +4662,8 @@
   function formatTokensCompact(n) {
     if (!n) return '0';
     if (n < 1000) return String(n);
-    if (n < 10000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-    return Math.round(n / 1000).toLocaleString() + 'k';
+    if (n < 10000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+    return `${Math.round(n / 1000).toLocaleString()}k`;
   }
 
   /**
@@ -4717,7 +4681,7 @@
     group.open = true;
     const sum = document.createElement('summary');
     sum.className = 'dkan-aiq-debug-step-summary';
-    sum.textContent = 'Step ' + key;
+    sum.textContent = `Step ${key}`;
     group.appendChild(sum);
     const body = document.createElement('div');
     body.className = 'dkan-aiq-debug-step-list';
@@ -4731,8 +4695,8 @@
       this.dom.debugLog.appendChild(group);
     }
     const record = {
-      group: group,
-      body: body,
+      group,
+      body,
       summary: sum,
       count: 0,
       ms: 0,
@@ -4749,15 +4713,14 @@
    * Token chip is suppressed when no provider response has been seen yet.
    */
   Widget.prototype.updateStepGroupSummary = function (record) {
-    const meta = [record.count + ' tool' + (record.count !== 1 ? 's' : '')];
+    const meta = [`${record.count} tool${record.count !== 1 ? 's' : ''}`];
     if (record.ms > 0) {
-      meta.push(record.ms.toLocaleString() + 'ms');
+      meta.push(`${record.ms.toLocaleString()}ms`);
     }
     if (record.tokens && record.tokens.total > 0) {
-      meta.push(formatTokensCompact(record.tokens.total) + ' tokens');
+      meta.push(`${formatTokensCompact(record.tokens.total)} tokens`);
     }
-    record.summary.textContent =
-      'Step ' + record.loop + ' — ' + meta.join(' · ');
+    record.summary.textContent = `Step ${record.loop} — ${meta.join(' · ')}`;
   };
 
   /**
@@ -4808,8 +4771,7 @@
     }
     const errs = this.debugErrorCount || 0;
     if (errs > 0) {
-      sum.textContent =
-        'Agent diagnostics — ' + errs + ' error' + (errs !== 1 ? 's' : '');
+      sum.textContent = `Agent diagnostics — ${errs} error${errs !== 1 ? 's' : ''}`;
       sum.classList.add('has-errors');
     } else {
       sum.textContent = 'Agent diagnostics';
@@ -4837,7 +4799,7 @@
     if (!this.dom.debugLog || this.dom.debugPanel.hidden) {
       return;
     }
-    const toolId = ev.tool_id || 'tool-' + this.debugToolCount;
+    const toolId = ev.tool_id || `tool-${this.debugToolCount}`;
     // Each entry is a <details> so successful calls collapse to a single
     // line — name + result chip + meta — and only errored calls auto-open
     // (see debugToolFinished).
@@ -4879,7 +4841,7 @@
     const stepRecord = this.getOrCreateStepGroup(this.debugIterationLast || 1);
     stepRecord.body.appendChild(entry);
     this.debugPending[toolId] = {
-      entry: entry,
+      entry,
       meta: metaEl,
       result: resultEl,
       startedAt: typeof ev.time === 'number' ? ev.time : null,
@@ -4906,7 +4868,7 @@
     }
 
     if (entry && pending && pending.meta && durationMs != null) {
-      pending.meta.textContent = durationMs + 'ms';
+      pending.meta.textContent = `${durationMs}ms`;
     }
 
     // Result summary chip — lives in the entry's <summary> so successful
@@ -4961,38 +4923,36 @@
     const parts = [];
     if (this.debugToolCount > 0) {
       parts.push(
-        this.debugToolCount +
-          ' tool call' +
-          (this.debugToolCount !== 1 ? 's' : ''),
+        `${this.debugToolCount} tool call${
+          this.debugToolCount !== 1 ? 's' : ''
+        }`,
       );
     }
     if (this.debugIterationMax > 0) {
       parts.push(
-        this.debugIterationMax +
-          ' step' +
-          (this.debugIterationMax !== 1 ? 's' : ''),
+        `${this.debugIterationMax} step${
+          this.debugIterationMax !== 1 ? 's' : ''
+        }`,
       );
     }
     if (this.debugTotalMs > 0) {
-      parts.push(this.debugTotalMs.toLocaleString() + 'ms');
+      parts.push(`${this.debugTotalMs.toLocaleString()}ms`);
     }
     if (this.debugErrorCount > 0) {
       parts.push(
-        this.debugErrorCount +
-          ' error' +
-          (this.debugErrorCount !== 1 ? 's' : ''),
+        `${this.debugErrorCount} error${this.debugErrorCount !== 1 ? 's' : ''}`,
       );
     }
     if (hasTokens) {
       const tokenParts = [];
-      if (tu.input > 0) tokenParts.push(tu.input.toLocaleString() + ' in');
-      if (tu.output > 0) tokenParts.push(tu.output.toLocaleString() + ' out');
-      if (tu.total > 0) tokenParts.push(tu.total.toLocaleString() + ' total');
+      if (tu.input > 0) tokenParts.push(`${tu.input.toLocaleString()} in`);
+      if (tu.output > 0) tokenParts.push(`${tu.output.toLocaleString()} out`);
+      if (tu.total > 0) tokenParts.push(`${tu.total.toLocaleString()} total`);
       if (tu.cached > 0)
-        tokenParts.push(tu.cached.toLocaleString() + ' cached');
+        tokenParts.push(`${tu.cached.toLocaleString()} cached`);
       if (tu.reasoning > 0)
-        tokenParts.push(tu.reasoning.toLocaleString() + ' reasoning');
-      parts.push(tokenParts.join(' · ') + ' tokens');
+        tokenParts.push(`${tu.reasoning.toLocaleString()} reasoning`);
+      parts.push(`${tokenParts.join(' · ')} tokens`);
     }
     totals.textContent = parts.join(' · ');
     footer.appendChild(totals);
@@ -5046,28 +5006,26 @@
     lines.push('Agent diagnostics');
     lines.push('=================');
     const totals = [
-      this.debugToolCount +
-        ' tool call' +
-        (this.debugToolCount !== 1 ? 's' : ''),
-      this.debugIterationMax +
-        ' step' +
-        (this.debugIterationMax !== 1 ? 's' : ''),
-      this.debugTotalMs.toLocaleString() + 'ms total',
+      `${this.debugToolCount} tool call${this.debugToolCount !== 1 ? 's' : ''}`,
+      `${this.debugIterationMax} step${
+        this.debugIterationMax !== 1 ? 's' : ''
+      }`,
+      `${this.debugTotalMs.toLocaleString()}ms total`,
     ];
     if (errs > 0) {
-      totals.push(errs + ' error' + (errs !== 1 ? 's' : ''));
+      totals.push(`${errs} error${errs !== 1 ? 's' : ''}`);
     }
     lines.push(totals.join(' · '));
     const tu = this.debugTokenUsage || {};
     if ((tu.input || 0) + (tu.output || 0) + (tu.total || 0) > 0) {
       const tParts = [];
-      if (tu.input > 0) tParts.push(tu.input.toLocaleString() + ' in');
-      if (tu.output > 0) tParts.push(tu.output.toLocaleString() + ' out');
-      if (tu.total > 0) tParts.push(tu.total.toLocaleString() + ' total');
-      if (tu.cached > 0) tParts.push(tu.cached.toLocaleString() + ' cached');
+      if (tu.input > 0) tParts.push(`${tu.input.toLocaleString()} in`);
+      if (tu.output > 0) tParts.push(`${tu.output.toLocaleString()} out`);
+      if (tu.total > 0) tParts.push(`${tu.total.toLocaleString()} total`);
+      if (tu.cached > 0) tParts.push(`${tu.cached.toLocaleString()} cached`);
       if (tu.reasoning > 0)
-        tParts.push(tu.reasoning.toLocaleString() + ' reasoning');
-      lines.push('Tokens: ' + tParts.join(' · '));
+        tParts.push(`${tu.reasoning.toLocaleString()} reasoning`);
+      lines.push(`Tokens: ${tParts.join(' · ')}`);
     }
     lines.push('');
 
@@ -5082,10 +5040,10 @@
         (node.querySelector('.dkan-aiq-debug-result-inline') || {})
           .textContent || '';
       const isError = node.classList.contains('dkan-aiq-debug-error');
-      const prefix = isError ? '[!]' : '[' + idx + ']';
+      const prefix = isError ? '[!]' : `[${idx}]`;
       const headerParts = [prefix, name];
       if (meta) {
-        headerParts.push('(' + meta + ')');
+        headerParts.push(`(${meta})`);
       }
       if (result) {
         headerParts.push(result);
@@ -5097,7 +5055,7 @@
         const indented = argsText
           .split('\n')
           .map(function (l) {
-            return '    ' + l;
+            return `    ${l}`;
           })
           .join('\n');
         lines.push('    args:');
@@ -5115,7 +5073,7 @@
           (group.querySelector(':scope > .dkan-aiq-debug-step-summary') || {})
             .textContent || '';
         if (stepSummary) {
-          lines.push('--- ' + stepSummary + ' ---');
+          lines.push(`--- ${stepSummary} ---`);
           lines.push('');
         }
         const entries = group.querySelectorAll(
@@ -5229,7 +5187,7 @@
       return '';
     }
     if (parsed.error) {
-      return '→ Error: ' + String(parsed.error);
+      return `→ Error: ${String(parsed.error)}`;
     }
     if (
       (name === 'query_datastore' ||
@@ -5244,9 +5202,7 @@
           : parsed.count != null
             ? parsed.count
             : got;
-      return (
-        '→ ' + got.toLocaleString() + ' of ' + total.toLocaleString() + ' rows'
-      );
+      return `→ ${got.toLocaleString()} of ${total.toLocaleString()} rows`;
     }
     if (name === 'get_datastore_schema') {
       const cols = Array.isArray(parsed.schema)
@@ -5262,14 +5218,11 @@
             c && typeof c === 'object' ? c.name || c.field || '?' : String(c),
           )
           .slice(0, 5);
-        return (
-          '→ ' +
-          cols.length +
-          ' columns' +
-          (names.length
-            ? ': ' + names.join(', ') + (cols.length > 5 ? ', …' : '')
-            : '')
-        );
+        return `→ ${cols.length} columns${
+          names.length
+            ? `: ${names.join(', ')}${cols.length > 5 ? ', …' : ''}`
+            : ''
+        }`;
       }
     }
     if (name === 'get_datastore_stats') {
@@ -5294,17 +5247,13 @@
         colCount = colCount || parsed.columns;
       }
       if (rows || colCount) {
-        let out =
-          '→ ' +
-          Number(rows).toLocaleString() +
-          ' rows, ' +
-          colCount +
-          ' columns';
+        let out = `→ ${Number(rows).toLocaleString()} rows, ${
+          colCount
+        } columns`;
         if (colNames.length) {
-          out +=
-            ': ' +
-            colNames.join(', ') +
-            (colCount > colNames.length ? ', …' : '');
+          out += `: ${colNames.join(
+            ', ',
+          )}${colCount > colNames.length ? ', …' : ''}`;
         }
         return out;
       }
@@ -5316,9 +5265,7 @@
           ? parsed.distributions
           : null;
       if (list) {
-        return (
-          '→ ' + list.length + ' distribution' + (list.length !== 1 ? 's' : '')
-        );
+        return `→ ${list.length} distribution${list.length !== 1 ? 's' : ''}`;
       }
     }
     if (name === 'list_datasets' || name === 'search_datasets') {
@@ -5331,13 +5278,9 @@
             : null;
       if (list) {
         const total = parsed.total != null ? parsed.total : list.length;
-        return (
-          '→ ' +
-          list.length +
-          ' of ' +
-          total +
-          (name === 'list_datasets' ? ' datasets' : ' results')
-        );
+        return `→ ${list.length} of ${
+          total
+        }${name === 'list_datasets' ? ' datasets' : ' results'}`;
       }
     }
     if (name === 'search_columns') {
@@ -5346,13 +5289,9 @@
         : parsed.total_matches || 0;
       const searched = parsed.resources_searched || 0;
       if (matches || searched) {
-        return (
-          '→ ' +
-          matches +
-          ' match' +
-          (matches !== 1 ? 'es' : '') +
-          (searched ? ' across ' + searched + ' resources' : '')
-        );
+        return `→ ${matches} match${
+          matches !== 1 ? 'es' : ''
+        }${searched ? ` across ${searched} resources` : ''}`;
       }
     }
     if (name === 'find_dataset_resources') {
@@ -5361,15 +5300,9 @@
         : parsed.distribution_count || 0;
       const title = parsed.title || parsed.dataset_title || '';
       if (title || dists) {
-        return (
-          '→ ' +
-          (title || 'dataset') +
-          ' (' +
-          dists +
-          ' distribution' +
-          (dists !== 1 ? 's' : '') +
-          ')'
-        );
+        return `→ ${title || 'dataset'} (${dists} distribution${
+          dists !== 1 ? 's' : ''
+        })`;
       }
     }
     if (name === 'create_chart') {
@@ -5383,7 +5316,7 @@
             ? parsed.rows.length
             : null;
       if (got != null) {
-        return '→ ' + got + ' row' + (got !== 1 ? 's' : '');
+        return `→ ${got} row${got !== 1 ? 's' : ''}`;
       }
     }
     if (name === 'distinct_values') {
@@ -5394,26 +5327,18 @@
             ? parsed.values.length
             : null;
       if (n != null) {
-        return (
-          '→ ' +
-          n +
-          ' distinct value' +
-          (n !== 1 ? 's' : '') +
-          (parsed.truncated ? ' (truncated)' : '')
-        );
+        return `→ ${n} distinct value${
+          n !== 1 ? 's' : ''
+        }${parsed.truncated ? ' (truncated)' : ''}`;
       }
     }
     if (name === 'compute_stats') {
       const ops = Array.isArray(parsed.results) ? parsed.results.length : 0;
       const rows = parsed.row_count != null ? parsed.row_count : null;
       if (ops || rows != null) {
-        return (
-          '→ ' +
-          ops +
-          ' op' +
-          (ops !== 1 ? 's' : '') +
-          (rows != null ? ' over ' + rows.toLocaleString() + ' rows' : '')
-        );
+        return `→ ${ops} op${
+          ops !== 1 ? 's' : ''
+        }${rows != null ? ` over ${rows.toLocaleString()} rows` : ''}`;
       }
     }
     if (name === 'get_data_dictionary') {
@@ -5430,31 +5355,24 @@
           (acc, d) => acc + (Array.isArray(d.fields) ? d.fields.length : 0),
           0,
         );
-        return (
-          '→ ' +
-          dicts.length +
-          ' dictionary' +
-          (dicts.length !== 1 ? 'ies' : '') +
-          (fieldCount ? ', ' + fieldCount + ' fields' : '')
-        );
+        return `→ ${dicts.length} dictionary${
+          dicts.length !== 1 ? 'ies' : ''
+        }${fieldCount ? `, ${fieldCount} fields` : ''}`;
       }
     }
     if (name === 'refuse') {
       // The refusal artifact already renders the visible card; the debug panel
       // only needs a one-line acknowledgement so the tool entry isn't blank.
-      return '→ refused (' + (parsed.reason_category || 'other') + ')';
+      return `→ refused (${parsed.reason_category || 'other'})`;
     }
     // Fallbacks.
     if (Array.isArray(parsed)) {
-      return '→ ' + parsed.length + ' item' + (parsed.length !== 1 ? 's' : '');
+      return `→ ${parsed.length} item${parsed.length !== 1 ? 's' : ''}`;
     }
     if (Array.isArray(parsed.results)) {
-      return (
-        '→ ' +
-        parsed.results.length +
-        ' result' +
-        (parsed.results.length !== 1 ? 's' : '')
-      );
+      return `→ ${parsed.results.length} result${
+        parsed.results.length !== 1 ? 's' : ''
+      }`;
     }
     return '';
   }

@@ -11,18 +11,38 @@
  * its src/stubs are resolved from wherever that module is installed.
  */
 
-$siteAutoload = __DIR__ . '/../../../../../vendor/autoload.php';
-if (!file_exists($siteAutoload)) {
-  fwrite(STDERR, "ERROR: site vendor/autoload.php missing.\n  Run `composer install` at the project root first.\n");
+// Resolve the Composer project root. The dev-site layout puts the module at
+// <root>/<web>/modules/custom/<module>; on drupal.org GitLab CI the module is
+// symlinked into the web tree and __DIR__ resolves to the bare checkout, so
+// probe $CI_PROJECT_DIR too; a module-local `composer install` works as well.
+$rootCandidates = array_filter([
+  dirname(__DIR__, 5),
+  getenv('CI_PROJECT_DIR') ?: NULL,
+  dirname(__DIR__),
+]);
+$siteRoot = NULL;
+foreach ($rootCandidates as $candidate) {
+  if (file_exists($candidate . '/vendor/autoload.php')) {
+    $siteRoot = $candidate;
+    break;
+  }
+}
+if ($siteRoot === NULL) {
+  fwrite(STDERR, "ERROR: vendor/autoload.php not found.\n  Run `composer install` at the project root first.\n");
   exit(1);
 }
-require_once $siteAutoload;
+require_once $siteRoot . '/vendor/autoload.php';
 
 // dkan_query_tools ships inside drupal/dkan_mcp_server — probe the dev-site
-// custom checkout first, then a composer-installed contrib copy.
+// custom checkout first, then composer-installed contrib copies under the
+// common web roots.
 $queryToolsCandidates = [
   __DIR__ . '/../../dkan_mcp_server/modules/dkan_query_tools',
   __DIR__ . '/../../../contrib/dkan_mcp_server/modules/dkan_query_tools',
+  $siteRoot . '/web/modules/contrib/dkan_mcp_server/modules/dkan_query_tools',
+  $siteRoot . '/docroot/modules/contrib/dkan_mcp_server/modules/dkan_query_tools',
+  $siteRoot . '/web/modules/custom/dkan_mcp_server/modules/dkan_query_tools',
+  $siteRoot . '/docroot/modules/custom/dkan_mcp_server/modules/dkan_query_tools',
 ];
 $queryTools = NULL;
 foreach ($queryToolsCandidates as $candidate) {
