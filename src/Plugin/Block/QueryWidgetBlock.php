@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Plugin\Block;
+namespace Drupal\dkan_ai_query\Plugin\Block;
 
 use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\Enum\AiModelCapability;
@@ -15,7 +15,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Natural-language query widget block for DKAN dataset pages.
  *
  * @Block(
- *   id = "dkan_drupal_ai_query_widget",
+ *   id = "dkan_ai_query_widget",
  *   admin_label = @Translation("DKAN AI Query Widget"),
  *   category = @Translation("DKAN"),
  * )
@@ -86,7 +86,7 @@ class QueryWidgetBlock extends BlockBase implements ContainerFactoryPluginInterf
    */
   public function build(): array {
     $datasetId = $this->configuration['dataset_id'] ?? '';
-    $config = $this->configFactory->get('dkan_drupal_ai_query.settings');
+    $config = $this->configFactory->get('dkan_ai_query.settings');
 
     // Pull the live "provider__model" map from Drupal AI. Filtered to
     // providers that are usable (have keys configured) and to models that
@@ -124,11 +124,11 @@ class QueryWidgetBlock extends BlockBase implements ContainerFactoryPluginInterf
     }
 
     return [
-      '#theme' => 'dkan_drupal_ai_query_widget',
+      '#theme' => 'dkan_ai_query_widget',
       '#dataset_id' => $datasetId,
       '#cache' => ['max-age' => 0],
       '#attached' => [
-        'library' => ['dkan_drupal_ai_query/widget'],
+        'library' => ['dkan_ai_query/widget'],
         'drupalSettings' => [
           'dkanAiQuery' => [
             'datasetId' => $datasetId,

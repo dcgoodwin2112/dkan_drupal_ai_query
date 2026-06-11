@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Service;
+namespace Drupal\dkan_ai_query\Service;
 
 /**
  * Per-process registry of structured refusals captured during agent solves.

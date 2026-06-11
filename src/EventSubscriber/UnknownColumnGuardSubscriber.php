@@ -1,10 +1,10 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\EventSubscriber;
+namespace Drupal\dkan_ai_query\EventSubscriber;
 
 use Drupal\ai_agents\Event\AgentToolFinishedExecutionEvent;
-use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
-use Drupal\dkan_drupal_ai_query\Service\UnknownColumnCounter;
+use Drupal\dkan_ai_query\Service\RefusalCollector;
+use Drupal\dkan_ai_query\Service\UnknownColumnCounter;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**

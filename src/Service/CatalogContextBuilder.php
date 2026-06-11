@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Service;
+namespace Drupal\dkan_ai_query\Service;
 
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\dkan_query_tools\Tool\MetastoreTools;
@@ -36,7 +36,7 @@ class CatalogContextBuilder {
    */
   protected const MAX_RESOURCE_INLINE = 25;
 
-  protected const CID = 'dkan_drupal_ai_query:catalog_context';
+  protected const CID = 'dkan_ai_query:catalog_context';
   protected const TTL_SECONDS = 3600;
 
   public function __construct(

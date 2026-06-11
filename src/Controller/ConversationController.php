@@ -1,9 +1,9 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Controller;
+namespace Drupal\dkan_ai_query\Controller;
 
 use Drupal\Core\Session\AccountProxyInterface;
-use Drupal\dkan_drupal_ai_query\Service\ConversationStorage;
+use Drupal\dkan_ai_query\Service\ConversationStorage;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -89,7 +89,7 @@ class ConversationController {
    * Owner-or-admin check.
    */
   protected function canAccess($conversation): bool {
-    if ($this->currentUser->hasPermission('administer dkan drupal ai query conversations')) {
+    if ($this->currentUser->hasPermission('administer dkan ai query conversations')) {
       return TRUE;
     }
     return (int) $conversation->get('uid')->target_id === (int) $this->currentUser->id();

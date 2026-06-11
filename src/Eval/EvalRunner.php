@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Drupal\dkan_drupal_ai_query\Eval;
+namespace Drupal\dkan_ai_query\Eval;
 
 use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai_agents\PluginInterfaces\AiAgentInterface;
 use Drupal\ai_agents\PluginManager\AiAgentManager;
 use Drupal\ai_agents\Task\Task;
-use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
-use Drupal\dkan_drupal_ai_query\Service\CatalogContextBuilder;
-use Drupal\dkan_drupal_ai_query\Service\EvalToolCallCollector;
-use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
-use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
-use Drupal\dkan_drupal_ai_query\Service\UnknownColumnCounter;
+use Drupal\dkan_ai_query\Service\ArtifactStorage;
+use Drupal\dkan_ai_query\Service\CatalogContextBuilder;
+use Drupal\dkan_ai_query\Service\EvalToolCallCollector;
+use Drupal\dkan_ai_query\Service\RefusalCollector;
+use Drupal\dkan_ai_query\Service\SystemPromptLoader;
+use Drupal\dkan_ai_query\Service\UnknownColumnCounter;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -48,7 +48,7 @@ class EvalRunner {
   /**
    * Run a list of golden cases through the agent.
    *
-   * @param \Drupal\dkan_drupal_ai_query\Eval\GoldenCase[] $cases
+   * @param \Drupal\dkan_ai_query\Eval\GoldenCase[] $cases
    *   Cases to run, in order.
    * @param string $providerId
    *   AI provider plugin id.
@@ -63,7 +63,7 @@ class EvalRunner {
    * @param array $runFlags
    *   Run-level flags (e.g., 'no-schema-dictionary') recorded on every case.
    *
-   * @return \Drupal\dkan_drupal_ai_query\Eval\CaseResult[]
+   * @return \Drupal\dkan_ai_query\Eval\CaseResult[]
    *   Results in the same order as $cases.
    */
   public function run(

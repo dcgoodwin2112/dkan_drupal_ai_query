@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\dkan_drupal_ai_query\Eval;
+namespace Drupal\dkan_ai_query\Eval;
 
 /**
  * Outcome of running one golden case through the agent.

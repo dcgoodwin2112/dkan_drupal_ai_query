@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Drupal\dkan_drupal_ai_query\Drush\Commands;
+namespace Drupal\dkan_ai_query\Drush\Commands;
 
-use Drupal\dkan_drupal_ai_query\Service\AgentPromptSync;
+use Drupal\dkan_ai_query\Service\AgentPromptSync;
 use Drush\Attributes as CLI;
 use Drush\Boot\DrupalBootLevels;
 use Drush\Commands\DrushCommands;
@@ -23,7 +23,7 @@ class SyncPromptCommand extends DrushCommands {
 
   public static function create(ContainerInterface $container): self {
     return new self(
-      $container->get('dkan_drupal_ai_query.agent_prompt_sync'),
+      $container->get('dkan_ai_query.agent_prompt_sync'),
     );
   }
 

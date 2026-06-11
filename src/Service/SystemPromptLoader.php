@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Service;
+namespace Drupal\dkan_ai_query\Service;
 
 use Drupal\Core\Extension\ExtensionPathResolver;
 
@@ -83,7 +83,7 @@ class SystemPromptLoader {
   protected function resolvePath(string $version): ?string {
     $version = ltrim($version, 'v');
     try {
-      $modulePath = $this->pathResolver->getPath('module', 'dkan_drupal_ai_query');
+      $modulePath = $this->pathResolver->getPath('module', 'dkan_ai_query');
     }
     catch (\Throwable) {
       return NULL;

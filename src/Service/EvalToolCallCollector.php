@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\dkan_drupal_ai_query\Service;
+namespace Drupal\dkan_ai_query\Service;
 
 /**
  * Per-process in-memory store of tool calls executed during an eval run.

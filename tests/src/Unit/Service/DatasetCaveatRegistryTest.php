@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Drupal\Tests\dkan_drupal_ai_query\Unit\Service;
+namespace Drupal\Tests\dkan_ai_query\Unit\Service;
 
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\dkan_drupal_ai_query\DatasetCaveatInterface;
-use Drupal\dkan_drupal_ai_query\Service\DatasetCaveatRegistry;
+use Drupal\dkan_ai_query\DatasetCaveatInterface;
+use Drupal\dkan_ai_query\Service\DatasetCaveatRegistry;
 use PHPUnit\Framework\TestCase;
 
 class DatasetCaveatRegistryTest extends TestCase {

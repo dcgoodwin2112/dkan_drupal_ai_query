@@ -1,0 +1,13 @@
+name: 'DKAN AI Query'
+type: module
+description: 'Natural-language query for DKAN datasets, built on the Drupal AI agents framework with a polling UX.'
+core_version_requirement: ^10.2 || ^11
+package: DKAN
+configure: dkan_ai_query.settings_form
+dependencies:
+  - drupal:system
+  - drupal:user
+  - ai:ai
+  - ai_agents:ai_agents
+  - key:key
+  - dkan_mcp_server:dkan_query_tools

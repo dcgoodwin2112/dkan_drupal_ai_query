@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Form;
+namespace Drupal\dkan_ai_query\Form;
 
 use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\Enum\AiModelCapability;
@@ -9,7 +9,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\dkan_drupal_ai_query\Service\AgentPromptSync;
+use Drupal\dkan_ai_query\Service\AgentPromptSync;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -37,7 +37,7 @@ class SettingsForm extends ConfigFormBase {
   /**
    * The agent prompt sync service.
    *
-   * @var \Drupal\dkan_drupal_ai_query\Service\AgentPromptSync
+   * @var \Drupal\dkan_ai_query\Service\AgentPromptSync
    */
   protected AgentPromptSync $agentPromptSync;
 
@@ -66,7 +66,7 @@ class SettingsForm extends ConfigFormBase {
       $container->get('config.typed'),
       $container->get('ai.provider'),
       $container->get('entity_type.manager'),
-      $container->get('dkan_drupal_ai_query.agent_prompt_sync'),
+      $container->get('dkan_ai_query.agent_prompt_sync'),
     );
   }
 
@@ -74,21 +74,21 @@ class SettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   protected function getEditableConfigNames(): array {
-    return ['dkan_drupal_ai_query.settings'];
+    return ['dkan_ai_query.settings'];
   }
 
   /**
    * {@inheritdoc}
    */
   public function getFormId(): string {
-    return 'dkan_drupal_ai_query_settings';
+    return 'dkan_ai_query_settings';
   }
 
   /**
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state): array {
-    $config = $this->config('dkan_drupal_ai_query.settings');
+    $config = $this->config('dkan_ai_query.settings');
 
     // Live model list, scoped to providers that are usable for chat AND
     // models that declare the ChatTools capability — the agent loop only
@@ -309,7 +309,7 @@ class SettingsForm extends ConfigFormBase {
     $form['logging'] = [
       '#type' => 'details',
       '#title' => $this->t('Logging'),
-      '#description' => $this->t('Server-side logging to the <code>dkan_drupal_ai_query</code> channel. View entries with <code>drush watchdog:show --type=dkan_drupal_ai_query</code>. Independent of the in-widget Agent diagnostics panel above.'),
+      '#description' => $this->t('Server-side logging to the <code>dkan_ai_query</code> channel. View entries with <code>drush watchdog:show --type=dkan_ai_query</code>. Independent of the in-widget Agent diagnostics panel above.'),
       '#open' => FALSE,
       '#tree' => FALSE,
     ];
@@ -339,7 +339,7 @@ class SettingsForm extends ConfigFormBase {
     }
     $enableRawQueryTool = (bool) $form_state->getValue('enable_raw_query_tool');
 
-    $this->config('dkan_drupal_ai_query.settings')
+    $this->config('dkan_ai_query.settings')
       ->set('default_model', $form_state->getValue('default_model'))
       ->set('allowed_models', array_values(array_filter((array) $form_state->getValue('allowed_models'))))
       ->set('show_model_selector', (bool) $form_state->getValue('show_model_selector'))

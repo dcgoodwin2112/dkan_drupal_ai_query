@@ -1,0 +1,7 @@
+dkan_ai_query_mock.picker:
+  path: '/admin/dkan/ai-query/mock-scenarios'
+  defaults:
+    _form: '\Drupal\dkan_ai_query_mock\Form\MockScenarioPickerForm'
+    _title: 'AI Query mock scenarios'
+  requirements:
+    _permission: 'administer dkan ai query mock'

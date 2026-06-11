@@ -1,4 +1,4 @@
-# dkan_drupal_ai_query eval golden set
+# dkan_ai_query eval golden set
 #
 # Each case runs end-to-end through the dkan_data_query agent. Pass/fail is
 # determined by CaseEvaluator (see src/Eval/CaseEvaluator.php). Phase 1 uses

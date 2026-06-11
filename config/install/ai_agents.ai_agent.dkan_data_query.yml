@@ -3,33 +3,33 @@ status: true
 dependencies:
   enforced:
     module:
-      - dkan_drupal_ai_query
+      - dkan_ai_query
 id: dkan_data_query
 label: 'DKAN Data Query Agent'
 description: 'Answers natural-language questions against DKAN datasets using datastore query and discovery tools.'
 default_information_tools: ''
 # Placeholder. The active prompt lives in
 # prompts/query_system_prompt.v{N}.md and is synced into this field by
-# dkan_drupal_ai_query_install() / hook_update_N. Do not edit here — edit
+# dkan_ai_query_install() / hook_update_N. Do not edit here — edit
 # the .md file and run drush updb (or drush dkan-aiq:sync-prompt).
 system_prompt: 'Placeholder — see prompts/query_system_prompt.v{N}.md.'
 secured_system_prompt: ''
 tools:
-  'dkan_drupal_ai_query:query_datastore': true
-  'dkan_drupal_ai_query:query_datastore_join': true
-  'dkan_drupal_ai_query:get_data_dictionary': true
-  'dkan_drupal_ai_query:get_datastore_schema': true
-  'dkan_drupal_ai_query:get_datastore_stats': true
-  'dkan_drupal_ai_query:sample_rows': true
-  'dkan_drupal_ai_query:distinct_values': true
-  'dkan_drupal_ai_query:search_columns': true
-  'dkan_drupal_ai_query:search_datasets': true
-  'dkan_drupal_ai_query:list_datasets': true
-  'dkan_drupal_ai_query:list_distributions': true
-  'dkan_drupal_ai_query:find_dataset_resources': true
-  'dkan_drupal_ai_query:create_chart': true
-  'dkan_drupal_ai_query:compute_stats': true
-  'dkan_drupal_ai_query:refuse': true
+  'dkan_ai_query:query_datastore': true
+  'dkan_ai_query:query_datastore_join': true
+  'dkan_ai_query:get_data_dictionary': true
+  'dkan_ai_query:get_datastore_schema': true
+  'dkan_ai_query:get_datastore_stats': true
+  'dkan_ai_query:sample_rows': true
+  'dkan_ai_query:distinct_values': true
+  'dkan_ai_query:search_columns': true
+  'dkan_ai_query:search_datasets': true
+  'dkan_ai_query:list_datasets': true
+  'dkan_ai_query:list_distributions': true
+  'dkan_ai_query:find_dataset_resources': true
+  'dkan_ai_query:create_chart': true
+  'dkan_ai_query:compute_stats': true
+  'dkan_ai_query:refuse': true
 tool_usage_limits: {  }
 tool_settings: {  }
 orchestration_agent: false

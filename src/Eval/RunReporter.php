@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Drupal\dkan_drupal_ai_query\Eval;
+namespace Drupal\dkan_ai_query\Eval;
 
 /**
  * Writes JSONL machine output and a Markdown human summary for an eval run.
@@ -12,7 +12,7 @@ class RunReporter {
   /**
    * Write JSONL and Markdown reports for an eval run.
    *
-   * @param \Drupal\dkan_drupal_ai_query\Eval\CaseResult[] $results
+   * @param \Drupal\dkan_ai_query\Eval\CaseResult[] $results
    *   Results to serialize.
    * @param string $outputDir
    *   Directory to write into. Created if missing.
@@ -46,7 +46,7 @@ class RunReporter {
   /**
    * Compute aggregate counts and rates for a set of results.
    *
-   * @param \Drupal\dkan_drupal_ai_query\Eval\CaseResult[] $results
+   * @param \Drupal\dkan_ai_query\Eval\CaseResult[] $results
    *   Results to summarize.
    *
    * @return array
@@ -80,7 +80,7 @@ class RunReporter {
   /**
    * Render the human-readable Markdown summary.
    *
-   * @param \Drupal\dkan_drupal_ai_query\Eval\CaseResult[] $results
+   * @param \Drupal\dkan_ai_query\Eval\CaseResult[] $results
    *   Results to render.
    * @param string $runLabel
    *   Run label, used in the document title.

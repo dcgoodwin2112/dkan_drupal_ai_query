@@ -20,7 +20,7 @@ prompts/
 
 ## Runtime mechanism
 
-1. `dkan_drupal_ai_query_install()` writes the active `.md` body into the
+1. `dkan_ai_query_install()` writes the active `.md` body into the
    agent config entity's `system_prompt` field via `AgentPromptSync`.
 2. Each prompt-version bump ships a new `hook_update_N` that re-runs
    the same sync after the constant flips, keeping existing sites in
@@ -49,11 +49,11 @@ Then in `src/Service/SystemPromptLoader.php`:
 public const DEFAULT_VERSION = 'v5';
 ```
 
-Add a new update hook in `dkan_drupal_ai_query.install`:
+Add a new update hook in `dkan_ai_query.install`:
 
 ```php
-function dkan_drupal_ai_query_update_10007(): string {
-  return (string) \Drupal::service('dkan_drupal_ai_query.agent_prompt_sync')->sync()['message'];
+function dkan_ai_query_update_10007(): string {
+  return (string) \Drupal::service('dkan_ai_query.agent_prompt_sync')->sync()['message'];
 }
 ```
 

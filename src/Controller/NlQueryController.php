@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\dkan_drupal_ai_query\Controller;
+namespace Drupal\dkan_ai_query\Controller;
 
 use Drupal\ai\AiProviderPluginManager;
 use Drupal\ai\OperationType\Chat\ChatMessage;
@@ -10,13 +10,13 @@ use Drupal\ai_agents\Service\AgentStatus\Interfaces\AiAgentStatusPollerServiceIn
 use Drupal\ai_agents\Task\Task;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Session\AccountProxyInterface;
-use Drupal\dkan_drupal_ai_query\Service\ArtifactStorage;
-use Drupal\dkan_drupal_ai_query\Service\CatalogContextBuilder;
-use Drupal\dkan_drupal_ai_query\Service\ConversationStorage;
-use Drupal\dkan_drupal_ai_query\Service\RefusalCollector;
-use Drupal\dkan_drupal_ai_query\Service\SuggestionGenerator;
-use Drupal\dkan_drupal_ai_query\Service\SystemPromptLoader;
-use Drupal\dkan_drupal_ai_query\Service\UnknownColumnCounter;
+use Drupal\dkan_ai_query\Service\ArtifactStorage;
+use Drupal\dkan_ai_query\Service\CatalogContextBuilder;
+use Drupal\dkan_ai_query\Service\ConversationStorage;
+use Drupal\dkan_ai_query\Service\RefusalCollector;
+use Drupal\dkan_ai_query\Service\SuggestionGenerator;
+use Drupal\dkan_ai_query\Service\SystemPromptLoader;
+use Drupal\dkan_ai_query\Service\UnknownColumnCounter;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -100,7 +100,7 @@ class NlQueryController {
     }
     $this->artifacts->delete($threadId);
 
-    $debugLevel = (string) ($this->configFactory->get('dkan_drupal_ai_query.settings')->get('debug_log_level') ?? 'off');
+    $debugLevel = (string) ($this->configFactory->get('dkan_ai_query.settings')->get('debug_log_level') ?? 'off');
     if ($debugLevel === 'info' || $debugLevel === 'debug') {
       $this->logger->info('NL query start: thread=@t uid=@u question=@q', [
         '@t' => $threadId,
@@ -221,7 +221,7 @@ class NlQueryController {
     $this->unknownColumnCounter->forget($threadId);
 
     // Generate follow-up question chips when enabled and there's an answer.
-    $config = $this->configFactory->get('dkan_drupal_ai_query.settings');
+    $config = $this->configFactory->get('dkan_ai_query.settings');
     $suggestions = [];
     if (($config->get('show_follow_up_suggestions') ?? TRUE) && trim($answer) !== '') {
       $suggestions = $this->suggestions->generate($question, $answer);
@@ -275,7 +275,7 @@ class NlQueryController {
     if ($option !== '' && str_contains($option, '__')) {
       return explode('__', $option, 2);
     }
-    $configured = (string) ($this->configFactory->get('dkan_drupal_ai_query.settings')->get('default_model') ?? '');
+    $configured = (string) ($this->configFactory->get('dkan_ai_query.settings')->get('default_model') ?? '');
     if ($configured !== '' && str_contains($configured, '__')) {
       return explode('__', $configured, 2);
     }
@@ -310,7 +310,7 @@ class NlQueryController {
    * Owner-or-admin access check for a Conversation entity.
    */
   protected function canAccessConversation($conversation): bool {
-    if ($this->currentUser->hasPermission('administer dkan drupal ai query conversations')) {
+    if ($this->currentUser->hasPermission('administer dkan ai query conversations')) {
       return TRUE;
     }
     return (int) $conversation->get('uid')->target_id === (int) $this->currentUser->id();

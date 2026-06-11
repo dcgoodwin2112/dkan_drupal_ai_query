@@ -1,0 +1,6 @@
+dkan_ai_query_mock.picker:
+  title: 'Mock scenarios'
+  description: 'Pick which fixture the dkan_aiq_mock provider replays.'
+  parent: dkan_ai_query.admin
+  route_name: dkan_ai_query_mock.picker
+  weight: 10
