@@ -21,6 +21,9 @@ class SyncPromptCommand extends DrushCommands {
     parent::__construct();
   }
 
+  /**
+   * Instantiates the command from the container.
+   */
   public static function create(ContainerInterface $container): self {
     return new self(
       $container->get('dkan_ai_query.agent_prompt_sync'),

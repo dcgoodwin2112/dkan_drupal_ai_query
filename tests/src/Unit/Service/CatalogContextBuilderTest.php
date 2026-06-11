@@ -9,8 +9,16 @@ use Drupal\dkan_ai_query\Service\CatalogContextBuilder;
 use Drupal\dkan_query_tools\Tool\MetastoreTools;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Tests CatalogContextBuilder catalog snippet generation.
+ *
+ * @group dkan_ai_query
+ */
 class CatalogContextBuilderTest extends TestCase {
 
+  /**
+   * Builds an in-memory CacheBackendInterface mock.
+   */
   protected function buildCache(): CacheBackendInterface {
     $cache = $this->createMock(CacheBackendInterface::class);
     $store = [];
@@ -31,6 +39,9 @@ class CatalogContextBuilderTest extends TestCase {
     return $cache;
   }
 
+  /**
+   * Builds a MetastoreTools mock over datasets and distributions.
+   */
   protected function buildMetastore(array $datasets, ?int $totalOverride = NULL, array $distributionsByUuid = []): MetastoreTools {
     $metastore = $this->createMock(MetastoreTools::class);
     $metastore->method('listDatasets')->willReturnCallback(function (int $offset, int $limit) use ($datasets, $totalOverride) {
@@ -55,11 +66,17 @@ class CatalogContextBuilderTest extends TestCase {
     return $metastore;
   }
 
+  /**
+   * An empty catalog builds an empty string.
+   */
   public function testReturnsEmptyStringForEmptyCatalog(): void {
     $builder = new CatalogContextBuilder($this->buildMetastore([]), $this->buildCache());
     $this->assertSame('', $builder->build());
   }
 
+  /**
+   * Each dataset renders as a title/UUID line.
+   */
   public function testFormatsTitleAndUuidPerLine(): void {
     $builder = new CatalogContextBuilder(
       $this->buildMetastore([
@@ -74,6 +91,9 @@ class CatalogContextBuilderTest extends TestCase {
     $this->assertStringContainsString('"Asthma Prevalence" — uuid-2', $out);
   }
 
+  /**
+   * Catalogs above the cap truncate with a search hint.
+   */
   public function testTruncatesAboveMaxAndAddsHint(): void {
     $datasets = [];
     for ($i = 1; $i <= 60; $i++) {
@@ -88,6 +108,9 @@ class CatalogContextBuilderTest extends TestCase {
     $this->assertStringContainsString('search_datasets', $out);
   }
 
+  /**
+   * Build() hits the cache on subsequent calls.
+   */
   public function testCachesAcrossCalls(): void {
     $metastore = $this->createMock(MetastoreTools::class);
     $callCount = 0;
@@ -102,6 +125,9 @@ class CatalogContextBuilderTest extends TestCase {
     $this->assertSame(1, $callCount, 'Second build() must hit the cache, not the metastore');
   }
 
+  /**
+   * Invalidate() forces a rebuild from the metastore.
+   */
   public function testInvalidateForcesRebuild(): void {
     $metastore = $this->createMock(MetastoreTools::class);
     $callCount = 0;
@@ -116,6 +142,9 @@ class CatalogContextBuilderTest extends TestCase {
     $this->assertSame(2, $callCount);
   }
 
+  /**
+   * Metastore failures degrade to an empty string.
+   */
   public function testReturnsEmptyOnMetastoreFailure(): void {
     $metastore = $this->createMock(MetastoreTools::class);
     $metastore->method('listDatasets')->willThrowException(new \RuntimeException('boom'));
@@ -123,6 +152,9 @@ class CatalogContextBuilderTest extends TestCase {
     $this->assertSame('', $builder->build());
   }
 
+  /**
+   * Datasets without a UUID are skipped.
+   */
   public function testSkipsEntriesWithoutUuid(): void {
     $builder = new CatalogContextBuilder(
       $this->buildMetastore([
@@ -136,6 +168,9 @@ class CatalogContextBuilderTest extends TestCase {
     $this->assertStringContainsString('Has UUID', $out);
   }
 
+  /**
+   * Single-distribution datasets get their resource id inlined.
+   */
   public function testInlinesResourceIdForSingleDistributionDatasets(): void {
     $builder = new CatalogContextBuilder(
       $this->buildMetastore(
@@ -155,6 +190,9 @@ class CatalogContextBuilderTest extends TestCase {
     $this->assertStringContainsString('"Crime Data" — uuid-1 (data: rid-abc__1)', $out);
   }
 
+  /**
+   * Multi-distribution datasets show a file count instead.
+   */
   public function testShowsDistributionCountForMultiDistDatasets(): void {
     $builder = new CatalogContextBuilder(
       $this->buildMetastore([
@@ -167,6 +205,9 @@ class CatalogContextBuilderTest extends TestCase {
     $this->assertStringNotContainsString('data: ', $out);
   }
 
+  /**
+   * A missing resource id falls back to a plain line.
+   */
   public function testFallsBackToPlainLineWhenLookupReturnsNoResourceId(): void {
     $builder = new CatalogContextBuilder(
       $this->buildMetastore(
@@ -184,6 +225,9 @@ class CatalogContextBuilderTest extends TestCase {
     $this->assertStringNotContainsString('(data:', $out);
   }
 
+  /**
+   * A distribution lookup failure falls back to a plain line.
+   */
   public function testFallsBackToPlainLineWhenListDistributionsThrows(): void {
     $builder = new CatalogContextBuilder(
       $this->buildMetastore(
@@ -200,6 +244,9 @@ class CatalogContextBuilderTest extends TestCase {
     $this->assertStringNotContainsString('(data:', $out);
   }
 
+  /**
+   * Resource id inlining is capped at MAX_RESOURCE_INLINE.
+   */
   public function testCapsResourceIdInliningAtMaxResourceInline(): void {
     // 30 single-dist datasets — only the first 25 should get a resource_id
     // inlined; the rest appear as plain lines.
@@ -223,6 +270,9 @@ class CatalogContextBuilderTest extends TestCase {
     $this->assertStringNotContainsString('(data: rid-30', $out);
   }
 
+  /**
+   * Zero-distribution datasets get no suffix.
+   */
   public function testZeroDistributionDatasetGetsNoSuffix(): void {
     $builder = new CatalogContextBuilder(
       $this->buildMetastore([

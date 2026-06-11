@@ -8,15 +8,31 @@ use Drupal\dkan_ai_query\Eval\CaseResult;
 use Drupal\dkan_ai_query\Eval\RunReporter;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Tests RunReporter summaries and report file output.
+ *
+ * @group dkan_ai_query
+ */
 class RunReporterTest extends TestCase {
 
+  /**
+   * Throwaway temp directory for report output.
+   *
+   * @var string
+   */
   protected string $tmpDir;
 
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp(): void {
     $this->tmpDir = sys_get_temp_dir() . '/eval_reporter_' . bin2hex(random_bytes(4));
     mkdir($this->tmpDir);
   }
 
+  /**
+   * {@inheritdoc}
+   */
   protected function tearDown(): void {
     foreach (glob($this->tmpDir . '/*') as $f) {
       @unlink($f);
@@ -24,6 +40,9 @@ class RunReporterTest extends TestCase {
     @rmdir($this->tmpDir);
   }
 
+  /**
+   * Builds a CaseResult with the given outcome and category.
+   */
   protected function makeResult(string $id, string $outcome, ?string $cat = NULL): CaseResult {
     return new CaseResult(
       caseId: $id,
@@ -40,6 +59,9 @@ class RunReporterTest extends TestCase {
     );
   }
 
+  /**
+   * Summarize() reports totals, rates, and failure categories.
+   */
   public function testSummarizeCountsAndRates(): void {
     $results = [
       $this->makeResult('a', CaseResult::OUTCOME_PASS),
@@ -56,6 +78,9 @@ class RunReporterTest extends TestCase {
     $this->assertSame(['dsl_limitation' => 1, 'wrong_summary' => 1], $summary['by_failure_category']);
   }
 
+  /**
+   * Write() produces JSONL and Markdown report files.
+   */
   public function testWriteProducesJsonlAndMarkdown(): void {
     $results = [$this->makeResult('a', CaseResult::OUTCOME_PASS)];
     $paths = (new RunReporter())->write($results, $this->tmpDir, 'test');
@@ -74,6 +99,9 @@ class RunReporterTest extends TestCase {
     $this->assertStringContainsString('Pass rate: 100.0%', $md);
   }
 
+  /**
+   * An empty result set summarizes to zero counts and rates.
+   */
   public function testEmptyResultsHandledCleanly(): void {
     $summary = (new RunReporter())->summarize([]);
     $this->assertSame(0, $summary['total']);

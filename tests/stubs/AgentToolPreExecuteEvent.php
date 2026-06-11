@@ -19,14 +19,23 @@ class AgentToolPreExecuteEvent {
     protected string $runnerId = '',
   ) {}
 
+  /**
+   * Returns the thread id.
+   */
   public function getThreadId(): string {
     return $this->threadId;
   }
 
+  /**
+   * Returns the runner id, falling back to the thread id.
+   */
   public function getAgentRunnerId(): string {
     return $this->runnerId !== '' ? $this->runnerId : $this->threadId;
   }
 
+  /**
+   * Returns the tool object.
+   */
   public function getTool(): mixed {
     return $this->tool;
   }

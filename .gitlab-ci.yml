@@ -1,0 +1,52 @@
+################################################################################
+# GitLab CI for dkan_ai_query.
+#
+# Uses the Drupal Association's contrib pipeline templates (same setup as the
+# sibling dkan_mcp_server project), so phpcs / phpstan / phpunit / eslint /
+# stylelint stay in step with core development automatically. Full activation
+# happens when the project moves to drupal.org GitLab; this file is authored
+# against that template now so the move is a no-op.
+#
+# Gates (config lives beside this file):
+#   - phpcs     -> phpcs.xml.dist     (Drupal + DrupalPractice, php/yml only)
+#   - phpstan   -> phpstan.neon.dist  (level 1, drupal extension)
+#   - phpunit   -> standalone stub-based unit suites (see job overrides below)
+#   - eslint /  -> core's configs against js/ and css/ (not skipped; this
+#     stylelint    module ships JS + CSS, unlike dkan_mcp_server)
+################################################################################
+
+include:
+  - project: $_GITLAB_TEMPLATES_REPO
+    ref: $_GITLAB_TEMPLATES_REF
+    file:
+      - '/includes/include.drupalci.main.yml'
+      - '/includes/include.drupalci.variables.yml'
+      - '/includes/include.drupalci.workflows.yml'
+
+variables:
+  # Spell-check dictionary for the cspell job (domain + dependency jargon).
+  # Extend on the first real pipeline run if cspell surfaces more terms.
+  _CSPELL_WORDS: 'artefacts, behaviour, bsubquer, conv, curlinfo, curlopt, customrequest, cweagans, ddev, dists, dkan, docroot, drupalci, drupalcode, drush, eslint, fulltext, getdkan, getinfo, gmdate, httpheader, inlines, isset, langcode, linecap, linejoin, mtimes, neon, nonjson, noopener, noreferrer, normalised, normalises, nums, olivero, opcache, opis, phpcbf, phpcs, phpstan, phpunit, postfields, punct, renderable, reqs, restringify, returntransfer, scorable, segs, setopt, sprintf, stddev, structurer, stylelint, tempstore, textareas, tmpl, updb, usleep, xyzzy, yorba'
+  # Eval run artifacts and versioned system prompts are model output / model
+  # input, not prose to spell-check; the mock fixtures are harvested data.
+  _CSPELL_IGNORE_PATHS: 'tests/eval/**, prompts/**, modules/dkan_ai_query_mock/fixtures/**'
+  # Core compatibility follows drupal/ai 1.3 (^10.5 || ^11.2); next-minor /
+  # next-major core opt-ins are left off until the baseline pipeline is green
+  # on drupal.org. Enable OPT_IN_TEST_NEXT_MINOR once verified there.
+
+# Both unit suites are standalone: stub-based, with their own bootstraps, no
+# Drupal kernel. The template default ('--all') would point phpunit at the
+# module folder under core's bootstrap, where the stubs collide with the real
+# classes. Swap the test command; the built environment comes from the
+# template's phpunit job.
+phpunit:
+  script:
+    # Path/binary come from the template (the module folder + composer bin
+    # dir); verify these on the first drupal.org run.
+    - $COMPOSER_BIN_DIR/phpunit -c $DRUPAL_PROJECT_FOLDER/phpunit.xml
+
+# The bundled mock AI provider submodule has its own standalone suite.
+'phpunit (dkan_ai_query_mock)':
+  extends: phpunit
+  script:
+    - $COMPOSER_BIN_DIR/phpunit -c $DRUPAL_PROJECT_FOLDER/modules/dkan_ai_query_mock/phpunit.xml

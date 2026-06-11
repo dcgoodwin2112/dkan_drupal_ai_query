@@ -13,9 +13,9 @@ use RootedData\Exception\ValidationException;
  *
  * Backs the `query_datastore_raw` FunctionCall plugin: the agent passes a JSON
  * string in DKAN's documented DatastoreQuery DSL and we hand it to
- * \Drupal\dkan_datastore\Service\Query::runQuery() with no flat-tool transforms.
- * Lives in its own service so it can be unit-tested without booting the
- * FunctionCallBase plugin scaffold.
+ * \Drupal\dkan_datastore\Service\Query::runQuery() with no flat-tool
+ * transforms. Lives in its own service so it can be unit-tested without
+ * booting the FunctionCallBase plugin scaffold.
  *
  * Resource identifiers in `resources[].id` are passed through
  * ResourceIdResolver, so the agent may use either canonical

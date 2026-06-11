@@ -8,8 +8,16 @@ use Drupal\dkan_query_tools\Tool\MetastoreTools;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Tests ResourceIdResolver id, title, and UUID resolution.
+ *
+ * @group dkan_ai_query
+ */
 class ResourceIdResolverTest extends TestCase {
 
+  /**
+   * Builds a MetastoreTools mock over the given datasets.
+   */
   protected function buildMetastore(array $datasets, array $distributions = []): MetastoreTools {
     $metastore = $this->createMock(MetastoreTools::class);
     $metastore->method('listDatasets')->willReturnCallback(function (int $offset, int $limit) use ($datasets) {
@@ -22,6 +30,9 @@ class ResourceIdResolverTest extends TestCase {
     return $metastore;
   }
 
+  /**
+   * Builds a DatastoreTools mock with per-resource import status.
+   */
   protected function buildDatastore(array $statusByResourceId): DatastoreTools {
     $datastore = $this->createMock(DatastoreTools::class);
     $datastore->method('getImportStatus')->willReturnCallback(function (string $rid) use ($statusByResourceId) {
@@ -30,6 +41,9 @@ class ResourceIdResolverTest extends TestCase {
     return $datastore;
   }
 
+  /**
+   * Normalize() strips quotes and surrounding whitespace.
+   */
   public function testNormalizeStripsQuotes(): void {
     $this->assertEquals('abc__123', ResourceIdResolver::normalize('"abc__123"'));
     $this->assertEquals("abc__123", ResourceIdResolver::normalize("'abc__123'"));
@@ -37,6 +51,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertEquals('"', ResourceIdResolver::normalize('"'));
   }
 
+  /**
+   * A canonical resource id with a datastore resolves directly.
+   */
   public function testResolveDirectId(): void {
     $datasets = [['identifier' => 'd1', 'title' => 'D1']];
     $resolver = new ResourceIdResolver(
@@ -46,6 +63,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertEquals('abc__123', $resolver->resolve('abc__123'));
   }
 
+  /**
+   * A stale resource id resolves via its version suffix.
+   */
   public function testResolveByVersionSuffix(): void {
     $datasets = [['identifier' => 'd1', 'title' => 'D1']];
     $distributions = ['d1' => [['resource_id' => 'real__123', 'identifier' => 'dist1']]];
@@ -59,6 +79,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertEquals('real__123', $resolver->resolve('corrupted__123'));
   }
 
+  /**
+   * A stale resource id resolves via its identifier prefix.
+   */
   public function testResolveByIdentifierPrefix(): void {
     $datasets = [['identifier' => 'd1', 'title' => 'D1']];
     $distributions = ['d1' => [['resource_id' => 'abcdef0000__999', 'identifier' => 'dist1']]];
@@ -72,6 +95,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertEquals('abcdef0000__999', $resolver->resolve('abcdef9999__888'));
   }
 
+  /**
+   * A fuzzy dataset title resolves to its resource id.
+   */
   public function testResolveByDatasetTitle(): void {
     $datasets = [['identifier' => 'd1', 'title' => 'Shark Tagging']];
     $distributions = ['d1' => [['resource_id' => 'rid__1', 'identifier' => 'dist1']]];
@@ -82,6 +108,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertEquals('rid__1', $resolver->resolve('shark'));
   }
 
+  /**
+   * Resolve() returns NULL when nothing matches.
+   */
   public function testResolveReturnsNullOnMiss(): void {
     $resolver = new ResourceIdResolver(
       $this->buildMetastore([]),
@@ -91,6 +120,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertNull($resolver->resolve('Some unknown title'));
   }
 
+  /**
+   * ResolveDistributionUuid() maps a resource id to its distribution.
+   */
   public function testResolveDistributionUuid(): void {
     $datasets = [['identifier' => 'd1', 'title' => 'D1']];
     $distributions = ['d1' => [['resource_id' => 'rid__1', 'identifier' => 'dist-uuid-1']]];
@@ -101,6 +133,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertEquals('dist-uuid-1', $resolver->resolveDistributionUuid('rid__1'));
   }
 
+  /**
+   * Dataset listing pages past the first 100-item chunk.
+   */
   public function testGetAllDatasetsPaginatesPastSinglePage(): void {
     // Build 250 datasets so the resolver has to fetch 3 pages of 100.
     $datasets = [];
@@ -116,6 +151,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertEquals('late__999', $resolver->resolve('Dataset 249'));
   }
 
+  /**
+   * FindDatasetResources() errors on an empty title.
+   */
   public function testFindDatasetResourcesEmptyTitle(): void {
     $resolver = new ResourceIdResolver(
       $this->buildMetastore([]),
@@ -125,6 +163,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertArrayHasKey('error', $result);
   }
 
+  /**
+   * ResolveToDatasetUuid() accepts a dataset UUID directly.
+   */
   public function testResolveToDatasetUuidFromUuid(): void {
     $datasets = [
       ['identifier' => 'aaaa-1111', 'title' => 'Alpha'],
@@ -137,6 +178,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertEquals('bbbb-2222', $resolver->resolveToDatasetUuid('bbbb-2222'));
   }
 
+  /**
+   * ResolveToDatasetUuid() maps a resource id to its dataset.
+   */
   public function testResolveToDatasetUuidFromResourceId(): void {
     $datasets = [['identifier' => 'd1', 'title' => 'Crime']];
     $distributions = ['d1' => [['resource_id' => 'rid__1', 'identifier' => 'dist1']]];
@@ -147,6 +191,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertEquals('d1', $resolver->resolveToDatasetUuid('rid__1'));
   }
 
+  /**
+   * ResolveToDatasetUuid() resolves a fuzzy title.
+   */
   public function testResolveToDatasetUuidFromTitle(): void {
     $datasets = [['identifier' => 'd1', 'title' => 'Shark Tagging']];
     $distributions = ['d1' => [['resource_id' => 'rid__1', 'identifier' => 'dist1']]];
@@ -157,6 +204,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertEquals('d1', $resolver->resolveToDatasetUuid('shark'));
   }
 
+  /**
+   * ResolveToDatasetUuid() returns NULL when nothing matches.
+   */
   public function testResolveToDatasetUuidReturnsNullOnMiss(): void {
     $resolver = new ResourceIdResolver(
       $this->buildMetastore([]),
@@ -166,6 +216,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertNull($resolver->resolveToDatasetUuid('nope__123'));
   }
 
+  /**
+   * Ambiguous titles surface multiple_matches candidates.
+   */
   public function testFindDatasetResourcesReturnsMultipleMatchesOnAmbiguity(): void {
     // Two titles contain "asthma" — neither is an exact match for the
     // search term, so the resolver must surface both candidates rather
@@ -200,6 +253,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertArrayNotHasKey('distributions', $result);
   }
 
+  /**
+   * An exact title match beats partial matches.
+   */
   public function testFindDatasetResourcesExactMatchWinsOverPartial(): void {
     // The literal title "Asthma" should beat the substring match against
     // "Asthma Prevalence" — exact wins, so the result is unambiguous.
@@ -220,6 +276,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertSame('Asthma', $result['title']);
   }
 
+  /**
+   * The candidate list is capped while match_count stays exact.
+   */
   public function testFindDatasetResourcesCapsCandidateList(): void {
     // 8 datasets containing "set" but only the first 5 should appear in
     // the candidates list; match_count still reports the full total so
@@ -238,6 +297,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertSame(8, $result['match_count']);
   }
 
+  /**
+   * No matching title returns an error.
+   */
   public function testFindDatasetResourcesReturnsErrorWhenNothingMatches(): void {
     $datasets = [['identifier' => 'd1', 'title' => 'Crime Data']];
     $resolver = new ResourceIdResolver(
@@ -248,6 +310,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertArrayHasKey('error', $result);
   }
 
+  /**
+   * Resolve() returns NULL instead of guessing on ambiguity.
+   */
   public function testResolveReturnsNullWhenTitleIsAmbiguous(): void {
     // resolve() must NOT silently pick the first match — the whole
     // point of multiple_matches is to refuse a guess.
@@ -266,6 +331,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertNull($resolver->resolve('asthma'));
   }
 
+  /**
+   * ResolveToDatasetUuid() returns NULL on ambiguous titles.
+   */
   public function testResolveToDatasetUuidReturnsNullWhenTitleIsAmbiguous(): void {
     $datasets = [
       ['identifier' => 'd1', 'title' => 'Asthma Prevalence'],
@@ -278,6 +346,9 @@ class ResourceIdResolverTest extends TestCase {
     $this->assertNull($resolver->resolveToDatasetUuid('asthma'));
   }
 
+  /**
+   * A warning is logged when the dataset cap truncates the catalog.
+   */
   public function testLoggerWarningOnMaxDatasetsCap(): void {
     // Pretend the catalog is huge by reporting a total beyond the cap.
     $datasets = [];

@@ -13,10 +13,16 @@ use RootedData\Exception\ValidationException;
 use RootedData\RootedJsonData;
 
 /**
+ * Tests DatastoreRawQueryRunner payload validation and error shaping.
+ *
  * @covers \Drupal\dkan_ai_query\Service\DatastoreRawQueryRunner
+ * @group dkan_ai_query
  */
 class DatastoreRawQueryRunnerTest extends TestCase {
 
+  /**
+   * Builds a ResourceIdResolver mock from a resolution map.
+   */
   protected function buildResolver(array $resolutions): ResourceIdResolver {
     $resolver = $this->createMock(ResourceIdResolver::class);
     $resolver->method('resolve')->willReturnCallback(
@@ -25,12 +31,18 @@ class DatastoreRawQueryRunnerTest extends TestCase {
     return $resolver;
   }
 
+  /**
+   * Builds a Query mock returning the given result JSON.
+   */
   protected function buildQuery(string $resultJson = '{"results":[{"a":1}],"count":1}'): Query {
     $query = $this->createMock(Query::class);
     $query->method('runQuery')->willReturn(new RootedJsonData($resultJson));
     return $query;
   }
 
+  /**
+   * A blank payload returns an error.
+   */
   public function testEmptyPayloadReturnsError(): void {
     $runner = new DatastoreRawQueryRunner(
       $this->buildQuery(),
@@ -40,6 +52,9 @@ class DatastoreRawQueryRunnerTest extends TestCase {
     $this->assertSame(['error' => 'payload is required.'], $out);
   }
 
+  /**
+   * Malformed JSON returns an Invalid JSON error.
+   */
   public function testInvalidJsonReturnsError(): void {
     $runner = new DatastoreRawQueryRunner(
       $this->buildQuery(),
@@ -50,6 +65,9 @@ class DatastoreRawQueryRunnerTest extends TestCase {
     $this->assertStringStartsWith('Invalid JSON', $out['error']);
   }
 
+  /**
+   * Non-object JSON payloads are rejected.
+   */
   public function testNonObjectPayloadReturnsError(): void {
     $runner = new DatastoreRawQueryRunner(
       $this->buildQuery(),
@@ -59,6 +77,9 @@ class DatastoreRawQueryRunnerTest extends TestCase {
     $this->assertSame(['error' => 'Payload must be a JSON object.'], $runner->run('"a"'));
   }
 
+  /**
+   * A valid payload returns the runQuery() result.
+   */
   public function testValidPayloadReturnsRunQueryResult(): void {
     $runner = new DatastoreRawQueryRunner(
       $this->buildQuery('{"results":[{"x":1}],"count":1}'),
@@ -72,6 +93,9 @@ class DatastoreRawQueryRunnerTest extends TestCase {
     $this->assertSame(1, $out['count']);
   }
 
+  /**
+   * Fuzzy resource ids are resolved in place before querying.
+   */
   public function testFuzzyResourceIdIsResolvedInPlace(): void {
     $captured = NULL;
     $factory = function (string $json) use (&$captured): DatastoreQuery {
@@ -93,6 +117,9 @@ class DatastoreRawQueryRunnerTest extends TestCase {
     $this->assertSame('t', $decoded['resources'][0]['alias']);
   }
 
+  /**
+   * An unresolvable resource id returns an error.
+   */
   public function testUnresolvableResourceReturnsError(): void {
     $runner = new DatastoreRawQueryRunner(
       $this->buildQuery(),
@@ -105,6 +132,9 @@ class DatastoreRawQueryRunnerTest extends TestCase {
     $this->assertStringContainsString('Could not resolve resource', $out['error']);
   }
 
+  /**
+   * Resources must be a list of objects.
+   */
   public function testResourcesMustBeListOfObjects(): void {
     $runner = new DatastoreRawQueryRunner(
       $this->buildQuery(),
@@ -114,6 +144,9 @@ class DatastoreRawQueryRunnerTest extends TestCase {
     $this->assertSame(['error' => 'resources must be an array of {id, alias} objects.'], $out);
   }
 
+  /**
+   * A resource entry without an id returns an error.
+   */
   public function testResourceWithoutIdReturnsError(): void {
     $runner = new DatastoreRawQueryRunner(
       $this->buildQuery(),
@@ -124,6 +157,9 @@ class DatastoreRawQueryRunnerTest extends TestCase {
     $this->assertStringContainsString('resources[0]', $out['error']);
   }
 
+  /**
+   * Schema validation failures are formatted as validation_errors.
+   */
   public function testValidationErrorFormatsValidationErrors(): void {
     $error = new ValidationError(
       'bad',
@@ -153,6 +189,9 @@ class DatastoreRawQueryRunnerTest extends TestCase {
     $this->assertSame(['max' => 500], $out['validation_errors'][0]['args']);
   }
 
+  /**
+   * Exceptions from runQuery() surface as error payloads.
+   */
   public function testRunQueryThrowingReturnsError(): void {
     $query = $this->createMock(Query::class);
     $query->method('runQuery')->willThrowException(new \RuntimeException('storage missing'));

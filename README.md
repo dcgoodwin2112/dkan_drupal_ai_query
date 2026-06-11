@@ -2,6 +2,8 @@
 
 Natural-language query widget for DKAN datasets. Built on `drupal/ai` + `drupal/ai_agents` + `dkan_query_tools`. Polling-based architecture (long-blocking POST + 500 ms GET poll) aligned with the Drupal AI initiative's roadmap.
 
+Project page: <https://www.drupal.org/project/dkan_ai_query>
+
 ## Architecture
 
 ```
@@ -32,36 +34,46 @@ While `solve()` blocks server-side, `ai_agents` writes per-iteration status even
 
 ## Requirements
 
-- Drupal 10.5+ or 11
+- Drupal 10.5+ or 11.2+, PHP 8.3+
 - DKAN 4.1+ (`dkan_metastore`, `dkan_datastore` modules enabled)
 - `dkan_query_tools` module enabled — provides the catalog/datastore/search tool classes that the FunctionCall plugins call into. It ships as a submodule of the [dkan_mcp_server](https://www.drupal.org/project/dkan_mcp_server) project.
-- `drupal/ai` ^1.2 with `drupal/ai_agents` ^1.2
-- An AI provider module: `drupal/ai_provider_anthropic` and/or `drupal/ai_provider_openai`
+- `drupal/ai` ^1.3 with `drupal/ai_agents` ^1.2
+- An AI provider module: `drupal/ai_provider_anthropic` and/or `drupal/ai_provider_openai` (suggested, not required by Composer — install one explicitly)
 - API key for the chosen provider
+
+## Versioning
+
+This module uses 0.x semantic versioning while the API settles: **a minor bump
+(0.1 → 0.2) may contain breaking changes**; patch releases are fixes only.
+Composer's caret operator pins below 1.0 — `^0.1` will never pick up `0.2.0` —
+so moving to a new minor is always a deliberate constraint bump. Check the
+[release notes](https://www.drupal.org/project/dkan_ai_query) before bumping.
 
 ## Installing
 
-1. Pull in `dkan_query_tools` first. It ships inside the
+1. Require this module together with the `dkan_query_tools` dependency chain.
+   `dkan_query_tools` ships inside the
    [dkan_mcp_server](https://www.drupal.org/project/dkan_mcp_server) project:
 
    ```bash
-   composer require drupal/dkan_mcp_server:^1.0@alpha drupal/dkan_query_tools:^1.0@alpha drupal/mcp_server:2.x-dev
-   ddev drush en dkan_query_tools   # the query lib alone; does not enable the MCP server
+   composer require drupal/dkan_ai_query:^0.1 drupal/dkan_mcp_server:^1.0@alpha drupal/dkan_query_tools:^1.0@alpha drupal/mcp_server:2.x-dev
    ```
 
-   The explicit constraints matter: the alpha release depends on alpha/dev
-   packages (`drupal/dkan_query_tools`, `drupal/mcp_server 2.x-dev`), which
-   a default `minimum-stability: stable` root won't accept otherwise. Enable
-   only `dkan_query_tools` if you don't want the MCP server running.
+   The explicit constraints matter: this module depends on alpha/dev packages
+   (`drupal/dkan_mcp_server`, `drupal/dkan_query_tools`,
+   `drupal/mcp_server 2.x-dev`), which a default `minimum-stability: stable`
+   root won't accept otherwise.
 
-2. Make sure the Drupal AI stack is in place:
+2. Make sure the Drupal AI stack is in place, including an AI provider module
+   (this module suggests but does not require one):
 
    ```bash
    composer require drupal/ai drupal/ai_agents drupal/ai_provider_anthropic
    ddev drush en ai ai_agents ai_provider_anthropic
    ```
 
-3. Enable this module:
+3. Enable this module (`dkan_query_tools` is enabled with it as a dependency;
+   the MCP server module itself stays off unless you enable it):
 
    ```bash
    ddev drush en dkan_ai_query
@@ -227,14 +239,19 @@ returned by `DatastoreTools`) lives at
 
 ## Tests
 
-PHPUnit:
+Both unit suites are standalone (stub-based, no Drupal bootstrap). From the
+module directory, using any PHPUnit 10/11 (e.g. a site's `vendor/bin/phpunit`
+or the module's own after `composer install`):
 
 ```bash
-cd web/modules/custom/dkan_ai_query && ../../../vendor/bin/phpunit
+phpunit                                              # main suite
+phpunit -c modules/dkan_ai_query_mock/phpunit.xml    # mock submodule suite
 ```
 
-Lint (PHP only — JS sniffs in Drupal phpcs misfire on modern JS):
+Lint and static analysis use the bundled configs (`phpcs.xml.dist` is PHP/YAML
+only — JS and CSS are covered by core's eslint/stylelint in CI):
 
 ```bash
-ddev exec vendor/bin/phpcs --standard=Drupal,DrupalPractice --extensions=php,module web/modules/custom/dkan_ai_query/
+phpcs                          # Drupal + DrupalPractice
+phpstan analyse                # level 1
 ```

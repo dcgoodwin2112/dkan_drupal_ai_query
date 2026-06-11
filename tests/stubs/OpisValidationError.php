@@ -13,6 +13,11 @@ namespace Opis\JsonSchema;
  */
 final class ValidationError {
 
+  /**
+   * Full data pointer (parent pointer merged with the local one).
+   *
+   * @var array
+   */
   protected array $dataPointer;
 
   public function __construct(
@@ -27,18 +32,30 @@ final class ValidationError {
     $this->dataPointer = $parentDataPointer ? array_merge($parentDataPointer, $dataPointer) : $dataPointer;
   }
 
+  /**
+   * Returns the full data pointer.
+   */
   public function dataPointer(): array {
     return $this->dataPointer;
   }
 
+  /**
+   * Returns the failing schema keyword.
+   */
   public function keyword(): string {
     return $this->keyword;
   }
 
+  /**
+   * Returns the keyword arguments.
+   */
   public function keywordArgs(): array {
     return $this->keywordArgs;
   }
 
+  /**
+   * Returns the number of sub-errors.
+   */
   public function subErrorsCount(): int {
     return count($this->subErrors);
   }
