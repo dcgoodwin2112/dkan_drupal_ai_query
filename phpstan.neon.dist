@@ -1,0 +1,31 @@
+parameters:
+  level: 1
+  paths:
+    - src
+    - modules/dkan_ai_query_mock/src
+    - tests
+    - modules/dkan_ai_query_mock/tests
+  excludePaths:
+    # Deliberately minimal test doubles that mimic third-party classes (Opis,
+    # ai_agents, DKAN); they are not real implementations and are not meant to
+    # pass static analysis.
+    - tests/stubs/*
+  ignoreErrors:
+    # new static() is a best practice in Drupal, so we cannot fix that.
+    - "#^Unsafe usage of new static#"
+    # The unit suites run against intentionally simplified stand-ins for
+    # ai_agents and Opis classes, loaded by tests/bootstrap.php (which phpstan
+    # never runs). Checking those call sites against the real dependency
+    # surface produces false constructor/type mismatches.
+    - message: '#^Instantiated class FunctionCallStub not found\.$#'
+      path: tests/src/Unit/*
+    - message: '#^Class Drupal\\ai_agents\\Event\\AgentTool(PreExecute|FinishedExecution)Event constructor invoked with#'
+      path: tests/src/Unit/*
+    - message: '#invalid return type FunctionCallStub\.$#'
+      path: tests/src/Unit/*
+    - message: '#^Instantiated class Opis\\JsonSchema\\ValidationError not found\.$#'
+      path: tests/src/Unit/*
+    # Dev-only mock provider: \Drupal lookups keep it decoupled from
+    # AiProviderClientBase constructor churn across drupal/ai releases.
+    - message: '#\\Drupal calls should be avoided in classes#'
+      path: modules/dkan_ai_query_mock/src/Plugin/AiProvider/*

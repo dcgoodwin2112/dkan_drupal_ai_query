@@ -73,11 +73,11 @@
   // universal baseline; the rest are ordered by rough usage frequency among
   // DKAN's data-integration audience.
   const PLAYGROUND_CODE_LANGUAGES = [
-    { id: 'curl',   label: 'cURL',       copyLabel: 'Copy cURL' },
-    { id: 'httpie', label: 'HTTPie',     copyLabel: 'Copy HTTPie' },
-    { id: 'python', label: 'Python',     copyLabel: 'Copy Python' },
-    { id: 'js',     label: 'JavaScript', copyLabel: 'Copy JavaScript' },
-    { id: 'php',    label: 'PHP',        copyLabel: 'Copy PHP' },
+    { id: 'curl', label: 'cURL', copyLabel: 'Copy cURL' },
+    { id: 'httpie', label: 'HTTPie', copyLabel: 'Copy HTTPie' },
+    { id: 'python', label: 'Python', copyLabel: 'Copy Python' },
+    { id: 'js', label: 'JavaScript', copyLabel: 'Copy JavaScript' },
+    { id: 'php', label: 'PHP', copyLabel: 'Copy PHP' },
   ];
 
   // Cell text past this length is truncated in the table view; click expands.
@@ -130,16 +130,26 @@
   // for an analyst audience: what the tool reads, what it returns, and any
   // important constraint (e.g. "in the database").
   const TOOL_DESCRIPTIONS = {
-    query_datastore: 'Runs a structured query against one resource’s datastore table. Filters, sorts, and aggregations happen in the database; only matching rows come back.',
-    query_datastore_join: 'Runs a structured query that joins two datastore tables on a shared column. The join happens in the database; only matching rows come back.',
-    query_datastore_raw: 'Submits a raw DKAN DatastoreQuery payload — the agent reaches for this when the flat query tools can\'t express the shape (nested OR groups, three-way joins, compound expressions). Response shape matches the REST endpoint verbatim.',
-    sample_rows: 'Returns a small random sample of rows from the resource so you can eyeball the data.',
-    distinct_values: 'Lists the unique values that appear in one column of the resource.',
-    search_columns: 'Searches column names (and optionally descriptions) across all dataset resources to find columns matching your keyword.',
-    search_datasets: 'Searches the catalog by keyword and returns matching datasets with their identifier, title, description, and distribution count.',
-    list_datasets: 'Returns a page of datasets from the catalog so you can browse what is available.',
-    list_distributions: 'Lists the distributions — downloadable files or API endpoints — that belong to one dataset.',
-    get_datastore_schema: 'Returns the column definitions for one resource: name, type, and (when available) a description from the data dictionary.',
+    query_datastore:
+      'Runs a structured query against one resource’s datastore table. Filters, sorts, and aggregations happen in the database; only matching rows come back.',
+    query_datastore_join:
+      'Runs a structured query that joins two datastore tables on a shared column. The join happens in the database; only matching rows come back.',
+    query_datastore_raw:
+      "Submits a raw DKAN DatastoreQuery payload — the agent reaches for this when the flat query tools can't express the shape (nested OR groups, three-way joins, compound expressions). Response shape matches the REST endpoint verbatim.",
+    sample_rows:
+      'Returns a small random sample of rows from the resource so you can eyeball the data.',
+    distinct_values:
+      'Lists the unique values that appear in one column of the resource.',
+    search_columns:
+      'Searches column names (and optionally descriptions) across all dataset resources to find columns matching your keyword.',
+    search_datasets:
+      'Searches the catalog by keyword and returns matching datasets with their identifier, title, description, and distribution count.',
+    list_datasets:
+      'Returns a page of datasets from the catalog so you can browse what is available.',
+    list_distributions:
+      'Lists the distributions — downloadable files or API endpoints — that belong to one dataset.',
+    get_datastore_schema:
+      'Returns the column definitions for one resource: name, type, and (when available) a description from the data dictionary.',
   };
 
   // Friendly labels and intro blurbs for non-table tool calls surfaced in
@@ -153,11 +163,16 @@
   };
 
   const AUX_TOOL_DESCRIPTIONS = {
-    compute_stats: 'The agent computed these statistics from the query results above (median, stddev, quartiles, etc.).',
-    get_data_dictionary: 'Publisher-supplied field definitions for the resources the agent looked up.',
-    get_datastore_stats: 'Per-column stats the agent peeked at while planning the query — null counts, distinct values, min/max.',
-    get_datastore_schema: 'Column definitions the agent retrieved while planning the query — name, type, and (when available) description.',
-    distinct_values: 'Unique values for a single column the agent looked up while filtering or exploring.',
+    compute_stats:
+      'The agent computed these statistics from the query results above (median, stddev, quartiles, etc.).',
+    get_data_dictionary:
+      'Publisher-supplied field definitions for the resources the agent looked up.',
+    get_datastore_stats:
+      'Per-column stats the agent peeked at while planning the query — null counts, distinct values, min/max.',
+    get_datastore_schema:
+      'Column definitions the agent retrieved while planning the query — name, type, and (when available) description.',
+    distinct_values:
+      'Unique values for a single column the agent looked up while filtering or exploring.',
   };
 
   const PROV_LABELS = {
@@ -205,11 +220,9 @@
       if (a.type === 'data') {
         const t = a.tool || 'query_datastore';
         counts[t] = (counts[t] || 0) + 1;
-      }
-      else if (a.type === 'chart') {
+      } else if (a.type === 'chart') {
         chartCount++;
-      }
-      else if (a.type === 'aux_tool') {
+      } else if (a.type === 'aux_tool') {
         auxCount++;
       }
     });
@@ -223,21 +236,29 @@
       phrases.push(chartCount + ' chart' + (chartCount === 1 ? '' : 's'));
     }
     if (auxCount) {
-      phrases.push(auxCount + ' supporting lookup' + (auxCount === 1 ? '' : 's'));
+      phrases.push(
+        auxCount + ' supporting lookup' + (auxCount === 1 ? '' : 's'),
+      );
     }
     if (!phrases.length) return null;
     let joined;
     if (phrases.length === 1) joined = phrases[0];
     else if (phrases.length === 2) joined = phrases[0] + ' and ' + phrases[1];
-    else joined = phrases.slice(0, -1).join(', ') + ', and ' + phrases[phrases.length - 1];
+    else
+      joined =
+        phrases.slice(0, -1).join(', ') +
+        ', and ' +
+        phrases[phrases.length - 1];
     return 'Answered using ' + joined + '.';
   }
 
   Drupal.behaviors.dkanAiQueryWidget = {
     attach: function (context) {
-      once('dkan-aiq-widget', '.dkan-aiq-widget', context).forEach(function (root) {
-        new Widget(root).init();
-      });
+      once('dkan-aiq-widget', '.dkan-aiq-widget', context).forEach(
+        function (root) {
+          new Widget(root).init();
+        },
+      );
     },
   };
 
@@ -248,8 +269,10 @@
     this.root = root;
     const settings = drupalSettings.dkanAiQuery || {};
     this.settings = settings;
-    this.datasetId = root.getAttribute('data-dataset-id') || settings.datasetId || '';
-    this.historyEnabled = !!settings.saveChatHistory && !!settings.userAuthenticated;
+    this.datasetId =
+      root.getAttribute('data-dataset-id') || settings.datasetId || '';
+    this.historyEnabled =
+      !!settings.saveChatHistory && !!settings.userAuthenticated;
     this.currentConversationId = null;
     this.activeRun = null;
     this.datasetMap = {};
@@ -323,7 +346,9 @@
 
   Widget.prototype.init = function () {
     this.applyVisibilityToggles();
-    this.defaultPlaceholder = this.dom.input ? (this.dom.input.placeholder || '') : '';
+    this.defaultPlaceholder = this.dom.input
+      ? this.dom.input.placeholder || ''
+      : '';
     this.defaultExamplesHtml = this.dom.examplesContainer
       ? this.dom.examplesContainer.innerHTML
       : '';
@@ -346,27 +371,28 @@
     this.updateThreadHeader();
     if (!this.datasetId) {
       this.populateDatasetSelector();
-    }
-    else if (this.historyEnabled) {
+    } else if (this.historyEnabled) {
       // Single-dataset mode: still need the dataset map for sidebar labels.
       this.fetchDatasetMap();
     }
   };
 
   Widget.prototype.fetchDatasetMap = function () {
-    fetchAllDatasets()
-      .then((datasets) => {
-        datasets.forEach((ds) => {
-          if (ds && ds.identifier) {
-            this.datasetMap[ds.identifier] = ds.title || ds.identifier;
-          }
-        });
-        if (this.cachedConversations.length) {
-          // Re-render with already-loaded conversations + current pagination
-          // total so the dataset labels (now in datasetMap) appear.
-          this.renderSidebar({ items: this.cachedConversations.slice(), total: this.sidebarTotal }, false);
+    fetchAllDatasets().then((datasets) => {
+      datasets.forEach((ds) => {
+        if (ds && ds.identifier) {
+          this.datasetMap[ds.identifier] = ds.title || ds.identifier;
         }
       });
+      if (this.cachedConversations.length) {
+        // Re-render with already-loaded conversations + current pagination
+        // total so the dataset labels (now in datasetMap) appear.
+        this.renderSidebar(
+          { items: this.cachedConversations.slice(), total: this.sidebarTotal },
+          false,
+        );
+      }
+    });
   };
 
   Widget.prototype.applyVisibilityToggles = function () {
@@ -411,44 +437,51 @@
       groups[providerId].push(value);
     });
     const defaultValue = this.settings.defaultModel || '';
-    Object.keys(groups).sort().forEach((providerId) => {
-      const group = document.createElement('optgroup');
-      group.label = providerId.charAt(0).toUpperCase() + providerId.slice(1);
-      groups[providerId].forEach((value) => {
-        const opt = document.createElement('option');
-        opt.value = value;
-        opt.textContent = models[value].replace(providerId.charAt(0).toUpperCase() + providerId.slice(1) + ' - ', '');
-        if (value === defaultValue) {
-          opt.selected = true;
-        }
-        group.appendChild(opt);
+    Object.keys(groups)
+      .sort()
+      .forEach((providerId) => {
+        const group = document.createElement('optgroup');
+        group.label = providerId.charAt(0).toUpperCase() + providerId.slice(1);
+        groups[providerId].forEach((value) => {
+          const opt = document.createElement('option');
+          opt.value = value;
+          opt.textContent = models[value].replace(
+            providerId.charAt(0).toUpperCase() + providerId.slice(1) + ' - ',
+            '',
+          );
+          if (value === defaultValue) {
+            opt.selected = true;
+          }
+          group.appendChild(opt);
+        });
+        this.dom.modelSelect.appendChild(group);
       });
-      this.dom.modelSelect.appendChild(group);
-    });
   };
 
   Widget.prototype.populateDatasetSelector = function () {
     if (!this.dom.datasetSelect) {
       return;
     }
-    fetchAllDatasets()
-      .then((datasets) => {
-        datasets.forEach((ds) => {
-          if (!ds || !ds.identifier) {
-            return;
-          }
-          this.datasetMap[ds.identifier] = ds.title || ds.identifier;
-          const opt = document.createElement('option');
-          opt.value = ds.identifier;
-          opt.textContent = ds.title || ds.identifier;
-          this.dom.datasetSelect.appendChild(opt);
-        });
-        if (this.cachedConversations.length) {
-          // Re-render with already-loaded conversations + current pagination
-          // total so the dataset labels (now in datasetMap) appear.
-          this.renderSidebar({ items: this.cachedConversations.slice(), total: this.sidebarTotal }, false);
+    fetchAllDatasets().then((datasets) => {
+      datasets.forEach((ds) => {
+        if (!ds || !ds.identifier) {
+          return;
         }
+        this.datasetMap[ds.identifier] = ds.title || ds.identifier;
+        const opt = document.createElement('option');
+        opt.value = ds.identifier;
+        opt.textContent = ds.title || ds.identifier;
+        this.dom.datasetSelect.appendChild(opt);
       });
+      if (this.cachedConversations.length) {
+        // Re-render with already-loaded conversations + current pagination
+        // total so the dataset labels (now in datasetMap) appear.
+        this.renderSidebar(
+          { items: this.cachedConversations.slice(), total: this.sidebarTotal },
+          false,
+        );
+      }
+    });
   };
 
   /**
@@ -466,8 +499,12 @@
       return csrfTokenPromise;
     }
     csrfTokenPromise = fetch('/session/token', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.text() : ''; })
-      .catch(function () { return ''; });
+      .then(function (r) {
+        return r.ok ? r.text() : '';
+      })
+      .catch(function () {
+        return '';
+      });
     return csrfTokenPromise;
   }
 
@@ -482,10 +519,18 @@
     const PAGE_SIZE = 100;
     const out = [];
     function loadPage(offset) {
-      return fetch('/api/1/metastore/schemas/dataset/items?limit=' + PAGE_SIZE + '&offset=' + offset, {
-        credentials: 'same-origin',
-      })
-        .then(function (r) { return r.ok ? r.json() : []; })
+      return fetch(
+        '/api/1/metastore/schemas/dataset/items?limit=' +
+          PAGE_SIZE +
+          '&offset=' +
+          offset,
+        {
+          credentials: 'same-origin',
+        },
+      )
+        .then(function (r) {
+          return r.ok ? r.json() : [];
+        })
         .then(function (page) {
           if (!Array.isArray(page) || page.length === 0) {
             return out;
@@ -498,7 +543,9 @@
           }
           return loadPage(offset + page.length);
         })
-        .catch(function () { return out; });
+        .catch(function () {
+          return out;
+        });
     }
     return loadPage(0);
   }
@@ -515,7 +562,8 @@
     // Auto-resize textarea.
     this.dom.input.addEventListener('input', () => {
       this.dom.input.style.height = 'auto';
-      this.dom.input.style.height = Math.min(this.dom.input.scrollHeight, 200) + 'px';
+      this.dom.input.style.height =
+        Math.min(this.dom.input.scrollHeight, 200) + 'px';
     });
   };
 
@@ -523,12 +571,14 @@
     if (!this.dom.examplesContainer) {
       return;
     }
-    this.dom.examplesContainer.querySelectorAll('.dkan-aiq-example').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const q = btn.getAttribute('data-question') || btn.textContent;
-        this.askQuestion(q);
+    this.dom.examplesContainer
+      .querySelectorAll('.dkan-aiq-example')
+      .forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const q = btn.getAttribute('data-question') || btn.textContent;
+          this.askQuestion(q);
+        });
       });
-    });
   };
 
   Widget.prototype.resetExamplesToDefault = function () {
@@ -580,10 +630,12 @@
     // re-type to re-apply. Server-side search is intentionally out of scope.
     this.dom.sidebarSearch.addEventListener('input', () => {
       const term = this.dom.sidebarSearch.value.toLowerCase();
-      this.dom.sidebarList.querySelectorAll('.dkan-aiq-sidebar-entry').forEach((item) => {
-        const title = item.getAttribute('data-title') || '';
-        item.style.display = title.toLowerCase().includes(term) ? '' : 'none';
-      });
+      this.dom.sidebarList
+        .querySelectorAll('.dkan-aiq-sidebar-entry')
+        .forEach((item) => {
+          const title = item.getAttribute('data-title') || '';
+          item.style.display = title.toLowerCase().includes(term) ? '' : 'none';
+        });
     });
   };
 
@@ -592,12 +644,13 @@
       return;
     }
     const toggle = () => {
-      const collapsed = !this.dom.sidebar.classList.contains('dkan-aiq-sidebar--collapsed');
+      const collapsed = !this.dom.sidebar.classList.contains(
+        'dkan-aiq-sidebar--collapsed',
+      );
       this.setSidebarCollapsed(collapsed);
       try {
         localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
-      }
-      catch (e) {
+      } catch (e) {
         // Safari private mode can throw QuotaExceededError; collapse still works
         // for the current session, just not persisted.
       }
@@ -615,8 +668,7 @@
     let collapsed = false;
     try {
       collapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
-    }
-    catch (e) {
+    } catch (e) {
       // localStorage may be unavailable; default to expanded.
     }
     this.setSidebarCollapsed(collapsed);
@@ -628,10 +680,13 @@
     }
     this.dom.sidebar.classList.toggle('dkan-aiq-sidebar--collapsed', collapsed);
     if (this.dom.sidebarToggle) {
-      this.dom.sidebarToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      this.dom.sidebarToggle.setAttribute(
+        'aria-expanded',
+        collapsed ? 'false' : 'true',
+      );
       this.dom.sidebarToggle.setAttribute(
         'aria-label',
-        collapsed ? 'Expand history sidebar' : 'Collapse history sidebar'
+        collapsed ? 'Expand history sidebar' : 'Collapse history sidebar',
       );
     }
   };
@@ -641,12 +696,19 @@
       return;
     }
     this.sidebarOffset = 0;
-    fetch('/api/dkan-ai-query/conversations?offset=0&limit=' + SIDEBAR_PAGE_SIZE, {
-      headers: { 'Accept': 'application/json' },
-      credentials: 'same-origin',
-    })
-      .then(function (r) { return r.json(); })
-      .then((payload) => { this.renderSidebar(payload, false); })
+    fetch(
+      '/api/dkan-ai-query/conversations?offset=0&limit=' + SIDEBAR_PAGE_SIZE,
+      {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      },
+    )
+      .then(function (r) {
+        return r.json();
+      })
+      .then((payload) => {
+        this.renderSidebar(payload, false);
+      })
       .catch(() => {});
   };
 
@@ -655,11 +717,19 @@
       return;
     }
     const nextOffset = this.sidebarOffset + SIDEBAR_PAGE_SIZE;
-    fetch('/api/dkan-ai-query/conversations?offset=' + nextOffset + '&limit=' + SIDEBAR_PAGE_SIZE, {
-      headers: { 'Accept': 'application/json' },
-      credentials: 'same-origin',
-    })
-      .then(function (r) { return r.json(); })
+    fetch(
+      '/api/dkan-ai-query/conversations?offset=' +
+        nextOffset +
+        '&limit=' +
+        SIDEBAR_PAGE_SIZE,
+      {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      },
+    )
+      .then(function (r) {
+        return r.json();
+      })
       .then((payload) => {
         this.sidebarOffset = nextOffset;
         this.renderSidebar(payload, true);
@@ -668,10 +738,15 @@
   };
 
   Widget.prototype.renderSidebar = function (payload, append) {
-    const items = (payload && Array.isArray(payload.items)) ? payload.items : [];
-    this.sidebarTotal = (payload && typeof payload.total === 'number') ? payload.total : items.length;
+    const items = payload && Array.isArray(payload.items) ? payload.items : [];
+    this.sidebarTotal =
+      payload && typeof payload.total === 'number'
+        ? payload.total
+        : items.length;
 
-    const oldLoadMore = this.dom.sidebarList.querySelector('.dkan-aiq-sidebar-load-more');
+    const oldLoadMore = this.dom.sidebarList.querySelector(
+      '.dkan-aiq-sidebar-load-more',
+    );
     if (oldLoadMore) {
       oldLoadMore.remove();
     }
@@ -679,9 +754,10 @@
     if (!append) {
       this.cachedConversations = items.slice();
       this.dom.sidebarList.innerHTML = '';
-    }
-    else {
-      const empty = this.dom.sidebarList.querySelector('.dkan-aiq-sidebar-empty');
+    } else {
+      const empty = this.dom.sidebarList.querySelector(
+        '.dkan-aiq-sidebar-empty',
+      );
       if (empty) {
         empty.remove();
       }
@@ -693,8 +769,7 @@
       empty.className = 'dkan-aiq-sidebar-empty';
       empty.textContent = 'No conversations yet.';
       this.dom.sidebarList.appendChild(empty);
-    }
-    else {
+    } else {
       items.forEach((conv) => {
         this.dom.sidebarList.appendChild(this.buildSidebarEntry(conv));
       });
@@ -706,7 +781,9 @@
       btn.type = 'button';
       btn.className = 'dkan-aiq-sidebar-load-more';
       btn.textContent = 'Load more';
-      btn.addEventListener('click', () => { this.loadMoreSidebar(); });
+      btn.addEventListener('click', () => {
+        this.loadMoreSidebar();
+      });
       this.dom.sidebarList.appendChild(btn);
     }
 
@@ -725,8 +802,12 @@
       this.dom.sidebarRailSummary.setAttribute(
         'aria-label',
         total
-          ? 'Expand history sidebar (' + total + ' conversation' + (total !== 1 ? 's' : '') + ')'
-          : 'Expand history sidebar'
+          ? 'Expand history sidebar (' +
+              total +
+              ' conversation' +
+              (total !== 1 ? 's' : '') +
+              ')'
+          : 'Expand history sidebar',
       );
     }
 
@@ -738,10 +819,11 @@
       return;
     }
     if (loaded >= total) {
-      this.dom.sidebarFooter.textContent = total + ' conversation' + (total !== 1 ? 's' : '');
-    }
-    else {
-      this.dom.sidebarFooter.textContent = loaded + ' of ' + total + ' conversations';
+      this.dom.sidebarFooter.textContent =
+        total + ' conversation' + (total !== 1 ? 's' : '');
+    } else {
+      this.dom.sidebarFooter.textContent =
+        loaded + ' of ' + total + ' conversations';
     }
   };
 
@@ -774,7 +856,10 @@
     meta.className = 'dkan-aiq-sidebar-meta';
 
     const date = new Date(conv.changed * 1000);
-    const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const dateStr = date.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    });
     const dateSpan = document.createElement('span');
     dateSpan.textContent = dateStr;
     meta.appendChild(dateSpan);
@@ -789,11 +874,14 @@
     pinBtn.title = conv.pinned ? 'Unpin' : 'Pin';
     pinBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      ensureCsrfToken().then((token) => fetch('/api/dkan-ai-query/conversations/' + conv.id + '/pin', {
-        method: 'POST',
-        headers: { 'X-CSRF-Token': token },
-        credentials: 'same-origin',
-      }))
+      ensureCsrfToken()
+        .then((token) =>
+          fetch('/api/dkan-ai-query/conversations/' + conv.id + '/pin', {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': token },
+            credentials: 'same-origin',
+          }),
+        )
         .then((r) => r.json())
         .then((result) => {
           conv.pinned = !!result.pinned;
@@ -807,54 +895,68 @@
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
     delBtn.className = 'dkan-aiq-sidebar-delete';
-    delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+    delBtn.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
     delBtn.title = 'Delete';
     delBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (!window.confirm('Delete this conversation?')) {
         return;
       }
-      ensureCsrfToken().then((token) => fetch('/api/dkan-ai-query/conversations/' + conv.id, {
-        method: 'DELETE',
-        headers: { 'X-CSRF-Token': token },
-        credentials: 'same-origin',
-      })).then(() => {
-        this.cachedConversations = this.cachedConversations.filter((c) => c.id !== conv.id);
-        entry.remove();
-        if (this.currentConversationId === conv.id) {
-          this.currentConversationId = null;
-          this.dom.thread.innerHTML = '';
-          this.dom.input.placeholder = this.defaultPlaceholder;
-        }
-        if (this.sidebarTotal > 0) {
-          this.sidebarTotal -= 1;
-        }
-        this.sidebarHasMore = this.cachedConversations.length < this.sidebarTotal;
-        if (!this.sidebarHasMore) {
-          const btn = this.dom.sidebarList.querySelector('.dkan-aiq-sidebar-load-more');
-          if (btn) {
-            btn.remove();
+      ensureCsrfToken()
+        .then((token) =>
+          fetch('/api/dkan-ai-query/conversations/' + conv.id, {
+            method: 'DELETE',
+            headers: { 'X-CSRF-Token': token },
+            credentials: 'same-origin',
+          }),
+        )
+        .then(() => {
+          this.cachedConversations = this.cachedConversations.filter(
+            (c) => c.id !== conv.id,
+          );
+          entry.remove();
+          if (this.currentConversationId === conv.id) {
+            this.currentConversationId = null;
+            this.dom.thread.innerHTML = '';
+            this.dom.input.placeholder = this.defaultPlaceholder;
           }
-        }
-        this.updateSidebarFooter();
-      });
+          if (this.sidebarTotal > 0) {
+            this.sidebarTotal -= 1;
+          }
+          this.sidebarHasMore =
+            this.cachedConversations.length < this.sidebarTotal;
+          if (!this.sidebarHasMore) {
+            const btn = this.dom.sidebarList.querySelector(
+              '.dkan-aiq-sidebar-load-more',
+            );
+            if (btn) {
+              btn.remove();
+            }
+          }
+          this.updateSidebarFooter();
+        });
     });
     actions.appendChild(delBtn);
 
     meta.appendChild(actions);
     entry.appendChild(meta);
 
-    entry.addEventListener('click', () => { this.loadConversation(conv.id); });
+    entry.addEventListener('click', () => {
+      this.loadConversation(conv.id);
+    });
 
     return entry;
   };
 
   Widget.prototype.loadConversation = function (id) {
     fetch('/api/dkan-ai-query/conversations/' + id, {
-      headers: { 'Accept': 'application/json' },
+      headers: { Accept: 'application/json' },
       credentials: 'same-origin',
     })
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json();
+      })
       .then((full) => {
         this.currentConversationId = full.id;
         this.dom.thread.innerHTML = '';
@@ -878,11 +980,12 @@
         messages.forEach((m) => {
           if (m.role === 'user') {
             this.appendUserBubble(m.content);
-          }
-          else if (m.role === 'assistant') {
+          } else if (m.role === 'assistant') {
             const bubble = this.appendAssistantBubble();
             this.renderAssistantText(bubble, m.content);
-            (m.artifacts || []).forEach((a) => this.renderArtifactInBubble(bubble, a));
+            (m.artifacts || []).forEach((a) =>
+              this.renderArtifactInBubble(bubble, a),
+            );
             lastAssistantArtifacts = m.artifacts || [];
           }
         });
@@ -921,7 +1024,7 @@
       this.debugToolFinished({
         tool_name: a.tool_name || '',
         tool_results: a.tool_results || '',
-        tool_id: 'replay-' + (this.debugToolCount),
+        tool_id: 'replay-' + this.debugToolCount,
       });
     });
     this.debugFooter();
@@ -937,7 +1040,8 @@
       .forEach((el) => el.classList.add('dkan-aiq-refusal--historical'));
     this.appendUserBubble(question);
     const bubble = this.appendAssistantBubble();
-    const threadId = 'aiq-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    const threadId =
+      'aiq-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
     this.dom.input.value = '';
     this.dom.input.placeholder = this.followUpPlaceholder;
     this.dom.submit.disabled = true;
@@ -946,32 +1050,33 @@
 
     const seen = { events: 0, artifacts: 0 };
     let lastIterationText = '';
-    const renderText = () => this.renderAssistantText(bubble, lastIterationText);
+    const renderText = () =>
+      this.renderAssistantText(bubble, lastIterationText);
 
     const handleEvent = (ev) => {
       const t = ev.type || '';
       if (t === 'tool_started') {
-        const fb = ev.tool_feedback_message || ('Calling ' + (ev.tool_name || 'tool') + '…');
+        const fb =
+          ev.tool_feedback_message ||
+          'Calling ' + (ev.tool_name || 'tool') + '…';
         this.setStatus(fb);
         this.debugToolStarted(ev);
-      }
-      else if (t === 'tool_finished') {
+      } else if (t === 'tool_finished') {
         this.setStatus('Reading results…');
         this.debugToolFinished(ev);
-      }
-      else if (t === 'text_generated') {
+      } else if (t === 'text_generated') {
         lastIterationText = ev.text_response || '';
         renderText();
-      }
-      else if (t === 'agent_iteration') {
+      } else if (t === 'agent_iteration') {
         this.debugIteration(ev);
-      }
-      else if (t === 'ai_provider_response') {
+      } else if (t === 'ai_provider_response') {
         this.debugProviderResponse(ev);
       }
     };
 
-    const dataset = this.datasetId || (this.dom.datasetSelect ? this.dom.datasetSelect.value : '');
+    const dataset =
+      this.datasetId ||
+      (this.dom.datasetSelect ? this.dom.datasetSelect.value : '');
     const model = this.dom.modelSelect ? this.dom.modelSelect.value : '';
     const body = JSON.stringify({
       question: question,
@@ -983,10 +1088,12 @@
 
     const pollHandle = setInterval(() => {
       fetch('/api/dkan-ai-query/poll/' + encodeURIComponent(threadId), {
-        headers: { 'Accept': 'application/json' },
+        headers: { Accept: 'application/json' },
         credentials: 'same-origin',
       })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          return r.json();
+        })
         .then((json) => {
           const events = json.events || [];
           for (let i = seen.events; i < events.length; i++) {
@@ -1004,18 +1111,23 @@
     }, POLL_INTERVAL_MS);
     this.activeRun = pollHandle;
 
-    ensureCsrfToken().then((token) => fetch('/api/dkan-ai-query/start', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-CSRF-Token': token,
-      },
-      body: body,
-      credentials: 'same-origin',
-    }))
+    ensureCsrfToken()
+      .then((token) =>
+        fetch('/api/dkan-ai-query/start', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-Token': token,
+          },
+          body: body,
+          credentials: 'same-origin',
+        }),
+      )
       .then(function (r) {
-        return r.json().then(function (j) { return { ok: r.ok, body: j }; });
+        return r.json().then(function (j) {
+          return { ok: r.ok, body: j };
+        });
       })
       .then((resp) => {
         clearInterval(pollHandle);
@@ -1038,16 +1150,23 @@
           // Refusal artifacts already render their own card via polling, so
           // don't show "(no answer)" on top of one.
           const hasRefusal = !!bubble.querySelector('.dkan-aiq-refusal');
-          this.renderAssistantText(bubble, resp.body.answer || lastIterationText || (hasRefusal ? '' : '(no answer)'));
+          this.renderAssistantText(
+            bubble,
+            resp.body.answer ||
+              lastIterationText ||
+              (hasRefusal ? '' : '(no answer)'),
+          );
           if (resp.body.conversation_id) {
             this.currentConversationId = resp.body.conversation_id;
             this.refreshSidebar();
           }
-          if (this.settings.showFollowUpSuggestions !== false && Array.isArray(resp.body.suggestions)) {
+          if (
+            this.settings.showFollowUpSuggestions !== false &&
+            Array.isArray(resp.body.suggestions)
+          ) {
             this.renderFollowUpSuggestions(resp.body.suggestions);
           }
-        }
-        else {
+        } else {
           this.dom.error.textContent = resp.body.error || 'An error occurred.';
           this.dom.error.hidden = false;
           if (bubble.parentElement) {
@@ -1078,8 +1197,7 @@
     if (msg) {
       this.dom.statusText.textContent = msg;
       this.dom.status.hidden = false;
-    }
-    else {
+    } else {
       this.dom.status.hidden = true;
       this.dom.statusText.textContent = '';
     }
@@ -1121,8 +1239,7 @@
       try {
         textEl.innerHTML = window.marked.parse(text || '');
         return;
-      }
-      catch (e) {
+      } catch (e) {
         // fall through
       }
     }
@@ -1132,14 +1249,11 @@
   Widget.prototype.renderArtifactInBubble = function (bubble, artifact) {
     if (artifact.type === 'data') {
       this.renderTableInBubble(bubble, artifact);
-    }
-    else if (artifact.type === 'chart') {
+    } else if (artifact.type === 'chart') {
       this.renderChartInBubble(bubble, artifact);
-    }
-    else if (artifact.type === 'refusal') {
+    } else if (artifact.type === 'refusal') {
       this.renderRefusalInBubble(bubble, artifact);
-    }
-    else if (artifact.type === 'aux_tool') {
+    } else if (artifact.type === 'aux_tool') {
       // Admin-gated; defaults to off in QueryWidgetBlock so public widgets
       // stay clean. When on, the agent's behind-the-scenes tool calls
       // (compute_stats, data dictionary, column stats) get a collapsed
@@ -1153,7 +1267,11 @@
 
     // Track every domain-relevant artifact so the method-summary line above
     // the tables can recompute its phrasing as artifacts stream in.
-    if (artifact.type === 'data' || artifact.type === 'chart' || artifact.type === 'aux_tool') {
+    if (
+      artifact.type === 'data' ||
+      artifact.type === 'chart' ||
+      artifact.type === 'aux_tool'
+    ) {
       if (!bubble.__methodArtifacts) bubble.__methodArtifacts = [];
       bubble.__methodArtifacts.push(artifact);
       this.updateMethodSummary(bubble);
@@ -1168,9 +1286,10 @@
    */
   Widget.prototype.updateMethodSummary = function (bubble) {
     const artifacts = bubble.__methodArtifacts || [];
-    const text = (this.settings || {}).showMethodSummary === false
-      ? null
-      : buildMethodSummary(artifacts);
+    const text =
+      (this.settings || {}).showMethodSummary === false
+        ? null
+        : buildMethodSummary(artifacts);
     let line = bubble.querySelector(':scope > .dkan-aiq-method-summary');
     if (!text) {
       if (line) line.remove();
@@ -1184,8 +1303,7 @@
       const textEl = bubble.querySelector(':scope > .dkan-aiq-bubble-text');
       if (textEl && textEl.nextSibling) {
         bubble.insertBefore(line, textEl.nextSibling);
-      }
-      else {
+      } else {
         bubble.appendChild(line);
       }
     }
@@ -1204,7 +1322,10 @@
     // Admin escape hatch: when the umbrella toggle is off, suppress the
     // table for the simple-tool family entirely. Datastore queries always
     // render — they're the headline feature.
-    if (isSimpleTool && (this.settings || {}).showSimpleTableArtifacts === false) {
+    if (
+      isSimpleTool &&
+      (this.settings || {}).showSimpleTableArtifacts === false
+    ) {
       return;
     }
     // Honor the capture-time column hint (search_columns, list_datasets, etc.)
@@ -1213,8 +1334,7 @@
     let cols = [];
     if (Array.isArray(artifact.columns_hint) && artifact.columns_hint.length) {
       cols = artifact.columns_hint.slice();
-    }
-    else if (rows.length) {
+    } else if (rows.length) {
       cols = Object.keys(rows[0] || {});
     }
 
@@ -1245,17 +1365,38 @@
     // datastore-query tools. The structured `apiCall` itself is built for
     // every playground-eligible tool, so the playground sidebar can replay
     // simple-table tools (sample_rows, list_datasets, etc.) too.
-    const apiPrimary = input ? (input.distribution_uuid || input.resolved_resource_id || input.resource_id || '') : '';
-    const apiJoin = input ? (input.join_distribution_uuid || input.resolved_join_resource_id || input.join_resource_id || '') : '';
-    const sqlPrimary = (!isSimpleTool && input) ? (input.resolved_resource_id || input.resource_id || '') : '';
-    const sqlJoin = (!isSimpleTool && input) ? (input.resolved_join_resource_id || input.join_resource_id || '') : '';
-    const apiCall = (PLAYGROUND_ELIGIBLE_TOOLS.has(toolName) && input)
-      ? buildApiEquivalent(toolName, input, apiPrimary, apiJoin)
-      : null;
+    const apiPrimary = input
+      ? input.distribution_uuid ||
+        input.resolved_resource_id ||
+        input.resource_id ||
+        ''
+      : '';
+    const apiJoin = input
+      ? input.join_distribution_uuid ||
+        input.resolved_join_resource_id ||
+        input.join_resource_id ||
+        ''
+      : '';
+    const sqlPrimary =
+      !isSimpleTool && input
+        ? input.resolved_resource_id || input.resource_id || ''
+        : '';
+    const sqlJoin =
+      !isSimpleTool && input
+        ? input.resolved_join_resource_id || input.join_resource_id || ''
+        : '';
+    const apiCall =
+      PLAYGROUND_ELIGIBLE_TOOLS.has(toolName) && input
+        ? buildApiEquivalent(toolName, input, apiPrimary, apiJoin)
+        : null;
     // Inline text-panel preview only renders for the two query tools — for
     // other eligible tools the `apiCall` is consumed by the playground only.
-    const apiText = (!isSimpleTool && apiCall) ? formatApiEquivalent(apiCall) : null;
-    const sqlText = (!isSimpleTool && input) ? buildSqlEquivalent(toolName, input, sqlPrimary, sqlJoin) : null;
+    const apiText =
+      !isSimpleTool && apiCall ? formatApiEquivalent(apiCall) : null;
+    const sqlText =
+      !isSimpleTool && input
+        ? buildSqlEquivalent(toolName, input, sqlPrimary, sqlJoin)
+        : null;
 
     const container = document.createElement('div');
     container.className = 'dkan-aiq-table-container';
@@ -1285,7 +1426,8 @@
     if (cols.length) {
       const shape = document.createElement('span');
       shape.className = 'dkan-aiq-table-shape';
-      shape.textContent = cols.length + ' column' + (cols.length !== 1 ? 's' : '');
+      shape.textContent =
+        cols.length + ' column' + (cols.length !== 1 ? 's' : '');
       summary.appendChild(shape);
     }
 
@@ -1314,12 +1456,14 @@
     // we just pre-build the DOM nodes here (when the corresponding setting
     // is on) and hand them off to renderProvenancePanel.
     const showCopy = s.showCopyButtons !== false;
-    const apiNode = (apiText && s.showApiCall !== false)
-      ? buildApiPanelNode(apiText, apiPrimary, sqlPrimary, showCopy)
-      : null;
-    const sqlNode = (sqlText && s.showSql !== false)
-      ? buildSqlPanelNode(sqlText, apiPrimary, sqlPrimary, showCopy)
-      : null;
+    const apiNode =
+      apiText && s.showApiCall !== false
+        ? buildApiPanelNode(apiText, apiPrimary, sqlPrimary, showCopy)
+        : null;
+    const sqlNode =
+      sqlText && s.showSql !== false
+        ? buildSqlPanelNode(sqlText, apiPrimary, sqlPrimary, showCopy)
+        : null;
 
     let provBtn = null;
     let provLabel = null;
@@ -1339,7 +1483,9 @@
       csvBtn.type = 'button';
       csvBtn.className = 'dkan-aiq-csv-btn';
       csvBtn.textContent = 'Download CSV';
-      csvBtn.addEventListener('click', () => { downloadCsv(cols, rows); });
+      csvBtn.addEventListener('click', () => {
+        downloadCsv(cols, rows);
+      });
       actions.appendChild(csvBtn);
     }
 
@@ -1348,7 +1494,11 @@
     // admin toggle is on, and only when we have the captured input the
     // playground would replay. The button reuses the structured api-call
     // shape we already built above for the "Show API call" panel.
-    if (apiCall && s.showRestPlaygroundSidebar !== false && PLAYGROUND_ELIGIBLE_TOOLS.has(toolName)) {
+    if (
+      apiCall &&
+      s.showRestPlaygroundSidebar !== false &&
+      PLAYGROUND_ELIGIBLE_TOOLS.has(toolName)
+    ) {
       const playgroundBtn = document.createElement('button');
       playgroundBtn.type = 'button';
       playgroundBtn.className = 'dkan-aiq-playground-btn';
@@ -1382,7 +1532,9 @@
       provBtn.addEventListener('click', () => {
         const isHidden = provWrap.hidden;
         provWrap.hidden = !isHidden;
-        provLabel.nodeValue = isHidden ? ' Hide result details' : ' Show result details';
+        provLabel.nodeValue = isHidden
+          ? ' Hide result details'
+          : ' Show result details';
         provBtn.classList.toggle('is-open', isHidden);
         provBtn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
         this.scrollToBottom();
@@ -1424,8 +1576,7 @@
         th.addEventListener('click', () => {
           if (sortCol === col) {
             sortAsc = !sortAsc;
-          }
-          else {
+          } else {
             sortCol = col;
             sortAsc = true;
           }
@@ -1437,7 +1588,9 @@
             if (!isNaN(na) && !isNaN(nb)) {
               return sortAsc ? na - nb : nb - na;
             }
-            return sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+            return sortAsc
+              ? String(va).localeCompare(String(vb))
+              : String(vb).localeCompare(String(va));
           });
           tableWrap.innerHTML = '';
           buildTable(sorted);
@@ -1461,10 +1614,11 @@
             td.textContent = text.slice(0, CELL_TRUNCATE_LEN) + '…';
             td.addEventListener('click', () => {
               const expanded = td.classList.toggle('dkan-aiq-cell-expanded');
-              td.textContent = expanded ? text : (text.slice(0, CELL_TRUNCATE_LEN) + '…');
+              td.textContent = expanded
+                ? text
+                : text.slice(0, CELL_TRUNCATE_LEN) + '…';
             });
-          }
-          else {
+          } else {
             td.textContent = text;
           }
           tr.appendChild(td);
@@ -1510,7 +1664,12 @@
    * consume this — render with `formatApiEquivalent()` for the existing
    * text-panel UI; pass straight to fetch() for the playground.
    */
-  function buildApiEquivalent(toolName, input, resolvedResourceId, resolvedJoinId) {
+  function buildApiEquivalent(
+    toolName,
+    input,
+    resolvedResourceId,
+    resolvedJoinId,
+  ) {
     // query_datastore_raw — translate the agent's payload into a
     // REST-faithful payload. Both the collection endpoint and the per-resource
     // endpoint expect distribution UUIDs in resources[].id (not the internal
@@ -1518,12 +1677,21 @@
     // input.distribution_uuid_map so we can rewrite each id at render time.
     if (toolName === 'query_datastore_raw') {
       let body = {};
-      const raw = (input && typeof input.payload === 'string') ? input.payload : '';
+      const raw =
+        input && typeof input.payload === 'string' ? input.payload : '';
       if (raw) {
-        try { body = JSON.parse(raw); }
-        catch (e) { body = { _parseError: e.message, _raw: raw }; }
+        try {
+          body = JSON.parse(raw);
+        } catch (e) {
+          body = { _parseError: e.message, _raw: raw };
+        }
       }
-      const uuidMap = (input && input.distribution_uuid_map && typeof input.distribution_uuid_map === 'object') ? input.distribution_uuid_map : {};
+      const uuidMap =
+        input &&
+        input.distribution_uuid_map &&
+        typeof input.distribution_uuid_map === 'object'
+          ? input.distribution_uuid_map
+          : {};
       if (body && Array.isArray(body.resources)) {
         body.resources = body.resources.map((r) => {
           if (!r || typeof r !== 'object') return r;
@@ -1568,7 +1736,11 @@
       const params = {};
       if (input.offset) params.offset = input.offset;
       if (input.limit) params.limit = input.limit;
-      return { method: 'GET', url: '/api/1/metastore/schemas/dataset/items', body: params };
+      return {
+        method: 'GET',
+        url: '/api/1/metastore/schemas/dataset/items',
+        body: params,
+      };
     }
     if (toolName === 'list_distributions') {
       // No direct REST endpoint; the tool walks distributions client-side
@@ -1616,7 +1788,10 @@
     if (toolName === 'distinct_values') {
       const dvId = resolvedResourceId || input.resource_id || '';
       const col = input.column || '';
-      const dvLimit = Math.max(1, Math.min(parseInt(input.limit, 10) || 50, 500));
+      const dvLimit = Math.max(
+        1,
+        Math.min(parseInt(input.limit, 10) || 50, 500),
+      );
       return {
         method: 'POST',
         url: '/api/1/datastore/query/' + dvId,
@@ -1653,12 +1828,24 @@
       // rejects `count(*)` ("Column not found") because operands must name
       // a real column. Exact null/distinct-count parity with the full tool
       // would require multiple round trips; that's the trade-off.
-      const cols = (input.columns || '').split(',').map(s => s.trim()).filter(Boolean);
+      const cols = (input.columns || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       const exprs = [];
       cols.forEach((c) => {
-        exprs.push({ expression: { operator: 'min', operands: [c] }, alias: c + '_min' });
-        exprs.push({ expression: { operator: 'max', operands: [c] }, alias: c + '_max' });
-        exprs.push({ expression: { operator: 'count', operands: [c] }, alias: c + '_count' });
+        exprs.push({
+          expression: { operator: 'min', operands: [c] },
+          alias: c + '_min',
+        });
+        exprs.push({
+          expression: { operator: 'max', operands: [c] },
+          alias: c + '_max',
+        });
+        exprs.push({
+          expression: { operator: 'count', operands: [c] },
+          alias: c + '_count',
+        });
       });
       return {
         method: 'POST',
@@ -1692,8 +1879,7 @@
         if (isJoin && col.indexOf('.') !== -1) {
           const parts = col.split('.');
           properties.push({ resource: parts[0], property: parts[1] });
-        }
-        else {
+        } else {
           properties.push(col);
         }
       });
@@ -1722,8 +1908,9 @@
             alias: expr.alias,
           });
         });
+      } catch (e) {
+        /* ignore */
       }
-      catch (e) { /* ignore */ }
     }
 
     if (properties.length) {
@@ -1733,8 +1920,7 @@
     if (input.conditions) {
       try {
         body.conditions = JSON.parse(input.conditions);
-      }
-      catch (e) {
+      } catch (e) {
         body.conditions = input.conditions;
       }
     }
@@ -1745,8 +1931,7 @@
         const sortParts = input.sort_field.split('.');
         sort.resource = sortParts[0];
         sort.property = sortParts[1];
-      }
-      else {
+      } else {
         sort.property = input.sort_field;
       }
       body.sorts = [sort];
@@ -1759,17 +1944,33 @@
           const parsed = JSON.parse(joinOn);
           const left = parseQualifiedField(parsed.left || '', 't');
           const right = parseQualifiedField(parsed.right || '', 'j');
-          body.joins = [{ resource: right.resource, condition: { resource: left.resource, property: left.property, value: right } }];
-        }
-        catch (e) {
+          body.joins = [
+            {
+              resource: right.resource,
+              condition: {
+                resource: left.resource,
+                property: left.property,
+                value: right,
+              },
+            },
+          ];
+        } catch (e) {
           body.joins = [{ raw: joinOn }];
         }
-      }
-      else if (joinOn.indexOf('=') !== -1) {
+      } else if (joinOn.indexOf('=') !== -1) {
         const eqParts = joinOn.split('=');
         const leftField = parseQualifiedField(eqParts[0].trim(), 't');
         const rightField = parseQualifiedField(eqParts[1].trim(), 'j');
-        body.joins = [{ resource: rightField.resource, condition: { resource: leftField.resource, property: leftField.property, value: rightField } }];
+        body.joins = [
+          {
+            resource: rightField.resource,
+            condition: {
+              resource: leftField.resource,
+              property: leftField.property,
+              value: rightField,
+            },
+          },
+        ];
       }
     }
 
@@ -1793,7 +1994,9 @@
    * can consume the structured form without re-parsing.
    */
   function formatApiEquivalent(api) {
-    return api.method + ' ' + api.url + '\n' + JSON.stringify(api.body, null, 2);
+    return (
+      api.method + ' ' + api.url + '\n' + JSON.stringify(api.body, null, 2)
+    );
   }
 
   /**
@@ -1824,33 +2027,47 @@
         const parsed = JSON.parse(raw);
         if (!parsed || !parsed.spec || !parsed.fetchedAt) return null;
         return parsed;
+      } catch (e) {
+        return null;
       }
-      catch (e) { return null; }
     }
 
     function writeStorage(payload) {
       try {
-        if (window.localStorage) localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        if (window.localStorage)
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (e) {
+        /* quota exceeded / disabled — ignore */
       }
-      catch (e) { /* quota exceeded / disabled — ignore */ }
     }
 
     function load() {
-      if (memCache && (Date.now() - memCache.fetchedAt) < TTL_MS) {
+      if (memCache && Date.now() - memCache.fetchedAt < TTL_MS) {
         return Promise.resolve(memCache.spec);
       }
       if (inFlight) return inFlight;
       const stored = readStorage();
-      const headers = stored && stored.etag ? { 'If-None-Match': stored.etag } : {};
-      inFlight = fetch(SPEC_URL, { headers: headers, credentials: 'same-origin' })
+      const headers =
+        stored && stored.etag ? { 'If-None-Match': stored.etag } : {};
+      inFlight = fetch(SPEC_URL, {
+        headers: headers,
+        credentials: 'same-origin',
+      })
         .then((res) => {
           if (res.status === 304 && stored) {
-            memCache = { spec: stored.spec, etag: stored.etag, fetchedAt: Date.now() };
+            memCache = {
+              spec: stored.spec,
+              etag: stored.etag,
+              fetchedAt: Date.now(),
+            };
             writeStorage(memCache);
             return memCache.spec;
           }
           if (!res.ok) {
-            if (stored) { memCache = stored; return stored.spec; }
+            if (stored) {
+              memCache = stored;
+              return stored.spec;
+            }
             return null;
           }
           const etag = res.headers.get('ETag') || null;
@@ -1861,15 +2078,22 @@
           });
         })
         .catch(() => {
-          if (stored) { memCache = stored; return stored.spec; }
+          if (stored) {
+            memCache = stored;
+            return stored.spec;
+          }
           return null;
         })
-        .then((spec) => { inFlight = null; return spec; });
+        .then((spec) => {
+          inFlight = null;
+          return spec;
+        });
       return inFlight;
     }
 
     function deref(spec, ref) {
-      if (!ref || typeof ref !== 'string' || ref.indexOf('#/') !== 0) return null;
+      if (!ref || typeof ref !== 'string' || ref.indexOf('#/') !== 0)
+        return null;
       const parts = ref.slice(2).split('/');
       let node = spec;
       for (let i = 0; i < parts.length; i++) {
@@ -1928,10 +2152,16 @@
         for (let i = 0; i < tmplParts.length; i++) {
           const t = tmplParts[i];
           if (t.charAt(0) === '{' && t.charAt(t.length - 1) === '}') {
-            if (!urlParts[i]) { ok = false; break; }
+            if (!urlParts[i]) {
+              ok = false;
+              break;
+            }
             continue;
           }
-          if (t !== urlParts[i]) { ok = false; break; }
+          if (t !== urlParts[i]) {
+            ok = false;
+            break;
+          }
           literals++;
         }
         if (ok && literals > bestLiterals) {
@@ -1976,7 +2206,8 @@
           if (schema && schema.properties) {
             const required = new Set(schema.required || []);
             for (const k in schema.properties) {
-              if (!Object.prototype.hasOwnProperty.call(schema.properties, k)) continue;
+              if (!Object.prototype.hasOwnProperty.call(schema.properties, k))
+                continue;
               const prop = schema.properties[k] || {};
               out.bodyProperties.push({
                 name: k,
@@ -1992,9 +2223,14 @@
     }
 
     return { load: load, describe: describe };
-  }());
+  })();
 
-  function buildSqlEquivalent(toolName, input, resolvedResourceId, resolvedJoinId) {
+  function buildSqlEquivalent(
+    toolName,
+    input,
+    resolvedResourceId,
+    resolvedJoinId,
+  ) {
     // SQL preview only applies to the two datastore-query tools. Anything
     // else (search, list, etc.) doesn't map to SQL, so return null and the
     // caller skips rendering the SQL panel.
@@ -2008,7 +2244,9 @@
 
     const selectCols = [];
     if (input.columns) {
-      input.columns.split(',').forEach((c) => { selectCols.push(c.trim()); });
+      input.columns.split(',').forEach((c) => {
+        selectCols.push(c.trim());
+      });
     }
     if (input.expressions) {
       try {
@@ -2025,36 +2263,36 @@
           }
           selectCols.push(exprStr);
         });
+      } catch (e) {
+        /* ignore */
       }
-      catch (e) { /* ignore */ }
     }
     parts.push('SELECT ' + (selectCols.length ? selectCols.join(', ') : '*'));
 
     // Prefer the physical table name resolved by the backend
     // (datastore_<md5>) over a name built from the resource id, which would
     // be wrong because the actual table uses md5(identifier__version__perspective).
-    const tableName = input.table_name || ('datastore_' + resourceId.replace(/-/g, '_'));
+    const tableName =
+      input.table_name || 'datastore_' + resourceId.replace(/-/g, '_');
     if (isJoin) {
       parts.push('FROM ' + tableName + ' AS t');
-    }
-    else {
+    } else {
       parts.push('FROM ' + tableName);
     }
 
     if (isJoin && input.join_on) {
-      const joinTable = input.join_table_name || ('datastore_' + joinId.replace(/-/g, '_'));
+      const joinTable =
+        input.join_table_name || 'datastore_' + joinId.replace(/-/g, '_');
       const joinOn = input.join_on.trim();
       let onClause = '';
       if (joinOn.charAt(0) === '{') {
         try {
           const parsed = JSON.parse(joinOn);
           onClause = (parsed.left || 't.id') + ' = ' + (parsed.right || 'j.id');
-        }
-        catch (e) {
+        } catch (e) {
           onClause = joinOn;
         }
-      }
-      else if (joinOn.indexOf('=') !== -1) {
+      } else if (joinOn.indexOf('=') !== -1) {
         const eqParts = joinOn.split('=');
         let left = eqParts[0].trim();
         let right = eqParts[1].trim();
@@ -2065,8 +2303,7 @@
           right = 'j.' + right;
         }
         onClause = left + ' = ' + right;
-      }
-      else {
+      } else {
         onClause = joinOn;
       }
       parts.push('JOIN ' + joinTable + ' AS j ON ' + onClause);
@@ -2090,8 +2327,12 @@
               return col + ' ' + op + ' ' + val;
             }
             if (op === 'IN' || op === 'NOT IN') {
-              const vals = Array.isArray(cond.value) ? cond.value : [cond.value];
-              const formatted = vals.map((v) => (typeof v === 'string' ? "'" + v.replace(/'/g, "''") + "'" : v));
+              const vals = Array.isArray(cond.value)
+                ? cond.value
+                : [cond.value];
+              const formatted = vals.map((v) =>
+                typeof v === 'string' ? "'" + v.replace(/'/g, "''") + "'" : v,
+              );
               return col + ' ' + op + ' (' + formatted.join(', ') + ')';
             }
             if (op === 'BETWEEN') {
@@ -2101,8 +2342,9 @@
           });
           parts.push('WHERE ' + whereClauses.join('\n  AND '));
         }
+      } catch (e) {
+        /* ignore */
       }
-      catch (e) { /* ignore */ }
     }
 
     if (input.groupings) {
@@ -2124,7 +2366,11 @@
   }
 
   function csvEscape(str) {
-    if (str.indexOf(',') !== -1 || str.indexOf('"') !== -1 || str.indexOf('\n') !== -1) {
+    if (
+      str.indexOf(',') !== -1 ||
+      str.indexOf('"') !== -1 ||
+      str.indexOf('\n') !== -1
+    ) {
       return '"' + str.replace(/"/g, '""') + '"';
     }
     return str;
@@ -2169,7 +2415,9 @@
       copy.addEventListener('click', () => {
         navigator.clipboard.writeText(apiText).then(() => {
           copy.textContent = 'Copied!';
-          setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
+          setTimeout(() => {
+            copy.textContent = 'Copy';
+          }, 1500);
         });
       });
       wrap.appendChild(copy);
@@ -2205,7 +2453,9 @@
       copy.addEventListener('click', () => {
         navigator.clipboard.writeText(sqlText).then(() => {
           copy.textContent = 'Copied!';
-          setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
+          setTimeout(() => {
+            copy.textContent = 'Copy';
+          }, 1500);
         });
       });
       wrap.appendChild(copy);
@@ -2235,8 +2485,7 @@
       const dd = document.createElement('dd');
       if (value instanceof Node) {
         dd.appendChild(value);
-      }
-      else {
+      } else {
         dd.textContent = value;
       }
       dl.appendChild(dd);
@@ -2248,11 +2497,14 @@
       // Best-effort localization for the headline; falls back to the raw ISO
       // string when the input isn't parseable.
       const parsed = new Date(prov.executed_at);
-      time.textContent = isNaN(parsed.getTime()) ? prov.executed_at : parsed.toLocaleString();
+      time.textContent = isNaN(parsed.getTime())
+        ? prov.executed_at
+        : parsed.toLocaleString();
       addRow(PROV_LABELS.executed_at, time);
     }
 
-    const friendlyTool = TOOL_FRIENDLY_NAMES[prov.tool] || prov.tool || '(unknown)';
+    const friendlyTool =
+      TOOL_FRIENDLY_NAMES[prov.tool] || prov.tool || '(unknown)';
     addRow(PROV_LABELS.tool, friendlyTool);
 
     if (prov.row_count != null) {
@@ -2274,8 +2526,13 @@
       if (flags.row_cap_hit) {
         sentences.push(SANITY_GLOSS.row_cap_hit);
       }
-      if (Array.isArray(flags.all_null_columns) && flags.all_null_columns.length) {
-        sentences.push(SANITY_GLOSS.all_null_columns + flags.all_null_columns.join(', '));
+      if (
+        Array.isArray(flags.all_null_columns) &&
+        flags.all_null_columns.length
+      ) {
+        sentences.push(
+          SANITY_GLOSS.all_null_columns + flags.all_null_columns.join(', '),
+        );
       }
       if (flags.coverage_warning) {
         sentences.push(SANITY_GLOSS.coverage_warning + flags.coverage_warning);
@@ -2328,10 +2585,14 @@
     const lines = [];
     lines.push(columns.map(csvEscape).join(','));
     rows.forEach((row) => {
-      lines.push(columns.map((col) => {
-        const v = row[col];
-        return csvEscape(v === null || v === undefined ? '' : String(v));
-      }).join(','));
+      lines.push(
+        columns
+          .map((col) => {
+            const v = row[col];
+            return csvEscape(v === null || v === undefined ? '' : String(v));
+          })
+          .join(','),
+      );
     });
     const csv = lines.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2365,15 +2626,23 @@
       if (typeof window.vegaEmbed === 'undefined') {
         return;
       }
-      window.vegaEmbed(wrap, spec, {
-        actions: { export: true, source: false, compiled: false, editor: false },
-        renderer: 'svg',
-      }).catch(function () { wrap.textContent = 'Chart render failed.'; });
+      window
+        .vegaEmbed(wrap, spec, {
+          actions: {
+            export: true,
+            source: false,
+            compiled: false,
+            editor: false,
+          },
+          renderer: 'svg',
+        })
+        .catch(function () {
+          wrap.textContent = 'Chart render failed.';
+        });
     };
     if (typeof window.vegaEmbed !== 'undefined') {
       tryRender();
-    }
-    else {
+    } else {
       // Vega scripts are still loading; try once they finish.
       const interval = setInterval(() => {
         if (typeof window.vegaEmbed !== 'undefined') {
@@ -2452,8 +2721,7 @@
       list.className = 'dkan-aiq-aux-list';
       outer.appendChild(list);
       bubble.appendChild(outer);
-    }
-    else {
+    } else {
       list = outer.querySelector('.dkan-aiq-aux-list');
     }
 
@@ -2462,13 +2730,12 @@
     // so the disclosure can render an "API playground" button alongside
     // the raw-output details.
     const s = this.settings || {};
-    const playgroundCb = (
-      s.showRestPlaygroundSidebar !== false
-      && PLAYGROUND_ELIGIBLE_TOOLS.has(artifact.tool)
-      && artifact.input
-    )
-      ? this.buildAuxPlaygroundCallback(artifact)
-      : null;
+    const playgroundCb =
+      s.showRestPlaygroundSidebar !== false &&
+      PLAYGROUND_ELIGIBLE_TOOLS.has(artifact.tool) &&
+      artifact.input
+        ? this.buildAuxPlaygroundCallback(artifact)
+        : null;
 
     const entry = buildAuxEntry(artifact, playgroundCb);
     list.appendChild(entry);
@@ -2493,7 +2760,11 @@
    */
   Widget.prototype.buildAuxPlaygroundCallback = function (artifact) {
     const inp = Object.assign({}, artifact.input || {});
-    if (artifact.tool === 'get_data_dictionary' && artifact.raw && artifact.raw.dictionaries) {
+    if (
+      artifact.tool === 'get_data_dictionary' &&
+      artifact.raw &&
+      artifact.raw.dictionaries
+    ) {
       // The tool resolves a data-dictionary identifier from the dataset/
       // distribution refs. Pluck the first one off the response so the
       // playground GETs the actual item rather than a placeholder URL.
@@ -2508,8 +2779,11 @@
     const apiCall = buildApiEquivalent(
       artifact.tool,
       inp,
-      inp.distribution_uuid || inp.resolved_resource_id || inp.resource_id || '',
-      ''
+      inp.distribution_uuid ||
+        inp.resolved_resource_id ||
+        inp.resource_id ||
+        '',
+      '',
     );
     if (!apiCall) {
       return null;
@@ -2538,7 +2812,8 @@
     entry.className = 'dkan-aiq-aux-entry';
 
     const friendly = AUX_TOOL_FRIENDLY_NAMES[artifact.tool] || artifact.tool;
-    const headline = (artifact.structured && artifact.structured.headline) || '';
+    const headline =
+      (artifact.structured && artifact.structured.headline) || '';
 
     const summary = document.createElement('summary');
     const name = document.createElement('span');
@@ -2637,10 +2912,12 @@
 
     const rows = Array.isArray(s.rows) ? s.rows : [];
     if (rows.length) {
-      wrap.appendChild(buildAuxMicroTable(
-        ['Operation', 'Column', 'Value', 'Rows skipped'],
-        rows.map((r) => [r.operation, r.column, r.value, r.rows_skipped])
-      ));
+      wrap.appendChild(
+        buildAuxMicroTable(
+          ['Operation', 'Column', 'Value', 'Rows skipped'],
+          rows.map((r) => [r.operation, r.column, r.value, r.rows_skipped]),
+        ),
+      );
     }
     return wrap;
   }
@@ -2663,18 +2940,19 @@
         link.rel = 'noopener noreferrer';
         link.textContent = d.title || d.resource_id;
         heading.appendChild(link);
-      }
-      else {
+      } else {
         heading.textContent = d.title || d.resource_id;
       }
       section.appendChild(heading);
 
       const fields = Array.isArray(d.fields) ? d.fields : [];
       if (fields.length) {
-        section.appendChild(buildAuxMicroTable(
-          ['Name', 'Title', 'Type', 'Description'],
-          fields.map((f) => [f.name, f.title, f.type, f.description])
-        ));
+        section.appendChild(
+          buildAuxMicroTable(
+            ['Name', 'Title', 'Type', 'Description'],
+            fields.map((f) => [f.name, f.title, f.type, f.description]),
+          ),
+        );
       }
       wrap.appendChild(section);
     });
@@ -2686,10 +2964,19 @@
     wrap.className = 'dkan-aiq-aux-body';
     const cols = Array.isArray(s.columns) ? s.columns : [];
     if (cols.length) {
-      wrap.appendChild(buildAuxMicroTable(
-        ['Column', 'Type', 'Nulls', 'Distinct', 'Min', 'Max'],
-        cols.map((c) => [c.name, c.type, c.null_count, c.distinct_count, c.min, c.max])
-      ));
+      wrap.appendChild(
+        buildAuxMicroTable(
+          ['Column', 'Type', 'Nulls', 'Distinct', 'Min', 'Max'],
+          cols.map((c) => [
+            c.name,
+            c.type,
+            c.null_count,
+            c.distinct_count,
+            c.min,
+            c.max,
+          ]),
+        ),
+      );
     }
     return wrap;
   }
@@ -2699,10 +2986,12 @@
     wrap.className = 'dkan-aiq-aux-body';
     const cols = Array.isArray(s.columns) ? s.columns : [];
     if (cols.length) {
-      wrap.appendChild(buildAuxMicroTable(
-        ['Column', 'Type', 'Description'],
-        cols.map((c) => [c.name, c.type, c.description])
-      ));
+      wrap.appendChild(
+        buildAuxMicroTable(
+          ['Column', 'Type', 'Description'],
+          cols.map((c) => [c.name, c.type, c.description]),
+        ),
+      );
     }
     return wrap;
   }
@@ -2712,10 +3001,12 @@
     wrap.className = 'dkan-aiq-aux-body';
     const values = Array.isArray(s.values) ? s.values : [];
     if (values.length) {
-      wrap.appendChild(buildAuxMicroTable(
-        ['Value'],
-        values.map((v) => [v])
-      ));
+      wrap.appendChild(
+        buildAuxMicroTable(
+          ['Value'],
+          values.map((v) => [v]),
+        ),
+      );
     }
     if (s.truncated) {
       const note = document.createElement('p');
@@ -2747,7 +3038,8 @@
       const tr = document.createElement('tr');
       row.forEach((cell) => {
         const td = document.createElement('td');
-        td.textContent = cell === null || cell === undefined ? '' : String(cell);
+        td.textContent =
+          cell === null || cell === undefined ? '' : String(cell);
         tr.appendChild(td);
       });
       tbody.appendChild(tr);
@@ -2827,7 +3119,9 @@
     closeBtn.className = 'dkan-aiq-playground-close';
     closeBtn.setAttribute('aria-label', 'Close playground');
     closeBtn.innerHTML = '&times;';
-    closeBtn.addEventListener('click', () => { this.closePlayground(); });
+    closeBtn.addEventListener('click', () => {
+      this.closePlayground();
+    });
     headerActions.appendChild(toggleBtn);
     headerActions.appendChild(closeBtn);
     header.appendChild(title);
@@ -2880,7 +3174,8 @@
     const editorLabel = document.createElement('label');
     editorLabel.className = 'dkan-aiq-playground-editor-label';
     editorLabel.textContent = 'Request body (JSON)';
-    const textareaId = 'dkan-aiq-playground-body-' + Math.random().toString(36).slice(2, 8);
+    const textareaId =
+      'dkan-aiq-playground-body-' + Math.random().toString(36).slice(2, 8);
     editorLabel.setAttribute('for', textareaId);
     // Editor box wraps the textarea + a syntax-highlighted overlay <pre>.
     // The textarea text is rendered transparent (caret stays visible), and
@@ -2925,9 +3220,9 @@
           validityEl.textContent = '✓ Valid JSON';
           validityEl.classList.remove('is-invalid');
           validityEl.classList.add('is-valid');
-        }
-        else {
-          const where = (v.line >= 0) ? ('Line ' + v.line + ', col ' + v.col + ': ') : '';
+        } else {
+          const where =
+            v.line >= 0 ? 'Line ' + v.line + ', col ' + v.col + ': ' : '';
           validityEl.textContent = where + v.message;
           validityEl.classList.remove('is-valid');
           validityEl.classList.add('is-invalid');
@@ -2946,7 +3241,9 @@
     runBtn.type = 'button';
     runBtn.className = 'dkan-aiq-playground-run';
     runBtn.textContent = 'Run';
-    runBtn.addEventListener('click', () => { this.runPlayground(); });
+    runBtn.addEventListener('click', () => {
+      this.runPlayground();
+    });
     const resetBtn = document.createElement('button');
     resetBtn.type = 'button';
     resetBtn.className = 'dkan-aiq-playground-reset';
@@ -2971,7 +3268,9 @@
     openTabBtn.textContent = 'Open URL ↗';
     openTabBtn.title = 'Open this GET request in a new browser tab';
     openTabBtn.hidden = true;
-    openTabBtn.addEventListener('click', () => { this.openPlaygroundInNewTab(); });
+    openTabBtn.addEventListener('click', () => {
+      this.openPlaygroundInNewTab();
+    });
     actions.appendChild(openTabBtn);
     const errorEl = document.createElement('div');
     errorEl.className = 'dkan-aiq-playground-error';
@@ -3025,7 +3324,9 @@
     this.playground.helpBodyEl = helpBody;
     this.playground.toggleBtn = toggleBtn;
     this.playground.railSummary = railSummary;
-    this.playground.railCount = railSummary.querySelector('.dkan-aiq-playground-rail-count');
+    this.playground.railCount = railSummary.querySelector(
+      '.dkan-aiq-playground-rail-count',
+    );
     this.bindPlaygroundToggle();
     this.applyPlaygroundCollapsedState();
     // History UI may already be populated from a previous open in the same
@@ -3048,7 +3349,10 @@
 
   Widget.prototype.openPlayground = function (request) {
     this.ensurePlaygroundSidebar();
-    if (this.playground.dirty && !window.confirm('Discard your unsaved edits in the API playground?')) {
+    if (
+      this.playground.dirty &&
+      !window.confirm('Discard your unsaved edits in the API playground?')
+    ) {
       return;
     }
     const bodyJson = JSON.stringify(request.body, null, 2);
@@ -3067,15 +3371,15 @@
     this.playground.responseHost.hidden = true;
     this.playground.responseHost.innerHTML = '';
     this.playground.methodEl.textContent = request.method;
-    this.playground.methodEl.className = 'dkan-aiq-playground-method is-' + request.method.toLowerCase();
+    this.playground.methodEl.className =
+      'dkan-aiq-playground-method is-' + request.method.toLowerCase();
     this.playground.urlEl.textContent = request.url;
-    this.playground.openTabBtn.hidden = (request.method !== 'GET');
+    this.playground.openTabBtn.hidden = request.method !== 'GET';
     if (this.playground.noteEl) {
       if (request.note) {
         this.playground.noteEl.textContent = request.note;
         this.playground.noteEl.hidden = false;
-      }
-      else {
+      } else {
         this.playground.noteEl.hidden = true;
         this.playground.noteEl.textContent = '';
       }
@@ -3087,11 +3391,17 @@
     // A new bubble click implies the user wants to see the new request, so
     // override any persisted collapsed state. Don't rewrite localStorage —
     // the user's last explicit chevron click is still their preference.
-    if (this.playground.el.classList.contains('dkan-aiq-playground-sidebar--collapsed')) {
+    if (
+      this.playground.el.classList.contains(
+        'dkan-aiq-playground-sidebar--collapsed',
+      )
+    ) {
       this.setPlaygroundCollapsed(false);
     }
     // Defer focus so the slide-in transition doesn't fight it.
-    setTimeout(() => { this.playground.editor.focus(); }, 50);
+    setTimeout(() => {
+      this.playground.editor.focus();
+    }, 50);
   };
 
   Widget.prototype.closePlayground = function () {
@@ -3106,12 +3416,13 @@
       return;
     }
     const toggle = () => {
-      const collapsed = !this.playground.el.classList.contains('dkan-aiq-playground-sidebar--collapsed');
+      const collapsed = !this.playground.el.classList.contains(
+        'dkan-aiq-playground-sidebar--collapsed',
+      );
       this.setPlaygroundCollapsed(collapsed);
       try {
         localStorage.setItem(PLAYGROUND_COLLAPSED_KEY, collapsed ? '1' : '0');
-      }
-      catch (e) {
+      } catch (e) {
         // localStorage unavailable (Safari private mode); collapse still works
         // for the current session.
       }
@@ -3123,8 +3434,7 @@
         this.setPlaygroundCollapsed(false);
         try {
           localStorage.setItem(PLAYGROUND_COLLAPSED_KEY, '0');
-        }
-        catch (e) {}
+        } catch (e) {}
       });
     }
   };
@@ -3133,8 +3443,7 @@
     let collapsed = false;
     try {
       collapsed = localStorage.getItem(PLAYGROUND_COLLAPSED_KEY) === '1';
-    }
-    catch (e) {
+    } catch (e) {
       // Default to expanded.
     }
     this.setPlaygroundCollapsed(collapsed);
@@ -3144,12 +3453,18 @@
     if (!this.playground.el) {
       return;
     }
-    this.playground.el.classList.toggle('dkan-aiq-playground-sidebar--collapsed', collapsed);
+    this.playground.el.classList.toggle(
+      'dkan-aiq-playground-sidebar--collapsed',
+      collapsed,
+    );
     if (this.playground.toggleBtn) {
-      this.playground.toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      this.playground.toggleBtn.setAttribute(
+        'aria-expanded',
+        collapsed ? 'false' : 'true',
+      );
       this.playground.toggleBtn.setAttribute(
         'aria-label',
-        collapsed ? 'Expand playground' : 'Collapse playground'
+        collapsed ? 'Expand playground' : 'Collapse playground',
       );
     }
   };
@@ -3164,8 +3479,12 @@
       this.playground.railSummary.setAttribute(
         'aria-label',
         count
-          ? 'Expand API playground (' + count + ' recent run' + (count !== 1 ? 's' : '') + ')'
-          : 'Expand API playground'
+          ? 'Expand API playground (' +
+              count +
+              ' recent run' +
+              (count !== 1 ? 's' : '') +
+              ')'
+          : 'Expand API playground',
       );
     }
   };
@@ -3186,18 +3505,22 @@
     helpEl.hidden = true;
     bodyEl.innerHTML = '';
     const widget = this;
-    OpenApiSpec.load().then((spec) => {
-      const cur = widget.playground.current;
-      if (!cur || cur.method !== method || cur.url !== url) {
-        // A newer openPlayground call superseded this one before the spec
-        // resolved — bail out so we don't overwrite the newer help.
-        return;
-      }
-      const help = OpenApiSpec.describe(spec, method, url);
-      if (!help) return;
-      renderPlaygroundHelp(bodyEl, help);
-      helpEl.hidden = false;
-    }).catch(() => { /* graceful degradation */ });
+    OpenApiSpec.load()
+      .then((spec) => {
+        const cur = widget.playground.current;
+        if (!cur || cur.method !== method || cur.url !== url) {
+          // A newer openPlayground call superseded this one before the spec
+          // resolved — bail out so we don't overwrite the newer help.
+          return;
+        }
+        const help = OpenApiSpec.describe(spec, method, url);
+        if (!help) return;
+        renderPlaygroundHelp(bodyEl, help);
+        helpEl.hidden = false;
+      })
+      .catch(() => {
+        /* graceful degradation */
+      });
   };
 
   /**
@@ -3221,10 +3544,18 @@
     }
     const sections = [];
     if (help.parameters && help.parameters.length) {
-      sections.push({ title: 'URL parameters', items: help.parameters, showLocation: true });
+      sections.push({
+        title: 'URL parameters',
+        items: help.parameters,
+        showLocation: true,
+      });
     }
     if (help.bodyProperties && help.bodyProperties.length) {
-      sections.push({ title: 'Body properties', items: help.bodyProperties, showLocation: false });
+      sections.push({
+        title: 'Body properties',
+        items: help.bodyProperties,
+        showLocation: false,
+      });
     }
     sections.forEach((section) => {
       const wrap = document.createElement('div');
@@ -3278,8 +3609,7 @@
     let parsed;
     try {
       parsed = JSON.parse(raw);
-    }
-    catch (e) {
+    } catch (e) {
       this.playground.errorEl.hidden = false;
       this.playground.errorEl.textContent = 'Invalid JSON: ' + e.message;
       return;
@@ -3297,13 +3627,14 @@
         const u = new URL(cur.url);
         if (u.origin !== window.location.origin) {
           this.playground.errorEl.hidden = false;
-          this.playground.errorEl.textContent = 'Cross-origin requests are not supported in the playground.';
+          this.playground.errorEl.textContent =
+            'Cross-origin requests are not supported in the playground.';
           return;
         }
-      }
-      catch (e) {
+      } catch (e) {
         this.playground.errorEl.hidden = false;
-        this.playground.errorEl.textContent = 'Could not parse request URL: ' + e.message;
+        this.playground.errorEl.textContent =
+          'Could not parse request URL: ' + e.message;
         return;
       }
     }
@@ -3315,30 +3646,43 @@
     let runReq;
     if (cur.method === 'GET') {
       const qsStr = paramsToQueryString(cur.body);
-      runReq = { method: 'GET', url: cur.url + (qsStr ? '?' + qsStr : ''), body: cur.body };
-    }
-    else {
+      runReq = {
+        method: 'GET',
+        url: cur.url + (qsStr ? '?' + qsStr : ''),
+        body: cur.body,
+      };
+    } else {
       runReq = { method: cur.method, url: cur.url, body: cur.body };
     }
 
     this.playground.runBtn.disabled = true;
     this.playground.runBtn.textContent = 'Running…';
-    Promise.resolve(this.csrfToken || ensureCsrfToken()).then((tokenOrEmpty) => {
-      const csrfToken = typeof tokenOrEmpty === 'string' ? tokenOrEmpty : '';
-      return runPlaygroundRequest(runReq, csrfToken)
-        .then((result) => {
+    Promise.resolve(this.csrfToken || ensureCsrfToken())
+      .then((tokenOrEmpty) => {
+        const csrfToken = typeof tokenOrEmpty === 'string' ? tokenOrEmpty : '';
+        return runPlaygroundRequest(runReq, csrfToken).then((result) => {
           this.playground.responseHost.hidden = false;
           this.playground.responseHost.innerHTML = '';
-          renderPlaygroundResponse(this, this.playground.responseHost, runReq, result, csrfToken);
+          renderPlaygroundResponse(
+            this,
+            this.playground.responseHost,
+            runReq,
+            result,
+            csrfToken,
+          );
           this.recordPlaygroundRun(runReq, result, csrfToken);
         });
-    }).catch((err) => {
-      this.playground.errorEl.hidden = false;
-      this.playground.errorEl.textContent = 'Playground error: ' + (err && err.message ? err.message : String(err));
-    }).then(() => {
-      this.playground.runBtn.disabled = false;
-      this.playground.runBtn.textContent = 'Run';
-    });
+      })
+      .catch((err) => {
+        this.playground.errorEl.hidden = false;
+        this.playground.errorEl.textContent =
+          'Playground error: ' +
+          (err && err.message ? err.message : String(err));
+      })
+      .then(() => {
+        this.playground.runBtn.disabled = false;
+        this.playground.runBtn.textContent = 'Run';
+      });
   };
 
   /**
@@ -3353,8 +3697,7 @@
     let parsed;
     try {
       parsed = JSON.parse(this.playground.editor.value);
-    }
-    catch (e) {
+    } catch (e) {
       this.playground.errorEl.hidden = false;
       this.playground.errorEl.textContent = 'Invalid JSON: ' + e.message;
       return;
@@ -3364,7 +3707,9 @@
     const fullUrl = cur.url + (qsStr ? '?' + qsStr : '');
     // Promote to absolute so window.open behaves identically regardless of
     // the page's base href; same-origin by construction.
-    const absUrl = /^https?:/i.test(fullUrl) ? fullUrl : (window.location.origin + fullUrl);
+    const absUrl = /^https?:/i.test(fullUrl)
+      ? fullUrl
+      : window.location.origin + fullUrl;
     window.open(absUrl, '_blank', 'noopener,noreferrer');
   };
 
@@ -3379,8 +3724,7 @@
       const v = obj[k];
       if (Array.isArray(v)) {
         v.forEach((item) => qs.append(k, String(item)));
-      }
-      else if (v != null) {
+      } else if (v != null) {
         qs.append(k, String(v));
       }
     });
@@ -3446,7 +3790,14 @@
       const c = src[i];
       if (c === ' ' || c === '\t' || c === '\n' || c === '\r') {
         const start = i;
-        while (i < len && (src[i] === ' ' || src[i] === '\t' || src[i] === '\n' || src[i] === '\r')) i++;
+        while (
+          i < len &&
+          (src[i] === ' ' ||
+            src[i] === '\t' ||
+            src[i] === '\n' ||
+            src[i] === '\r')
+        )
+          i++;
         tokens.push({ type: 'ws', text: src.slice(start, i) });
         continue;
       }
@@ -3454,8 +3805,14 @@
         const start = i;
         i++;
         while (i < len) {
-          if (src[i] === '\\' && i + 1 < len) { i += 2; continue; }
-          if (src[i] === '"') { i++; break; }
+          if (src[i] === '\\' && i + 1 < len) {
+            i += 2;
+            continue;
+          }
+          if (src[i] === '"') {
+            i++;
+            break;
+          }
           i++;
         }
         tokens.push({ type: 'string', text: src.slice(start, i) });
@@ -3477,10 +3834,29 @@
         tokens.push({ type: 'number', text: src.slice(start, i) });
         continue;
       }
-      if (src.slice(i, i + 4) === 'true') { tokens.push({ type: 'bool', text: 'true' }); i += 4; continue; }
-      if (src.slice(i, i + 5) === 'false') { tokens.push({ type: 'bool', text: 'false' }); i += 5; continue; }
-      if (src.slice(i, i + 4) === 'null') { tokens.push({ type: 'null', text: 'null' }); i += 4; continue; }
-      if (c === '{' || c === '}' || c === '[' || c === ']' || c === ',' || c === ':') {
+      if (src.slice(i, i + 4) === 'true') {
+        tokens.push({ type: 'bool', text: 'true' });
+        i += 4;
+        continue;
+      }
+      if (src.slice(i, i + 5) === 'false') {
+        tokens.push({ type: 'bool', text: 'false' });
+        i += 5;
+        continue;
+      }
+      if (src.slice(i, i + 4) === 'null') {
+        tokens.push({ type: 'null', text: 'null' });
+        i += 4;
+        continue;
+      }
+      if (
+        c === '{' ||
+        c === '}' ||
+        c === '[' ||
+        c === ']' ||
+        c === ',' ||
+        c === ':'
+      ) {
         tokens.push({ type: 'punct', text: c });
         i++;
         continue;
@@ -3495,7 +3871,11 @@
       if (tokens[j].type !== 'string') continue;
       let k = j + 1;
       while (k < tokens.length && tokens[k].type === 'ws') k++;
-      if (k < tokens.length && tokens[k].type === 'punct' && tokens[k].text === ':') {
+      if (
+        k < tokens.length &&
+        tokens[k].type === 'punct' &&
+        tokens[k].text === ':'
+      ) {
         tokens[j].type = 'key';
       }
     }
@@ -3504,14 +3884,14 @@
 
   function highlightJson(src) {
     const tokens = tokenizeJson(src);
-    const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const escape = (s) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     let out = '';
     for (const t of tokens) {
       const safe = escape(t.text);
       if (t.type === 'ws' || t.type === 'unknown') {
         out += safe;
-      }
-      else {
+      } else {
         out += '<span class="dkan-aiq-tok-' + t.type + '">' + safe + '</span>';
       }
     }
@@ -3533,9 +3913,8 @@
     try {
       JSON.parse(src);
       return { ok: true };
-    }
-    catch (e) {
-      const msg = (e && e.message) ? e.message : String(e);
+    } catch (e) {
+      const msg = e && e.message ? e.message : String(e);
       const posMatch = msg.match(/position\s+(\d+)/);
       let line = -1;
       let col = -1;
@@ -3545,8 +3924,12 @@
         let c = 1;
         const stop = Math.min(pos, src.length);
         for (let i = 0; i < stop; i++) {
-          if (src.charCodeAt(i) === 10) { l++; c = 1; }
-          else { c++; }
+          if (src.charCodeAt(i) === 10) {
+            l++;
+            c = 1;
+          } else {
+            c++;
+          }
         }
         line = l;
         col = c;
@@ -3587,19 +3970,24 @@
       return;
     }
     this.playground.historyEl.hidden = false;
-    this.playground.historySummaryEl.textContent = 'Recent runs (' + this.playgroundHistory.length + ')';
+    this.playground.historySummaryEl.textContent =
+      'Recent runs (' + this.playgroundHistory.length + ')';
     this.playgroundHistory.forEach((entry) => {
       const li = document.createElement('li');
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'dkan-aiq-playground-history-item';
       const status = document.createElement('span');
-      status.className = 'dkan-aiq-playground-history-status ' + statusClassFor(entry.result);
-      status.textContent = entry.result.networkError ? 'ERR' : String(entry.result.status);
+      status.className =
+        'dkan-aiq-playground-history-status ' + statusClassFor(entry.result);
+      status.textContent = entry.result.networkError
+        ? 'ERR'
+        : String(entry.result.status);
       btn.appendChild(status);
       const endpoint = document.createElement('span');
       endpoint.className = 'dkan-aiq-playground-history-endpoint';
-      endpoint.textContent = entry.request.method + ' ' + shortenUrl(entry.request.url);
+      endpoint.textContent =
+        entry.request.method + ' ' + shortenUrl(entry.request.url);
       btn.appendChild(endpoint);
       const dur = document.createElement('span');
       dur.className = 'dkan-aiq-playground-history-dur';
@@ -3633,14 +4021,21 @@
     this.playground.dirty = false;
     this.playground.errorEl.hidden = true;
     this.playground.methodEl.textContent = entry.request.method;
-    this.playground.methodEl.className = 'dkan-aiq-playground-method is-' + entry.request.method.toLowerCase();
+    this.playground.methodEl.className =
+      'dkan-aiq-playground-method is-' + entry.request.method.toLowerCase();
     this.playground.urlEl.textContent = this.playground.current.url;
     if (this.playground.openTabBtn) {
-      this.playground.openTabBtn.hidden = (entry.request.method !== 'GET');
+      this.playground.openTabBtn.hidden = entry.request.method !== 'GET';
     }
     this.playground.responseHost.hidden = false;
     this.playground.responseHost.innerHTML = '';
-    renderPlaygroundResponse(this, this.playground.responseHost, entry.request, entry.result, entry.csrfToken);
+    renderPlaygroundResponse(
+      this,
+      this.playground.responseHost,
+      entry.request,
+      entry.result,
+      entry.csrfToken,
+    );
   };
 
   /**
@@ -3650,7 +4045,7 @@
    * {networkError, durationMs} so the response renderer has one code path.
    */
   function runPlaygroundRequest(req, csrfToken) {
-    const headers = { 'Accept': 'application/json' };
+    const headers = { Accept: 'application/json' };
     let bodyText;
     if (req.method !== 'GET') {
       headers['Content-Type'] = 'application/json';
@@ -3669,11 +4064,16 @@
       .then((response) => {
         const durationMs = Math.round(performance.now() - start);
         const headerMap = {};
-        response.headers.forEach((v, k) => { headerMap[k] = v; });
+        response.headers.forEach((v, k) => {
+          headerMap[k] = v;
+        });
         return response.text().then((text) => {
           let parsedBody = null;
-          try { parsedBody = JSON.parse(text); }
-          catch (e) { /* leave null; renderer falls back to raw text */ }
+          try {
+            parsedBody = JSON.parse(text);
+          } catch (e) {
+            /* leave null; renderer falls back to raw text */
+          }
           return {
             status: response.status,
             statusText: response.statusText,
@@ -3714,9 +4114,15 @@
     if (result.networkError) {
       badge.classList.add('is-error');
       badge.textContent = 'Network error';
-    }
-    else {
-      const cls = result.status >= 500 ? 'is-5xx' : (result.status >= 400 ? 'is-4xx' : (result.status >= 200 ? 'is-2xx' : 'is-info'));
+    } else {
+      const cls =
+        result.status >= 500
+          ? 'is-5xx'
+          : result.status >= 400
+            ? 'is-4xx'
+            : result.status >= 200
+              ? 'is-2xx'
+              : 'is-info';
       badge.classList.add(cls);
       badge.textContent = result.status + ' ' + (result.statusText || '');
     }
@@ -3728,7 +4134,8 @@
     if (result.status === 403 && !csrfToken) {
       const hint = document.createElement('span');
       hint.className = 'dkan-aiq-playground-hint';
-      hint.textContent = 'Tip: this endpoint may require a CSRF token, but the widget could not fetch one.';
+      hint.textContent =
+        'Tip: this endpoint may require a CSRF token, but the widget could not fetch one.';
       statusRow.appendChild(hint);
     }
     host.appendChild(statusRow);
@@ -3738,7 +4145,8 @@
     // case-corrected columns, etc.) before the LLM sees it.
     const disclaimer = document.createElement('div');
     disclaimer.className = 'dkan-aiq-playground-disclaimer';
-    disclaimer.textContent = 'REST response — the agent tool may transform this further before passing it to the LLM.';
+    disclaimer.textContent =
+      'REST response — the agent tool may transform this further before passing it to the LLM.';
     host.appendChild(disclaimer);
 
     // Tab strip.
@@ -3753,17 +4161,31 @@
     // both array-shaped results (datastore) and object-shaped results
     // (/api/1/search keyed by URI). Skipped on errors or non-tabular endpoints.
     if (extractPlaygroundRows(result.parsedBody).length > 0) {
-      tabSpecs.push({ id: 'table', label: 'Table', render: () => renderPlaygroundTable(result.parsedBody) });
+      tabSpecs.push({
+        id: 'table',
+        label: 'Table',
+        render: () => renderPlaygroundTable(result.parsedBody),
+      });
     }
-    tabSpecs.push({ id: 'code', label: 'Code', render: () => renderPlaygroundCode(widget, request, csrfToken) });
-    tabSpecs.push({ id: 'headers', label: 'Headers', render: () => renderPlaygroundHeaders(result.headers) });
+    tabSpecs.push({
+      id: 'code',
+      label: 'Code',
+      render: () => renderPlaygroundCode(widget, request, csrfToken),
+    });
+    tabSpecs.push({
+      id: 'headers',
+      label: 'Headers',
+      render: () => renderPlaygroundHeaders(result.headers),
+    });
     tabSpecs.forEach((spec, i) => {
       const tab = document.createElement('button');
       tab.type = 'button';
       tab.className = 'dkan-aiq-playground-tab' + (i === 0 ? ' is-active' : '');
       tab.textContent = spec.label;
       tab.addEventListener('click', () => {
-        tabs.querySelectorAll('.dkan-aiq-playground-tab').forEach((t) => t.classList.remove('is-active'));
+        tabs
+          .querySelectorAll('.dkan-aiq-playground-tab')
+          .forEach((t) => t.classList.remove('is-active'));
         tab.classList.add('is-active');
         panel.innerHTML = '';
         panel.appendChild(spec.render());
@@ -3815,7 +4237,10 @@
     rows.slice(0, 20).forEach((r) => {
       if (r && typeof r === 'object') {
         Object.keys(r).forEach((k) => {
-          if (!seen.has(k)) { seen.add(k); cols.push(k); }
+          if (!seen.has(k)) {
+            seen.add(k);
+            cols.push(k);
+          }
         });
       }
     });
@@ -3838,7 +4263,12 @@
       cols.forEach((c) => {
         const td = document.createElement('td');
         const v = r ? r[c] : '';
-        const text = (v == null) ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+        const text =
+          v == null
+            ? ''
+            : typeof v === 'object'
+              ? JSON.stringify(v)
+              : String(v);
         if (text.length > CELL_TRUNCATE_LEN) {
           td.textContent = text.slice(0, CELL_TRUNCATE_LEN) + '…';
           td.classList.add('is-truncated');
@@ -3846,10 +4276,11 @@
           let expanded = false;
           td.addEventListener('click', () => {
             expanded = !expanded;
-            td.textContent = expanded ? text : (text.slice(0, CELL_TRUNCATE_LEN) + '…');
+            td.textContent = expanded
+              ? text
+              : text.slice(0, CELL_TRUNCATE_LEN) + '…';
           });
-        }
-        else {
+        } else {
           td.textContent = text;
         }
         tr.appendChild(td);
@@ -3864,11 +4295,16 @@
 
     const footer = document.createElement('div');
     footer.className = 'dkan-aiq-playground-table-footer';
-    const total = parsedBody.count != null ? parsedBody.count
-                : (parsedBody.total != null ? parsedBody.total : null);
-    footer.textContent = total != null
-      ? rows.length + ' of ' + total + ' rows'
-      : rows.length + ' rows';
+    const total =
+      parsedBody.count != null
+        ? parsedBody.count
+        : parsedBody.total != null
+          ? parsedBody.total
+          : null;
+    footer.textContent =
+      total != null
+        ? rows.length + ' of ' + total + ' rows'
+        : rows.length + ' rows';
     wrap.appendChild(footer);
 
     return wrap;
@@ -3884,11 +4320,14 @@
       wrap.appendChild(err);
       return wrap;
     }
-    const fullText = result.parsedBody !== null
-      ? JSON.stringify(result.parsedBody, null, 2)
-      : result.bodyText;
+    const fullText =
+      result.parsedBody !== null
+        ? JSON.stringify(result.parsedBody, null, 2)
+        : result.bodyText;
     const truncated = fullText.length > PLAYGROUND_RESPONSE_DISPLAY_CAP;
-    const display = truncated ? fullText.slice(0, PLAYGROUND_RESPONSE_DISPLAY_CAP) + '\n\n…[truncated]' : fullText;
+    const display = truncated
+      ? fullText.slice(0, PLAYGROUND_RESPONSE_DISPLAY_CAP) + '\n\n…[truncated]'
+      : fullText;
     if (result.parsedBody === null && result.bodyText) {
       const note = document.createElement('div');
       note.className = 'dkan-aiq-playground-nonjson';
@@ -3902,17 +4341,23 @@
     if (truncated) {
       const note = document.createElement('div');
       note.className = 'dkan-aiq-playground-truncated';
-      note.textContent = 'Response truncated for display — use Download to get the full payload.';
+      note.textContent =
+        'Response truncated for display — use Download to get the full payload.';
       wrap.appendChild(note);
       const dl = document.createElement('button');
       dl.type = 'button';
       dl.className = 'dkan-aiq-playground-download';
       dl.textContent = 'Download response';
       dl.addEventListener('click', () => {
-        const blob = new Blob([fullText], { type: result.parsedBody !== null ? 'application/json' : 'text/plain' });
+        const blob = new Blob([fullText], {
+          type: result.parsedBody !== null ? 'application/json' : 'text/plain',
+        });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'playground-response-' + Date.now() + (result.parsedBody !== null ? '.json' : '.txt');
+        a.download =
+          'playground-response-' +
+          Date.now() +
+          (result.parsedBody !== null ? '.json' : '.txt');
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -3928,7 +4373,9 @@
       copy.addEventListener('click', () => {
         navigator.clipboard.writeText(fullText).then(() => {
           copy.textContent = 'Copied!';
-          setTimeout(() => { copy.textContent = 'Copy body'; }, 1500);
+          setTimeout(() => {
+            copy.textContent = 'Copy body';
+          }, 1500);
         });
       });
       wrap.appendChild(copy);
@@ -3960,8 +4407,9 @@
 
     function paint(langId) {
       widget.playgroundCodeLang = langId;
-      const lang = PLAYGROUND_CODE_LANGUAGES.find((l) => l.id === langId)
-        || PLAYGROUND_CODE_LANGUAGES[0];
+      const lang =
+        PLAYGROUND_CODE_LANGUAGES.find((l) => l.id === langId) ||
+        PLAYGROUND_CODE_LANGUAGES[0];
       const code = buildPlaygroundCodeSnippet(lang.id, request, csrfToken);
       pre.textContent = code;
       copy.textContent = lang.copyLabel;
@@ -3990,7 +4438,9 @@
       const original = copy.textContent;
       navigator.clipboard.writeText(snippet).then(() => {
         copy.textContent = 'Copied!';
-        setTimeout(() => { copy.textContent = original; }, 1500);
+        setTimeout(() => {
+          copy.textContent = original;
+        }, 1500);
       });
     });
 
@@ -3998,10 +4448,11 @@
     wrap.appendChild(pre);
     wrap.appendChild(copy);
 
-    const initial = (widget.playgroundCodeLang
-      && PLAYGROUND_CODE_LANGUAGES.some((l) => l.id === widget.playgroundCodeLang))
-      ? widget.playgroundCodeLang
-      : 'curl';
+    const initial =
+      widget.playgroundCodeLang &&
+      PLAYGROUND_CODE_LANGUAGES.some((l) => l.id === widget.playgroundCodeLang)
+        ? widget.playgroundCodeLang
+        : 'curl';
     paint(initial);
 
     return wrap;
@@ -4012,14 +4463,16 @@
     wrap.className = 'dkan-aiq-playground-headers-tab';
     const dl = document.createElement('dl');
     dl.className = 'dkan-aiq-playground-headers';
-    Object.keys(headers).sort().forEach((k) => {
-      const dt = document.createElement('dt');
-      dt.textContent = k;
-      const dd = document.createElement('dd');
-      dd.textContent = headers[k];
-      dl.appendChild(dt);
-      dl.appendChild(dd);
-    });
+    Object.keys(headers)
+      .sort()
+      .forEach((k) => {
+        const dt = document.createElement('dt');
+        dt.textContent = k;
+        const dd = document.createElement('dd');
+        dd.textContent = headers[k];
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      });
     wrap.appendChild(dl);
     return wrap;
   }
@@ -4030,7 +4483,9 @@
    * playground itself fetches with the relative URL; snippets never can.
    */
   function playgroundAbsUrl(req) {
-    return /^https?:/i.test(req.url) ? req.url : (window.location.origin + req.url);
+    return /^https?:/i.test(req.url)
+      ? req.url
+      : window.location.origin + req.url;
   }
 
   /**
@@ -4051,8 +4506,7 @@
       const bodyJson = JSON.stringify(req.body);
       const escaped = bodyJson.replace(/'/g, "'\\''");
       lines.push("  --data-raw '" + escaped + "'");
-    }
-    else {
+    } else {
       // Drop the trailing backslash from the previous line for GET requests.
       lines[lines.length - 1] = lines[lines.length - 1].replace(/ \\$/, '');
     }
@@ -4068,12 +4522,12 @@
     // Build all body lines first, then join with a trailing-backslash
     // continuation so the final line never has a stray slash. Avoids the
     // contortion of conditionally appending " \\" on every push.
-    const parts = ["http " + req.method + " '" + absUrl + "'"];
-    parts.push("  Accept:application/json");
+    const parts = ['http ' + req.method + " '" + absUrl + "'"];
+    parts.push('  Accept:application/json');
     if (req.method !== 'GET') {
-      parts.push("  Content-Type:application/json");
+      parts.push('  Content-Type:application/json');
       if (csrfToken) {
-        parts.push("  X-CSRF-Token:" + csrfToken);
+        parts.push('  X-CSRF-Token:' + csrfToken);
       }
       const bodyJson = JSON.stringify(req.body);
       const escaped = bodyJson.replace(/'/g, "'\\''");
@@ -4107,9 +4561,12 @@
       const bodyPretty = JSON.stringify(req.body, null, 2);
       out.push('body = """' + bodyPretty + '"""');
       out.push('');
-      out.push('response = requests.' + req.method.toLowerCase() + '(url, headers=headers, data=body)');
-    }
-    else {
+      out.push(
+        'response = requests.' +
+          req.method.toLowerCase() +
+          '(url, headers=headers, data=body)',
+      );
+    } else {
       out.push('');
       out.push('response = requests.get(url, headers=headers)');
     }
@@ -4130,7 +4587,7 @@
     out.push("const response = await fetch('" + absUrl + "', {");
     out.push("  method: '" + req.method + "',");
     out.push("  credentials: 'same-origin',");
-    out.push("  headers: {");
+    out.push('  headers: {');
     out.push("    'Accept': 'application/json',");
     if (req.method !== 'GET') {
       out.push("    'Content-Type': 'application/json',");
@@ -4138,14 +4595,14 @@
         out.push("    'X-CSRF-Token': '" + csrfToken + "',");
       }
     }
-    out.push("  },");
+    out.push('  },');
     if (req.method !== 'GET') {
       const bodyJson = JSON.stringify(req.body);
-      out.push("  body: JSON.stringify(" + bodyJson + "),");
+      out.push('  body: JSON.stringify(' + bodyJson + '),');
     }
-    out.push("});");
-    out.push("const data = await response.json();");
-    out.push("console.log(data);");
+    out.push('});');
+    out.push('const data = await response.json();');
+    out.push('console.log(data);');
     return out.join('\n');
   }
 
@@ -4158,19 +4615,20 @@
     const absUrl = playgroundAbsUrl(req);
     const out = [];
     out.push("$ch = curl_init('" + absUrl + "');");
-    out.push("curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);");
+    out.push('curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);');
     if (req.method !== 'GET') {
       if (req.method === 'POST') {
-        out.push("curl_setopt($ch, CURLOPT_POST, true);");
-      }
-      else {
-        out.push("curl_setopt($ch, CURLOPT_CUSTOMREQUEST, '" + req.method + "');");
+        out.push('curl_setopt($ch, CURLOPT_POST, true);');
+      } else {
+        out.push(
+          "curl_setopt($ch, CURLOPT_CUSTOMREQUEST, '" + req.method + "');",
+        );
       }
       const bodyJson = JSON.stringify(req.body);
       const phpEscaped = bodyJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
       out.push("curl_setopt($ch, CURLOPT_POSTFIELDS, '" + phpEscaped + "');");
     }
-    out.push("curl_setopt($ch, CURLOPT_HTTPHEADER, [");
+    out.push('curl_setopt($ch, CURLOPT_HTTPHEADER, [');
     out.push("    'Accept: application/json',");
     if (req.method !== 'GET') {
       out.push("    'Content-Type: application/json',");
@@ -4178,10 +4636,10 @@
         out.push("    'X-CSRF-Token: " + csrfToken + "',");
       }
     }
-    out.push("]);");
-    out.push("$response = curl_exec($ch);");
-    out.push("$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);");
-    out.push("curl_close($ch);");
+    out.push(']);');
+    out.push('$response = curl_exec($ch);');
+    out.push('$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);');
+    out.push('curl_close($ch);');
     out.push('echo $status . "\\n" . $response;');
     return out.join('\n');
   }
@@ -4193,12 +4651,17 @@
    */
   function buildPlaygroundCodeSnippet(lang, req, csrfToken) {
     switch (lang) {
-      case 'httpie': return buildHttpieCommand(req, csrfToken);
-      case 'python': return buildPythonRequestsCode(req, csrfToken);
-      case 'js':     return buildJavaScriptFetchCode(req, csrfToken);
-      case 'php':    return buildPhpCurlCode(req, csrfToken);
+      case 'httpie':
+        return buildHttpieCommand(req, csrfToken);
+      case 'python':
+        return buildPythonRequestsCode(req, csrfToken);
+      case 'js':
+        return buildJavaScriptFetchCode(req, csrfToken);
+      case 'php':
+        return buildPhpCurlCode(req, csrfToken);
       case 'curl':
-      default:       return buildCurlCommand(req, csrfToken);
+      default:
+        return buildCurlCommand(req, csrfToken);
     }
   }
 
@@ -4218,7 +4681,13 @@
     // Run-total token usage accumulated from ai_provider_response events.
     // Cached + reasoning are provider-specific (Anthropic prompt caching,
     // OpenAI o-series); shown only when non-zero.
-    this.debugTokenUsage = { input: 0, output: 0, total: 0, cached: 0, reasoning: 0 };
+    this.debugTokenUsage = {
+      input: 0,
+      output: 0,
+      total: 0,
+      cached: 0,
+      reasoning: 0,
+    };
     this.updateDebugPanelSummary();
   };
 
@@ -4258,8 +4727,7 @@
     const footer = this.dom.debugLog.querySelector('.dkan-aiq-debug-footer');
     if (footer) {
       this.dom.debugLog.insertBefore(group, footer);
-    }
-    else {
+    } else {
       this.dom.debugLog.appendChild(group);
     }
     const record = {
@@ -4288,7 +4756,8 @@
     if (record.tokens && record.tokens.total > 0) {
       meta.push(formatTokensCompact(record.tokens.total) + ' tokens');
     }
-    record.summary.textContent = 'Step ' + record.loop + ' — ' + meta.join(' · ');
+    record.summary.textContent =
+      'Step ' + record.loop + ' — ' + meta.join(' · ');
   };
 
   /**
@@ -4339,10 +4808,10 @@
     }
     const errs = this.debugErrorCount || 0;
     if (errs > 0) {
-      sum.textContent = 'Agent diagnostics — ' + errs + ' error' + (errs !== 1 ? 's' : '');
+      sum.textContent =
+        'Agent diagnostics — ' + errs + ' error' + (errs !== 1 ? 's' : '');
       sum.classList.add('has-errors');
-    }
-    else {
+    } else {
       sum.textContent = 'Agent diagnostics';
       sum.classList.remove('has-errors');
     }
@@ -4368,7 +4837,7 @@
     if (!this.dom.debugLog || this.dom.debugPanel.hidden) {
       return;
     }
-    const toolId = ev.tool_id || ('tool-' + this.debugToolCount);
+    const toolId = ev.tool_id || 'tool-' + this.debugToolCount;
     // Each entry is a <details> so successful calls collapse to a single
     // line — name + result chip + meta — and only errored calls auto-open
     // (see debugToolFinished).
@@ -4430,7 +4899,10 @@
     const entry = pending ? pending.entry : null;
     let durationMs = null;
     if (pending && pending.startedAt != null && typeof ev.time === 'number') {
-      durationMs = Math.max(0, Math.round((ev.time - pending.startedAt) * 1000));
+      durationMs = Math.max(
+        0,
+        Math.round((ev.time - pending.startedAt) * 1000),
+      );
     }
 
     if (entry && pending && pending.meta && durationMs != null) {
@@ -4488,24 +4960,38 @@
     totals.className = 'dkan-aiq-debug-footer-totals';
     const parts = [];
     if (this.debugToolCount > 0) {
-      parts.push(this.debugToolCount + ' tool call' + (this.debugToolCount !== 1 ? 's' : ''));
+      parts.push(
+        this.debugToolCount +
+          ' tool call' +
+          (this.debugToolCount !== 1 ? 's' : ''),
+      );
     }
     if (this.debugIterationMax > 0) {
-      parts.push(this.debugIterationMax + ' step' + (this.debugIterationMax !== 1 ? 's' : ''));
+      parts.push(
+        this.debugIterationMax +
+          ' step' +
+          (this.debugIterationMax !== 1 ? 's' : ''),
+      );
     }
     if (this.debugTotalMs > 0) {
       parts.push(this.debugTotalMs.toLocaleString() + 'ms');
     }
     if (this.debugErrorCount > 0) {
-      parts.push(this.debugErrorCount + ' error' + (this.debugErrorCount !== 1 ? 's' : ''));
+      parts.push(
+        this.debugErrorCount +
+          ' error' +
+          (this.debugErrorCount !== 1 ? 's' : ''),
+      );
     }
     if (hasTokens) {
       const tokenParts = [];
       if (tu.input > 0) tokenParts.push(tu.input.toLocaleString() + ' in');
       if (tu.output > 0) tokenParts.push(tu.output.toLocaleString() + ' out');
       if (tu.total > 0) tokenParts.push(tu.total.toLocaleString() + ' total');
-      if (tu.cached > 0) tokenParts.push(tu.cached.toLocaleString() + ' cached');
-      if (tu.reasoning > 0) tokenParts.push(tu.reasoning.toLocaleString() + ' reasoning');
+      if (tu.cached > 0)
+        tokenParts.push(tu.cached.toLocaleString() + ' cached');
+      if (tu.reasoning > 0)
+        tokenParts.push(tu.reasoning.toLocaleString() + ' reasoning');
       parts.push(tokenParts.join(' · ') + ' tokens');
     }
     totals.textContent = parts.join(' · ');
@@ -4532,11 +5018,14 @@
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(
-          function () { flash('Copied!'); },
-          function () { flash('Copy failed'); }
+          function () {
+            flash('Copied!');
+          },
+          function () {
+            flash('Copy failed');
+          },
         );
-      }
-      else {
+      } else {
         flash('Clipboard unavailable');
       }
     });
@@ -4557,8 +5046,12 @@
     lines.push('Agent diagnostics');
     lines.push('=================');
     const totals = [
-      this.debugToolCount + ' tool call' + (this.debugToolCount !== 1 ? 's' : ''),
-      this.debugIterationMax + ' step' + (this.debugIterationMax !== 1 ? 's' : ''),
+      this.debugToolCount +
+        ' tool call' +
+        (this.debugToolCount !== 1 ? 's' : ''),
+      this.debugIterationMax +
+        ' step' +
+        (this.debugIterationMax !== 1 ? 's' : ''),
       this.debugTotalMs.toLocaleString() + 'ms total',
     ];
     if (errs > 0) {
@@ -4572,7 +5065,8 @@
       if (tu.output > 0) tParts.push(tu.output.toLocaleString() + ' out');
       if (tu.total > 0) tParts.push(tu.total.toLocaleString() + ' total');
       if (tu.cached > 0) tParts.push(tu.cached.toLocaleString() + ' cached');
-      if (tu.reasoning > 0) tParts.push(tu.reasoning.toLocaleString() + ' reasoning');
+      if (tu.reasoning > 0)
+        tParts.push(tu.reasoning.toLocaleString() + ' reasoning');
       lines.push('Tokens: ' + tParts.join(' · '));
     }
     lines.push('');
@@ -4580,9 +5074,13 @@
     let idx = 0;
     const serializeEntry = function (node) {
       idx++;
-      const name = (node.querySelector('.dkan-aiq-debug-name') || {}).textContent || '';
-      const meta = (node.querySelector('.dkan-aiq-debug-meta') || {}).textContent || '';
-      const result = (node.querySelector('.dkan-aiq-debug-result-inline') || {}).textContent || '';
+      const name =
+        (node.querySelector('.dkan-aiq-debug-name') || {}).textContent || '';
+      const meta =
+        (node.querySelector('.dkan-aiq-debug-meta') || {}).textContent || '';
+      const result =
+        (node.querySelector('.dkan-aiq-debug-result-inline') || {})
+          .textContent || '';
       const isError = node.classList.contains('dkan-aiq-debug-error');
       const prefix = isError ? '[!]' : '[' + idx + ']';
       const headerParts = [prefix, name];
@@ -4596,26 +5094,36 @@
       const args = node.querySelector('.dkan-aiq-debug-args');
       if (args) {
         const argsText = args.textContent || '';
-        const indented = argsText.split('\n').map(function (l) { return '    ' + l; }).join('\n');
+        const indented = argsText
+          .split('\n')
+          .map(function (l) {
+            return '    ' + l;
+          })
+          .join('\n');
         lines.push('    args:');
         lines.push(indented);
       }
       lines.push('');
     };
 
-    const stepGroups = this.dom.debugLog.querySelectorAll(':scope > .dkan-aiq-debug-step');
+    const stepGroups = this.dom.debugLog.querySelectorAll(
+      ':scope > .dkan-aiq-debug-step',
+    );
     if (stepGroups.length) {
       stepGroups.forEach(function (group) {
-        const stepSummary = (group.querySelector(':scope > .dkan-aiq-debug-step-summary') || {}).textContent || '';
+        const stepSummary =
+          (group.querySelector(':scope > .dkan-aiq-debug-step-summary') || {})
+            .textContent || '';
         if (stepSummary) {
           lines.push('--- ' + stepSummary + ' ---');
           lines.push('');
         }
-        const entries = group.querySelectorAll(':scope > .dkan-aiq-debug-step-list > .dkan-aiq-debug-entry');
+        const entries = group.querySelectorAll(
+          ':scope > .dkan-aiq-debug-step-list > .dkan-aiq-debug-entry',
+        );
         entries.forEach(serializeEntry);
       });
-    }
-    else {
+    } else {
       // Fallback: flat children (covers any path where entries land outside
       // a step group, e.g. legacy state during a transition).
       const children = this.dom.debugLog.children;
@@ -4641,8 +5149,7 @@
     if (typeof value === 'string') {
       try {
         parsed = JSON.parse(value);
-      }
-      catch (e) {
+      } catch (e) {
         return value;
       }
     }
@@ -4671,14 +5178,17 @@
    */
   function unwrapDoubleEncodedStrings(value) {
     if (typeof value === 'string') {
-      if (value.length >= 2 && value.charAt(0) === '"' && value.charAt(value.length - 1) === '"') {
+      if (
+        value.length >= 2 &&
+        value.charAt(0) === '"' &&
+        value.charAt(value.length - 1) === '"'
+      ) {
         try {
           const inner = JSON.parse(value);
           if (typeof inner === 'string') {
             return inner;
           }
-        }
-        catch (e) {
+        } catch (e) {
           // not JSON, leave alone
         }
       }
@@ -4711,8 +5221,7 @@
     if (typeof raw === 'string') {
       try {
         parsed = JSON.parse(raw);
-      }
-      catch (e) {
+      } catch (e) {
         return '';
       }
     }
@@ -4722,18 +5231,45 @@
     if (parsed.error) {
       return '→ Error: ' + String(parsed.error);
     }
-    if ((name === 'query_datastore' || name === 'query_datastore_join' || name === 'query_datastore_raw') && Array.isArray(parsed.results)) {
+    if (
+      (name === 'query_datastore' ||
+        name === 'query_datastore_join' ||
+        name === 'query_datastore_raw') &&
+      Array.isArray(parsed.results)
+    ) {
       const got = parsed.results.length;
-      const total = parsed.total_rows != null
-        ? parsed.total_rows
-        : (parsed.count != null ? parsed.count : got);
-      return '→ ' + got.toLocaleString() + ' of ' + total.toLocaleString() + ' rows';
+      const total =
+        parsed.total_rows != null
+          ? parsed.total_rows
+          : parsed.count != null
+            ? parsed.count
+            : got;
+      return (
+        '→ ' + got.toLocaleString() + ' of ' + total.toLocaleString() + ' rows'
+      );
     }
     if (name === 'get_datastore_schema') {
-      const cols = Array.isArray(parsed.schema) ? parsed.schema : (Array.isArray(parsed.columns) ? parsed.columns : (Array.isArray(parsed) ? parsed : null));
+      const cols = Array.isArray(parsed.schema)
+        ? parsed.schema
+        : Array.isArray(parsed.columns)
+          ? parsed.columns
+          : Array.isArray(parsed)
+            ? parsed
+            : null;
       if (cols) {
-        const names = cols.map((c) => (c && typeof c === 'object' ? (c.name || c.field || '?') : String(c))).slice(0, 5);
-        return '→ ' + cols.length + ' columns' + (names.length ? ': ' + names.join(', ') + (cols.length > 5 ? ', …' : '') : '');
+        const names = cols
+          .map((c) =>
+            c && typeof c === 'object' ? c.name || c.field || '?' : String(c),
+          )
+          .slice(0, 5);
+        return (
+          '→ ' +
+          cols.length +
+          ' columns' +
+          (names.length
+            ? ': ' + names.join(', ') + (cols.length > 5 ? ', …' : '')
+            : '')
+        );
       }
     }
     if (name === 'get_datastore_stats') {
@@ -4749,80 +5285,158 @@
       if (Array.isArray(parsed.columns)) {
         colCount = colCount || parsed.columns.length;
         colNames = parsed.columns
-          .map((c) => (c && typeof c === 'object' ? (c.name || c.field || '') : String(c)))
+          .map((c) =>
+            c && typeof c === 'object' ? c.name || c.field || '' : String(c),
+          )
           .filter((n) => n)
           .slice(0, 5);
-      }
-      else if (typeof parsed.columns === 'number') {
+      } else if (typeof parsed.columns === 'number') {
         colCount = colCount || parsed.columns;
       }
       if (rows || colCount) {
-        let out = '→ ' + Number(rows).toLocaleString() + ' rows, ' + colCount + ' columns';
+        let out =
+          '→ ' +
+          Number(rows).toLocaleString() +
+          ' rows, ' +
+          colCount +
+          ' columns';
         if (colNames.length) {
-          out += ': ' + colNames.join(', ') + (colCount > colNames.length ? ', …' : '');
+          out +=
+            ': ' +
+            colNames.join(', ') +
+            (colCount > colNames.length ? ', …' : '');
         }
         return out;
       }
     }
     if (name === 'list_distributions') {
-      const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.distributions) ? parsed.distributions : null);
+      const list = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed.distributions)
+          ? parsed.distributions
+          : null;
       if (list) {
-        return '→ ' + list.length + ' distribution' + (list.length !== 1 ? 's' : '');
+        return (
+          '→ ' + list.length + ' distribution' + (list.length !== 1 ? 's' : '')
+        );
       }
     }
     if (name === 'list_datasets' || name === 'search_datasets') {
-      const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.results) ? parsed.results : (Array.isArray(parsed.datasets) ? parsed.datasets : null));
+      const list = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed.results)
+          ? parsed.results
+          : Array.isArray(parsed.datasets)
+            ? parsed.datasets
+            : null;
       if (list) {
         const total = parsed.total != null ? parsed.total : list.length;
-        return '→ ' + list.length + ' of ' + total + (name === 'list_datasets' ? ' datasets' : ' results');
+        return (
+          '→ ' +
+          list.length +
+          ' of ' +
+          total +
+          (name === 'list_datasets' ? ' datasets' : ' results')
+        );
       }
     }
     if (name === 'search_columns') {
-      const matches = Array.isArray(parsed.matches) ? parsed.matches.length : (parsed.total_matches || 0);
+      const matches = Array.isArray(parsed.matches)
+        ? parsed.matches.length
+        : parsed.total_matches || 0;
       const searched = parsed.resources_searched || 0;
       if (matches || searched) {
-        return '→ ' + matches + ' match' + (matches !== 1 ? 'es' : '') + (searched ? ' across ' + searched + ' resources' : '');
+        return (
+          '→ ' +
+          matches +
+          ' match' +
+          (matches !== 1 ? 'es' : '') +
+          (searched ? ' across ' + searched + ' resources' : '')
+        );
       }
     }
     if (name === 'find_dataset_resources') {
-      const dists = Array.isArray(parsed.distributions) ? parsed.distributions.length : (parsed.distribution_count || 0);
+      const dists = Array.isArray(parsed.distributions)
+        ? parsed.distributions.length
+        : parsed.distribution_count || 0;
       const title = parsed.title || parsed.dataset_title || '';
       if (title || dists) {
-        return '→ ' + (title || 'dataset') + ' (' + dists + ' distribution' + (dists !== 1 ? 's' : '') + ')';
+        return (
+          '→ ' +
+          (title || 'dataset') +
+          ' (' +
+          dists +
+          ' distribution' +
+          (dists !== 1 ? 's' : '') +
+          ')'
+        );
       }
     }
     if (name === 'create_chart') {
       return '→ chart rendered';
     }
     if (name === 'sample_rows') {
-      const got = parsed.row_count != null ? parsed.row_count : (Array.isArray(parsed.rows) ? parsed.rows.length : null);
+      const got =
+        parsed.row_count != null
+          ? parsed.row_count
+          : Array.isArray(parsed.rows)
+            ? parsed.rows.length
+            : null;
       if (got != null) {
         return '→ ' + got + ' row' + (got !== 1 ? 's' : '');
       }
     }
     if (name === 'distinct_values') {
-      const n = parsed.value_count != null
-        ? parsed.value_count
-        : (Array.isArray(parsed.values) ? parsed.values.length : null);
+      const n =
+        parsed.value_count != null
+          ? parsed.value_count
+          : Array.isArray(parsed.values)
+            ? parsed.values.length
+            : null;
       if (n != null) {
-        return '→ ' + n + ' distinct value' + (n !== 1 ? 's' : '') + (parsed.truncated ? ' (truncated)' : '');
+        return (
+          '→ ' +
+          n +
+          ' distinct value' +
+          (n !== 1 ? 's' : '') +
+          (parsed.truncated ? ' (truncated)' : '')
+        );
       }
     }
     if (name === 'compute_stats') {
       const ops = Array.isArray(parsed.results) ? parsed.results.length : 0;
       const rows = parsed.row_count != null ? parsed.row_count : null;
       if (ops || rows != null) {
-        return '→ ' + ops + ' op' + (ops !== 1 ? 's' : '') + (rows != null ? ' over ' + rows.toLocaleString() + ' rows' : '');
+        return (
+          '→ ' +
+          ops +
+          ' op' +
+          (ops !== 1 ? 's' : '') +
+          (rows != null ? ' over ' + rows.toLocaleString() + ' rows' : '')
+        );
       }
     }
     if (name === 'get_data_dictionary') {
       // The metastore returns either a single dictionary or a `dictionaries`
       // array; in either case, count the field rows so the summary mirrors
       // get_datastore_schema's "N columns" style.
-      const dicts = Array.isArray(parsed.dictionaries) ? parsed.dictionaries : (parsed.dictionary ? [parsed.dictionary] : null);
+      const dicts = Array.isArray(parsed.dictionaries)
+        ? parsed.dictionaries
+        : parsed.dictionary
+          ? [parsed.dictionary]
+          : null;
       if (dicts) {
-        const fieldCount = dicts.reduce((acc, d) => acc + (Array.isArray(d.fields) ? d.fields.length : 0), 0);
-        return '→ ' + dicts.length + ' dictionary' + (dicts.length !== 1 ? 'ies' : '') + (fieldCount ? ', ' + fieldCount + ' fields' : '');
+        const fieldCount = dicts.reduce(
+          (acc, d) => acc + (Array.isArray(d.fields) ? d.fields.length : 0),
+          0,
+        );
+        return (
+          '→ ' +
+          dicts.length +
+          ' dictionary' +
+          (dicts.length !== 1 ? 'ies' : '') +
+          (fieldCount ? ', ' + fieldCount + ' fields' : '')
+        );
       }
     }
     if (name === 'refuse') {
@@ -4835,7 +5449,12 @@
       return '→ ' + parsed.length + ' item' + (parsed.length !== 1 ? 's' : '');
     }
     if (Array.isArray(parsed.results)) {
-      return '→ ' + parsed.results.length + ' result' + (parsed.results.length !== 1 ? 's' : '');
+      return (
+        '→ ' +
+        parsed.results.length +
+        ' result' +
+        (parsed.results.length !== 1 ? 's' : '')
+      );
     }
     return '';
   }

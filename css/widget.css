@@ -314,7 +314,9 @@
   border: 1px solid #e2e8f0;
   border-radius: 4px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .dkan-aiq-new-conversation:hover {
@@ -548,7 +550,9 @@
 }
 
 @keyframes nl-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Answer text (inside assistant bubble) */
@@ -824,7 +828,9 @@
   border: 1px solid #2563eb;
   border-radius: 4px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .dkan-aiq-table-toggle:hover {
@@ -861,7 +867,9 @@
   border: 1px solid #e2e8f0;
   border-radius: 4px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .dkan-aiq-csv-btn:hover {
@@ -884,7 +892,9 @@
   border: 1px solid #bfdbfe;
   border-radius: 16px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
   text-align: left;
   line-height: 1.4;
 }
@@ -905,7 +915,7 @@
 
 .dkan-aiq-api-code {
   margin: 0;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 12px;
   line-height: 1.5;
   color: #e2e8f0;
@@ -925,7 +935,9 @@
   border: 1px solid #475569;
   border-radius: 3px;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .dkan-aiq-api-copy:hover {
@@ -944,7 +956,7 @@
 
 .dkan-aiq-sql-code {
   margin: 0;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 12px;
   line-height: 1.5;
   color: #e2e8f0;
@@ -964,7 +976,9 @@
   border: 1px solid #475569;
   border-radius: 3px;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .dkan-aiq-sql-copy:hover {
@@ -979,7 +993,7 @@
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid #334155;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 11px;
   color: #94a3b8;
   word-break: break-all;
@@ -994,7 +1008,9 @@
   border: 1px solid #e2e8f0;
   border-radius: 4px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .dkan-aiq-prov-btn:hover {
@@ -1081,7 +1097,7 @@
   background: #1e293b;
   color: #e2e8f0;
   border-radius: 4px;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 11px;
   line-height: 1.4;
   white-space: pre-wrap;
@@ -1279,7 +1295,7 @@
   padding: 2px 8px;
   background: #fee2e2;
   border-radius: 4px;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 11px;
   color: #991b1b;
 }
@@ -1335,7 +1351,9 @@
   border: 1px solid transparent;
   border-radius: 3px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .dkan-aiq-copy-btn:hover {
@@ -1386,7 +1404,7 @@
 }
 
 .dkan-aiq-debug-summary.has-errors::before {
-  content: '⚠ ';
+  content: "⚠ ";
 }
 
 .dkan-aiq-debug-log {
@@ -1396,7 +1414,7 @@
 }
 
 .dkan-aiq-debug-log:empty::after {
-  content: 'No tool calls yet.';
+  content: "No tool calls yet.";
   color: #94a3b8;
   font-style: italic;
 }
@@ -1530,7 +1548,7 @@
 }
 
 .dkan-aiq-debug-step > summary::before {
-  content: '▸ ';
+  content: "▸ ";
   display: inline-block;
   font-size: 10px;
   color: #94a3b8;
@@ -1606,7 +1624,9 @@
   border-left: 3px solid #2563eb;
   border-radius: 4px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .dkan-aiq-playground-btn:hover {
@@ -1727,7 +1747,9 @@
    visible. Mirror of the history sidebar collapse, polarity flipped because
    this sidebar is right-anchored. */
 .dkan-aiq-playground-sidebar {
-  transition: flex-basis 0.15s ease, max-width 0.15s ease;
+  transition:
+    flex-basis 0.15s ease,
+    max-width 0.15s ease;
 }
 
 .dkan-aiq-widget--with-playground .dkan-aiq-playground-sidebar--collapsed {
@@ -1945,12 +1967,22 @@
 /* JSON token palette — subdued, distinguishable on white. Keys get the
  * strongest distinct color since "find the key I want to edit" is the
  * single most common scan task in nested JSON. */
-.dkan-aiq-tok-key { color: #4338ca; }
-.dkan-aiq-tok-string { color: #15803d; }
-.dkan-aiq-tok-number { color: #1d4ed8; }
+.dkan-aiq-tok-key {
+  color: #4338ca;
+}
+.dkan-aiq-tok-string {
+  color: #15803d;
+}
+.dkan-aiq-tok-number {
+  color: #1d4ed8;
+}
 .dkan-aiq-tok-bool,
-.dkan-aiq-tok-null { color: #7c3aed; }
-.dkan-aiq-tok-punct { color: #64748b; }
+.dkan-aiq-tok-null {
+  color: #7c3aed;
+}
+.dkan-aiq-tok-punct {
+  color: #64748b;
+}
 
 .dkan-aiq-playground-validity {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -1961,8 +1993,12 @@
   word-break: break-word;
 }
 
-.dkan-aiq-playground-validity.is-valid { color: #15803d; }
-.dkan-aiq-playground-validity.is-invalid { color: #b91c1c; }
+.dkan-aiq-playground-validity.is-valid {
+  color: #15803d;
+}
+.dkan-aiq-playground-validity.is-invalid {
+  color: #b91c1c;
+}
 
 .dkan-aiq-playground-actions {
   display: flex;
@@ -2066,7 +2102,7 @@
 }
 
 .dkan-aiq-playground-help-summary::before {
-  content: '▸';
+  content: "▸";
   display: inline-block;
   margin-right: 6px;
   font-size: 10px;
