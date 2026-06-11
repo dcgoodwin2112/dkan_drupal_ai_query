@@ -7,6 +7,36 @@
 
 use Drupal\Core\Entity\EntityFormInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Url;
+
+/**
+ * Implements hook_help().
+ */
+function dkan_ai_query_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.dkan_ai_query':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('DKAN AI Query adds a natural-language query widget for <a href=":dkan">DKAN</a> datasets, built on the <a href=":ai_agents">AI Agents</a> framework. Visitors ask questions in plain language; an AI agent translates them into datastore queries and answers with the results, including provenance for every figure.', [
+        ':dkan' => 'https://www.drupal.org/project/dkan',
+        ':ai_agents' => 'https://www.drupal.org/project/ai_agents',
+      ]) . '</p>';
+      $output .= '<h3>' . t('Requirements') . '</h3>';
+      $output .= '<p>' . t('An AI provider module with a configured API key is required at runtime — for example <a href=":anthropic">ai_provider_anthropic</a> or <a href=":openai">ai_provider_openai</a>.', [
+        ':anthropic' => 'https://www.drupal.org/project/ai_provider_anthropic',
+        ':openai' => 'https://www.drupal.org/project/ai_provider_openai',
+      ]) . '</p>';
+      $output .= '<h3>' . t('Access control and configuration') . '</h3>';
+      $output .= '<p>' . t('Querying requires the <em>Use the DKAN AI query widget</em> permission; saved conversations and administration each have their own permissions. Pick the provider/model and place the widget from the <a href=":settings">AI Query settings</a> page. See the module README for the API endpoints, operational notes, and the system-prompt versioning workflow.', [
+        ':settings' => Url::fromRoute('dkan_ai_query.settings_form')->toString(),
+      ]) . '</p>';
+      return $output;
+
+    case 'dkan_ai_query.settings_form':
+      return '<p>' . t('Configure the AI provider and model, widget placement, and conversation retention for the DKAN AI query widget.') . '</p>';
+  }
+}
 
 /**
  * Implements hook_modules_installed().
