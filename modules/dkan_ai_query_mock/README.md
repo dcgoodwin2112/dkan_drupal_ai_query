@@ -3,6 +3,10 @@
 Scenario-driven mock AI provider for browser-driven testing of
 `dkan_ai_query` without hitting a live LLM.
 
+**Development/testing only.** Do not enable on a production site: it
+registers a fake AI provider whose answers come from scripted scenarios,
+not a model.
+
 Real tool execution against the datastore continues unchanged — only the LLM
 is mocked. Drop in scripted YAML scenarios under `scenarios/` to exercise
 specific UI states (data tables, charts, refusals, multi-turn).

@@ -1,8 +1,10 @@
 {
-  "name": "getdkan/dkan_ai_query",
-  "type": "drupal-custom-module",
+  "name": "drupal/dkan_ai_query",
+  "type": "drupal-module",
   "description": "Natural-language query for DKAN datasets, built on Drupal AI agents.",
+  "license": "GPL-2.0-or-later",
   "require": {
+    "php": ">=8.3",
     "drupal/dkan": "^4.1.0",
     "drupal/ai": "^1.3",
     "drupal/ai_agents": "^1.2",
@@ -15,9 +17,10 @@
     "drupal/ai_provider_openai": "OpenAI provider for the query agent (^1). One AI provider module with a configured key is required at runtime."
   },
   "require-dev": {
-    "drupal/core": "^10.2 || ^11",
-    "phpunit/phpunit": "^9 || ^10",
-    "getdkan/mock-chain": "^1"
+    "drupal/core": "^10.5 || ^11.2",
+    "phpunit/phpunit": "^10 || ^11",
+    "getdkan/mock-chain": "^1",
+    "drush/drush": "^13"
   },
   "repositories": {
     "drupal": {
@@ -27,9 +30,31 @@
   },
   "minimum-stability": "dev",
   "prefer-stable": true,
+  "autoload": {
+    "psr-4": {
+      "Drupal\\dkan_ai_query\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Drupal\\Tests\\dkan_ai_query\\": "tests/src/"
+    }
+  },
+  "extra": {
+    "drupal-scaffold": {
+      "locations": {
+        "web-root": "vendor/scaffold-sink/"
+      },
+      "file-mapping": {
+        "[project-root]/.editorconfig": false,
+        "[project-root]/.gitattributes": false,
+        "[project-root]/recipes/README.txt": false
+      }
+    }
+  },
   "config": {
     "allow-plugins": {
-      "drupal/core-composer-scaffold": false,
+      "drupal/core-composer-scaffold": true,
       "cweagans/composer-patches": false
     }
   }
